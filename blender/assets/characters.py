@@ -1026,7 +1026,8 @@ def build_pongo(lod=0):
     hoodie2_details(dt, B, hood, "pongo_hoodie", "pongo_blue", "pongo_hoodie", "d_pongo_logo", "d_pongo_back")
     det_o = dt.obj("pongo_hoodie_det", smooth_angle=50)
     hh = E.Mesher("pongo_hood")
-    hood2(hh, B, "pongo_hoodie", "pongo_lining")
+    E.mat("pongo_hood_outer", 0xE6EAF4, rim=0.35, soft=0.1)
+    hood2(hh, B, "pongo_hood_outer", "pongo_lining")
     hood_o = hh.obj("pongo_hood", subsurf=1, smooth_angle=60)
     sl = E.Mesher("pongo_sleeves")
     sleeves(sl, B, "pongo_hoodie", "pongo_blue")
@@ -1112,7 +1113,7 @@ def activate_edit(obj):
 def design_pongo(pose="idle", frame=10, yaw=205, name=None):
     E.reset()
     studio.stage(res=(900, 1200))
-    B, arm, objs = build_pongo()
+    B, arm, objs = build_pongo3()
     for o in objs:
         if o.type == 'MESH':
             E.add_outline(o, 0.006)
@@ -1134,7 +1135,7 @@ def outline_all(objs):
 def design_pongo_sheet():
     E.reset()
     studio.stage(res=(1000, 1400))
-    B, arm, objs = build_pongo()
+    B, arm, objs = build_pongo3()
     outline_all(objs)
     make_clips(arm)
     sc = bpy.context.scene
@@ -1154,13 +1155,13 @@ def design_pongo_sheet():
     sc.frame_set(10)
     sc.render.resolution_x, sc.render.resolution_y = 1200, 900
     studio.shoot("pongo_shoes", target=(0, 0.02, 0.1), dist=0.9, yaw=230, pitch=18, lens=60)
-    studio.shoot("pongo_hood", target=(0, -0.05, 1.25), dist=1.3, yaw=15, pitch=12, lens=60)
+    studio.shoot("pongo_backclose", target=(0, -0.05, 1.2), dist=1.4, yaw=15, pitch=10, lens=60)
     studio.shoot("pongo_chest", target=(0, 0.05, 1.12), dist=1.3, yaw=200, pitch=6, lens=60)
 
 
 def export_pongo():
     E.reset()
-    B, arm, objs = build_pongo()
+    B, arm, objs = build_pongo3()
     clips = make_clips(arm)
     body = E.join(objs, "pongo")
     E.export_erm(body, "pongo", arm=arm, clips=clips)
@@ -1372,7 +1373,7 @@ def hoodie2_details(m, B, body_obj, body_mat, trim_mat, string_mat, logo_tex, ba
     project_decal(m, bvh, -0.075, 1.255 * k, 0.085, 0.085, 7, 7, off=0.0012, mirror=True)
     E.mat("print_" + back_tex, 0xFFFFFF, tex=back_tex, flags=E.F_DECAL | E.F_NOCAST, outline=0, rim=0.0, soft=0.1)
     m.mat("print_" + back_tex)
-    project_decal(m, bvh, 0.0, 1.075 * k, 0.26, 0.13, 11, 6, off=0.0012, back=True)
+    project_decal(m, bvh, 0.045, 1.06 * k, 0.22, 0.11, 11, 6, off=0.0012, back=True)
     # drawstrings from the collar
     m.mat(string_mat)
     for side in (1, -1):
@@ -1394,7 +1395,7 @@ def hood2(m, B, outer_mat, lining_mat):
         rim = V((0.122 * math.sin(a), 0.018 - 0.126 * math.cos(a), 1.452 - 0.03 * (1 - math.cos(a))))
         tip = V((0.052 * u, -0.148 + 0.012 * abs(u), 1.222 + 0.03 * abs(u)))
         p = rim.lerp(tip, v ** 0.9)
-        bulge = 0.034 * math.sin(math.pi * min(1.0, v * 1.1)) * (1 - 0.6 * u * u)
+        bulge = 0.05 * math.sin(math.pi * min(1.0, v * 1.1)) * (1 - 0.5 * u * u)
         p.y -= bulge
         p.z += 0.01 * math.sin(math.pi * v)
         p.y += inset
@@ -1461,18 +1462,15 @@ def scarf2(m, B, mat, stripe_mat, fringe_mat):
         m.mat(mat)
         fs = m.sweep(pts, [(-1, -0.14), (1, -0.14), (1, 0.14), (-1, 0.14)], closed=True, cap=True,
                      scale=lambda t: (0.042 * k * (1 + 0.14 * t), 0.042 * k), twist=math.radians(14), up=(0, -1, 0), rings_out=rings)
-        # two crisp white stripes near the end (faces are created ring by ring, 4 per ring)
-        si = m.mats.index(stripe_mat) if stripe_mat in m.mats else (m.mats.append(stripe_mat) or len(m.mats) - 1)
+        # two white stripes: thin bands wrapped around the tail
+        m.mat(stripe_mat)
         nr = len(pts)
-        for fi, f in enumerate(fs):
-            if not f.is_valid:
-                continue
-            ring = fi // 4
-            if ring >= nr - 1:
-                continue
-            t = (ring + 0.5) / (nr - 1)
-            if 0.8 <= t <= 0.84 or 0.875 <= t <= 0.915:
-                f.material_index = si
+        for (t0, t1) in ((0.8, 0.84), (0.875, 0.915)):
+            i0, i1 = int(t0 * (nr - 1)), max(int(t1 * (nr - 1)), int(t0 * (nr - 1)) + 1)
+            sub = pts[i0:i1 + 1]
+            tw0 = math.radians(14) * i0 / (nr - 1)
+            m.sweep(sub, [(math.cos(tw0) * x - math.sin(tw0) * y, math.sin(tw0) * x + math.cos(tw0) * y) for (x, y) in [(-1, -0.2), (1, -0.2), (1, 0.2), (-1, 0.2)]],
+                    closed=True, cap=True, scale=lambda t, a0=t0, a1=t1: (0.043 * k * (1 + 0.14 * (a0 + (a1 - a0) * t)), 0.044 * k), up=(0, -1, 0))
         m.mat(fringe_mat)
         last = [V(p) for p in rings[-1]]
         a_ = (last[0] + last[3]) * 0.5
@@ -1484,3 +1482,359 @@ def scarf2(m, B, mat, stripe_mat, fringe_mat):
             m.tube([q0, q0.lerp(q1, 0.5), q1], r=0.0042 * k, seg=6, taper=0.4)
         tails.append(pts)
     return tails
+
+
+# ============================================================================ v3: metaball sculpting (head, shoes)
+
+def metaball_mesh(name, elems, mat_name, resolution=0.004, threshold=0.6):
+    """elems: [(type, co, radius, (sx, sy, sz), stiffness)] -> smooth organic mesh object."""
+    mb = bpy.data.metaballs.new(name)
+    mb.resolution = resolution
+    mb.render_resolution = resolution
+    mb.threshold = threshold
+    for (t, co, r, sz, stiff) in elems:
+        e = mb.elements.new(type=t)
+        e.co = V(co)
+        e.radius = r
+        if t in ('ELLIPSOID', 'CAPSULE', 'CUBE'):
+            e.size_x, e.size_y, e.size_z = sz
+        e.stiffness = stiff
+    ob = bpy.data.objects.new(name, mb)
+    E.link(ob)
+    E.activate(ob)
+    bpy.ops.object.convert(target='MESH')
+    ob = bpy.context.view_layer.objects.active
+    ob.name = name
+    me = ob.data
+    me.materials.clear()
+    me.materials.append(E._MATS[mat_name].bmat)
+    if "Col" not in me.color_attributes:
+        me.color_attributes.new("Col", 'BYTE_COLOR', 'CORNER')
+    E.ensure_ao(ob)
+    sm = ob.modifiers.new("smooth", 'SMOOTH')
+    sm.factor = 0.5
+    sm.iterations = 4
+    dec = ob.modifiers.new("dec", 'DECIMATE')
+    dec.ratio = 0.35
+    E.apply_modifiers(ob)
+    E.set_smooth(ob, 180)
+    return ob
+
+
+def meta_head(B, skin_mat, name="head"):
+    c = B.headc
+    r = B.head_r
+    q = lambda x, y, z: (c.x + x * r, c.y + y * r, c.z + z * r)
+    elems = [
+        ('BALL', q(0, -0.05, 0.1), 1.02 * r, (1, 1, 1), 2.0),                      # cranium
+        ('ELLIPSOID', q(0, 0.18, -0.25), 0.9 * r, (0.95, 0.8, 0.9), 2.0),         # face mass
+        ('ELLIPSOID', q(0, 0.32, -0.72), 0.5 * r, (0.8, 0.75, 0.9), 2.0),         # chin
+        ('BALL', q(0.46, 0.34, -0.38), 0.42 * r, (1, 1, 1), 1.5),                 # cheeks
+        ('BALL', q(-0.46, 0.34, -0.38), 0.42 * r, (1, 1, 1), 1.5),
+        ('ELLIPSOID', q(0.93, -0.02, -0.12), 0.24 * r, (0.45, 0.8, 1.2), 2.0),    # ears
+        ('ELLIPSOID', q(-0.93, -0.02, -0.12), 0.24 * r, (0.45, 0.8, 1.2), 2.0),
+    ]
+    return metaball_mesh(name, elems, skin_mat, resolution=0.0045)
+
+
+def meta_shoes(B, upper_mat, name="shoes"):
+    elems = []
+    for side in (1, -1):
+        a = B.mirror(B.ankle, side)
+        ox, oy = a.x, a.y + 0.012
+        elems += [
+            ('ELLIPSOID', (ox, oy + 0.105, 0.045), 0.06, (0.8, 1.05, 0.6), 2.0),   # toe box
+            ('ELLIPSOID', (ox, oy + 0.035, 0.06), 0.065, (0.78, 1.0, 0.75), 2.0),  # instep
+            ('BALL', (ox, oy - 0.045, 0.065), 0.058, (1, 1, 1), 2.0),               # heel
+            ('CAPSULE', (ox, oy - 0.018, 0.12), 0.052, (0.02, 0.95, 1.0), 2.0),    # ankle collar
+        ]
+    ob = metaball_mesh(name, elems, upper_mat, resolution=0.004)
+    # CAPSULE axis is X by default: rotate collars upright is handled by using a short capsule
+    return ob
+
+
+def sculpt_union(name, build, mat_name, voxel=0.0035, smooth_iter=12, smooth_fac=0.6, ratio=0.3):
+    """Build overlapping primitives, fuse them with voxel remesh, relax, decimate -> clean organic mesh."""
+    m = E.Mesher(name).mat(mat_name)
+    build(m)
+    ob = m.obj(name, smooth_angle=180)
+    ob.data.remesh_voxel_size = voxel
+    ob.data.use_remesh_fix_poles = True
+    E.activate(ob)
+    bpy.ops.object.voxel_remesh()
+    sm = ob.modifiers.new("smooth", 'SMOOTH')
+    sm.factor = smooth_fac
+    sm.iterations = smooth_iter
+    dec = ob.modifiers.new("dec", 'DECIMATE')
+    dec.ratio = ratio
+    E.apply_modifiers(ob)
+    me = ob.data
+    me.materials.clear()
+    me.materials.append(E._MATS[mat_name].bmat)
+    for a in [a for a in me.color_attributes if a.name == "Col"]:
+        me.color_attributes.remove(a)
+    ca = me.color_attributes.new("Col", 'BYTE_COLOR', 'CORNER')
+    ca.data.foreach_set("color", [1.0] * (4 * len(ca.data)))
+    if "AO" in me.color_attributes:
+        me.color_attributes.remove(me.color_attributes["AO"])
+    E.ensure_ao(ob)
+    E.set_smooth(ob, 180)
+    return ob
+
+
+def sculpt_head(B, skin_mat, name="head"):
+    c, r = B.headc, B.head_r
+    def build(m):
+        m.sphere(tuple(c + V((0, -0.03 * r, 0.08 * r))), 1.0, 32, 20, s=(1.0 * r, 1.04 * r, 0.98 * r))      # cranium
+        m.sphere(tuple(c + V((0, 0.1 * r, -0.28 * r))), 1.0, 32, 20, s=(0.88 * r, 0.82 * r, 0.8 * r))       # face
+        m.sphere(tuple(c + V((0, 0.24 * r, -0.72 * r))), 1.0, 24, 16, s=(0.42 * r, 0.44 * r, 0.36 * r))     # chin
+        for sd in (1, -1):
+            m.sphere(tuple(c + V((sd * 0.44 * r, 0.26 * r, -0.42 * r))), 1.0, 20, 12, s=(0.42 * r, 0.42 * r, 0.4 * r))  # cheeks
+            m.push(Matrix.Translation(c + V((sd * 0.95 * r, -0.04 * r, -0.12 * r))) @ Matrix.Rotation(math.radians(sd * 15), 4, 'Z'))
+            m.sphere((0, 0, 0), 1.0, 14, 10, s=(0.1 * r, 0.2 * r, 0.27 * r))                                  # ears
+            m.pop()
+    return sculpt_union(name, build, skin_mat, voxel=0.003, smooth_iter=10, smooth_fac=0.5, ratio=0.35)
+
+
+def sculpt_shoes(B, upper_mat, name="shoes"):
+    def build(m):
+        for side in (1, -1):
+            a = B.mirror(B.ankle, side)
+            ox, oy = a.x, a.y + 0.012
+            m.sphere((ox, oy + 0.1, 0.045), 1.0, 24, 14, s=(0.046, 0.074, 0.036))    # toe box
+            m.sphere((ox, oy + 0.03, 0.058), 1.0, 24, 14, s=(0.05, 0.082, 0.05))     # instep
+            m.sphere((ox, oy - 0.04, 0.066), 1.0, 24, 14, s=(0.047, 0.05, 0.058))    # heel
+            m.rbox((ox, oy + 0.03, 0.04), (0.094, 0.21, 0.05), 0.02, 3)               # base to meet the sole
+            m.cyl((ox, oy - 0.018, 0.112), 0.05, 0.1, 28)                              # high-top collar
+    return sculpt_union(name, build, upper_mat, voxel=0.003, smooth_iter=8, smooth_fac=0.5, ratio=0.35)
+
+
+def sneaker_details(m, B, sole, stripe, toe, lace, tab, logo, heel):
+    """Sole, toe cap, collar pad, tongue, laces and ankle badge around the sculpted shoe shells."""
+    for side in (1, -1):
+        a = B.mirror(B.ankle, side)
+        m.push(Matrix.Translation((a.x, a.y + 0.012, 0.0)))
+        out = [(x * 1.06, y * 1.03 + 0.001) for (x, y) in foot_outline(side)]
+        m.mat(sole)
+        m.extrude(out, 0.024, bevel=(0.005, 2), c=(0, 0, 0.012))
+        m.mat(stripe)
+        m.extrude([(x * 1.01, y * 1.005) for (x, y) in out], 0.004, c=(0, 0, 0.018))
+        m.mat(toe)
+        m.push(Matrix.Translation((0, 0.112, 0.038)))
+        m.sphere((0, 0, 0), 1.0, 24, 12, s=(0.047, 0.062, 0.03))
+        m.pop()
+        m.torus((0, -0.018, 0.162), R=0.05, r=0.009, seg=28, sides=8)
+        m.mat(tab)
+        m.push(Matrix.Translation((0, -0.07, 0.17)) @ Matrix.Rotation(math.radians(10), 4, 'X'))
+        m.rbox((0, 0, 0), (0.02, 0.008, 0.03), 0.004, 1)
+        m.pop()
+        m.mat(lace)
+        # laces across the instep, following the top of the shoe
+        for i in range(4):
+            y = 0.0 + i * 0.027
+            z = 0.112 - i * 0.017
+            m.push(Matrix.Translation((0, y, z)) @ Matrix.Rotation(math.radians(-28), 4, 'X'))
+            m.rbox((0, 0, 0), (0.06, 0.008, 0.007), 0.003, 1)
+            m.pop()
+        m.mat(logo)
+        m.push(Matrix.Translation((side * 0.051, -0.02, 0.11)) @ Matrix.Rotation(math.radians(90 * side), 4, 'Z') @ Matrix.Rotation(math.radians(90), 4, 'X'))
+        m.cyl((0, 0, 0), 0.02, 0.004, 24)
+        m.mat(heel)
+        m.extrude(E.star_pts(5, 0.016, 0.007), 0.005, c=(0, 0, 0.003))
+        m.pop()
+        m.pop()
+
+
+def tee(m, B, body_mat, trim_mat):
+    """Fitted T-shirt: body over the shorts, ribbed collar and hem, short sleeves."""
+    k = B.k
+    fs = torso_shell(m, B, body_mat, [
+        (0.87, 0.162, 0.113, 0.004), (0.9, 0.166, 0.116, 0.004), (0.97, 0.166, 0.116, 0.006), (1.04, 0.162, 0.114, 0.008),
+        (1.12, 0.17, 0.12, 0.01), (1.2, 0.18, 0.126, 0.012), (1.28, 0.184, 0.124, 0.01), (1.35, 0.178, 0.114, 0.004),
+        (1.395, 0.145, 0.097, 0.0), (1.425, 0.08, 0.066, 0.0), (1.44, 0.056, 0.052, 0.0)], n=24, pw=2.5)
+    band(fs, m, trim_mat, 0.0, 0.89 * k)
+    band(fs, m, trim_mat, 1.42 * k, 2.0)
+    for side in (1, -1):
+        sh = B.mirror(B.shoulder, side)
+        el = B.mirror(B.elbow, side)
+        d = (el - sh).normalized()
+        start = sh + V((-side * 0.03, 0, 0.005))
+        end = sh.lerp(el, 0.5)
+        pts = [start, sh.lerp(el, 0.2), sh.lerp(el, 0.42), end - d * 0.012, end]
+        m.mat(body_mat)
+        sf = limb(m, pts, [0.07, 0.066, 0.063, 0.064, 0.064], n=18)
+        ti = m.mats.index(trim_mat) if trim_mat in m.mats else (m.mats.append(trim_mat) or len(m.mats) - 1)
+        for f in sf:
+            if f.is_valid and (f.calc_center_median() - end).dot(d) > -0.014:
+                f.material_index = ti
+
+
+def arms_skin(m, B, skin_mat):
+    for side in (1, -1):
+        sh = B.mirror(B.shoulder, side)
+        el = B.mirror(B.elbow, side)
+        w = B.mirror(B.wrist, side)
+        m.mat(skin_mat)
+        limb(m, [sh + V((-side * 0.02, 0, 0)), sh.lerp(el, 0.5), el, el.lerp(w, 0.5), w + (w - el).normalized() * 0.01],
+             [0.05, 0.046, 0.04, 0.038, 0.032], n=14)
+
+
+def tee_prints(m, B, body_obj, logo_tex, back_tex):
+    k = B.k
+    bvh = bvh_of(body_obj)
+    E.mat("print_" + logo_tex, 0xFFFFFF, tex=logo_tex, flags=E.F_DECAL | E.F_NOCAST, outline=0, rim=0.0, soft=0.1)
+    m.mat("print_" + logo_tex)
+    project_decal(m, bvh, 0.0, 1.22 * k, 0.12, 0.12, 8, 8, off=0.0012, mirror=True)
+    E.mat("print_" + back_tex, 0xFFFFFF, tex=back_tex, flags=E.F_DECAL | E.F_NOCAST, outline=0, rim=0.0, soft=0.1)
+    m.mat("print_" + back_tex)
+    project_decal(m, bvh, 0.0, 1.16 * k, 0.26, 0.13, 11, 6, off=0.0012, back=True)
+
+
+def scarf_cloth(B, mat, stripe_mat, fringe_mat, colliders):
+    """Scarf wrap + two tails draped with Blender cloth simulation (pinned at the knot)."""
+    k = B.k
+    m = E.Mesher("scarf_wrap")
+    m.mat(mat)
+    path = []
+    for i in range(49):
+        a = 2 * math.pi * i / 48
+        rr = 1 + 0.03 * math.sin(5 * a)
+        path.append(V((0.08 * rr * math.sin(a) * k, (0.006 + 0.075 * rr * math.cos(a)) * k, (1.43 - 0.012 * math.cos(a)) * k)))
+    prof = [(math.cos(2 * math.pi * i / 12), math.sin(2 * math.pi * i / 12) * 0.55) for i in range(12)]
+    m.sweep(path, prof, closed=True, cap=False, scale=lambda t: (0.028 * k, 0.028 * k), twist=math.radians(8))
+    kn = V((-0.046 * k, -0.07 * k, 1.42 * k))
+    m.push(Matrix.Translation(kn))
+    m.sphere((0, 0, 0), 1.0, 16, 10, s=(0.032 * k, 0.024 * k, 0.03 * k))
+    m.pop()
+    wrap = m.obj("scarf_wrap", subsurf=1, smooth_angle=60)
+    # tails: flat strips hanging from the knot, then cloth-simulated
+    tails = []
+    for (dx, L) in ((0.0, 0.46), (0.045, 0.38)):
+        tm = E.Mesher("scarf_tail")
+        nL, nW = 24, 6
+        W = 0.085 * k
+        top = kn + V((dx * k - 0.01, -0.02 * k, -0.01 * k))
+        grid = []
+        for j in range(nL + 1):
+            row = []
+            for i in range(nW + 1):
+                u = i / nW - 0.5
+                row.append(top + V((u * W, -0.01 * j / nL, -L * k * j / nL)))
+            grid.append(row)
+        bm = tm.bm
+        vs = [[bm.verts.new(p) for p in row] for row in grid]
+        stripe_rows = {j for j in range(nL) if 0.8 <= (j + 0.5) / nL <= 0.84 or 0.875 <= (j + 0.5) / nL <= 0.915}
+        E.mat(mat); E.mat(stripe_mat)
+        tm.mats = [mat, stripe_mat]
+        for j in range(nL):
+            for i in range(nW):
+                f = bm.faces.new((vs[j][i], vs[j][i + 1], vs[j + 1][i + 1], vs[j + 1][i]))
+                f.material_index = 1 if j in stripe_rows else 0
+                f.smooth = True
+                for l in f.loops:
+                    l[tm.col] = (1, 1, 1, 1)
+        ob = tm.obj("scarf_tail", smooth_angle=180)
+        pin = ob.vertex_groups.new(name="pin")
+        pin.add(list(range(nW + 1)), 1.0, 'REPLACE')
+        tails.append(ob)
+    for c in colliders:
+        c.modifiers.new("coll", 'COLLISION')
+        c.collision.thickness_outer = 0.006
+    sc = bpy.context.scene
+    for ob in tails:
+        cm = ob.modifiers.new("cloth", 'CLOTH')
+        cs = cm.settings
+        cs.quality = 8
+        cs.mass = 0.12
+        cs.tension_stiffness = 20
+        cs.bending_stiffness = 0.6
+        cs.air_damping = 1.5
+        cs.vertex_group_mass = "pin"
+        cm.collision_settings.collision_quality = 4
+        cm.collision_settings.distance_min = 0.004
+        cm.point_cache.frame_start = 1
+        cm.point_cache.frame_end = 60
+        sol = ob.modifiers.new("solid", 'SOLIDIFY')
+        sol.thickness = 0.01
+        sol.offset = 0
+    for f in range(1, 61):
+        sc.frame_set(f)
+    for ob in tails:
+        E.apply_modifiers(ob)
+        E.set_smooth(ob, 180)
+    sc.frame_set(1)
+    for c in colliders:
+        for md in [md for md in c.modifiers if md.type == 'COLLISION']:
+            c.modifiers.remove(md)
+    tail = E.join(tails, "scarf_tails")
+    ln = [kn + V((-0.01, -0.02 * k, -0.01 * k))]
+    # chain for dynamic bones follows the draped first tail's centre line (sample by height)
+    vs = [tail.matrix_world @ v.co for v in tail.data.vertices]
+    zmax = max(v.z for v in vs); zmin = min(v.z for v in vs)
+    chain = []
+    for i in range(5):
+        z = zmax - (zmax - zmin) * i / 4
+        near = [v for v in vs if abs(v.z - z) < 0.02 and v.x < kn.x + 0.03]
+        if near:
+            chain.append(sum(near, V()) / len(near))
+    return wrap, tail, chain
+
+
+def build_pongo3():
+    B = Body(1.78)
+    pongo_mats()
+    E.mat("pongo_tee", 0xF6F7FB, rim=0.3, soft=0.1)
+    head = sculpt_head(B, "pongo_skin", "pongo_head")
+    fm = E.Mesher("pongo_face")
+    anime_face(B, fm, head, "d_eye_pongo", "d_mouth_grin", PONGO_COLORS["brow"], "pongo_skin", bandaid=True)
+    face = fm.obj("pongo_face", smooth_angle=60)
+    hr = E.Mesher("pongo_hair").mat("pongo_hair")
+    pongo_hair(hr, B)
+    hair = hr.obj("pongo_hair", smooth_angle=50)
+    gg = E.Mesher("pongo_goggles")
+    goggles(gg, B, "pongo_gstrap", "pongo_gframe", "pongo_lens")
+    gog = gg.obj("pongo_goggles", smooth_angle=45)
+    nk = E.Mesher("pongo_neck").mat("pongo_skin")
+    neck(nk, B)
+    neck_o = nk.obj("pongo_neck", subsurf=1)
+    tm = E.Mesher("pongo_tee")
+    tee(tm, B, "pongo_tee", "pongo_blue")
+    tee_o = tm.obj("pongo_tee", subsurf=1, smooth_angle=50)
+    pm = E.Mesher("pongo_prints")
+    tee_prints(pm, B, tee_o, "d_pongo_logo", "d_pongo_back")
+    prints = pm.obj("pongo_prints", smooth_angle=60)
+    am_ = E.Mesher("pongo_arms")
+    arms_skin(am_, B, "pongo_skin")
+    arms_o = am_.obj("pongo_arms", subsurf=1)
+    sh = E.Mesher("pongo_shorts")
+    shorts(sh, B, "pongo_shorts", "pongo_strap")
+    shorts_o = sh.obj("pongo_shorts", subsurf=1, smooth_angle=50)
+    lg = E.Mesher("pongo_legs")
+    legs_skin(lg, B, "pongo_skin")
+    socks(lg, B, "pongo_sock", "pongo_blue")
+    legs_o = lg.obj("pongo_legs", subsurf=1)
+    hn = E.Mesher("pongo_hands")
+    hands(hn, B, "pongo_glove", "pongo_skin")
+    hands_o = hn.obj("pongo_hands", subsurf=1, smooth_angle=50)
+    shell = sculpt_shoes(B, "pongo_shoe", "pongo_shoe_shell")
+    sd = E.Mesher("pongo_shoe_det")
+    sneaker_details(sd, B, "pongo_shoe_white", "pongo_sole_stripe", "pongo_shoe_white", "pongo_shoe_white",
+                    "pongo_tab", "pongo_shoe_white", "pongo_heel")
+    sdet = sd.obj("pongo_shoe_det", smooth_angle=45)
+    shoes_o = E.join([shell, sdet], "pongo_shoes")
+    for o in (tee_o, shorts_o):
+        E.apply_modifiers(o)
+    handL, handR = split_by_side(hands_o)
+    shoeL, shoeR = split_by_side(shoes_o)
+    arm = human_rig(B, "pongo")
+    objs = [head, face, hair, gog, neck_o, tee_o, prints, arms_o, shorts_o, legs_o, handL, handR, shoeL, shoeR]
+    for o in objs:
+        E.apply_modifiers(o, skip=('SOLIDIFY',))
+    bind([(neck_o, NECK_BONES), (tee_o, TORSO_BONES), (prints, TORSO_BONES), (arms_o, ARM_BONES),
+          (shorts_o, HIP_BONES), (legs_o, LEG_BONES)],
+         [(head, "head"), (face, "head"), (hair, "head"), (gog, "head"),
+          (handL, "hand.L"), (handR, "hand.R"), (shoeL, "foot.L"), (shoeR, "foot.R")], arm)
+    return B, arm, objs
+
+
+build_pongo = build_pongo3
