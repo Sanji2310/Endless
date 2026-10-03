@@ -1,3 +1,4 @@
 build/
 keystore/
 renders/design/dbg_*
+__pycache__/

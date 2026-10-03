@@ -7,7 +7,7 @@ package com.pongo.core;
 public final class Shaders {
     private Shaders() {}
 
-    public static final int MAX_BONES = 24;
+    public static final int MAX_BONES = 32;
 
     /** Shading types packed in aOut.w (x7). Mirrors tools/assetbuilder. */
     public static final int T_STD = 0, T_SKIN = 1, T_GLASS = 2, T_HAIR = 3, T_METAL = 4, T_FOLIAGE = 5, T_NIGHT = 6, T_UNLIT = 7;

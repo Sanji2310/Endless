@@ -142,6 +142,98 @@ def delete(obj):
     bpy.data.objects.remove(obj, do_unlink=True)
 
 
+# ----------------------------------------------------------------------------- surface finishing
+#
+# Clean toon shading depends on the normals more than on the polygon count:
+#  * hard surfaces get a small angle-limited bevel so every edge catches a thin
+#    highlight, then face-area weighted normals keep the big faces perfectly flat
+#    (one clean tone each) while the bevel strips carry the curvature;
+#  * organic parts (faces, hair masses, tree canopies) get their normals transferred
+#    from a smooth proxy shape so the cel terminator draws one simple, deliberate
+#    shape instead of following every bump of the actual geometry.
+
+def _pop_outline(obj):
+    m = obj.modifiers.get("_outline")
+    if m is None:
+        return None
+    w = m.thickness
+    obj.modifiers.remove(m)
+    return w
+
+
+def finish_hard(obj, width=0.012, segments=2, angle=35.0, weighted=True, outline=None):
+    """Angle-limited bevel + weighted normals (non-destructive; applied at export)."""
+    w = _pop_outline(obj)
+    set_smooth(obj, 180.0 if weighted else angle)
+    if width > 0:
+        b = obj.modifiers.new("finish_bevel", 'BEVEL')
+        b.width = width
+        b.segments = segments
+        b.limit_method = 'ANGLE'
+        b.angle_limit = math.radians(angle)
+        b.profile = 0.5
+        b.use_clamp_overlap = True
+        b.harden_normals = False
+        b.miter_outer = 'MITER_ARC'
+    if weighted:
+        wn = obj.modifiers.new("finish_wn", 'WEIGHTED_NORMAL')
+        wn.mode = 'FACE_AREA'
+        wn.weight = 100
+        wn.keep_sharp = True
+        wn.thresh = 0.01
+    if outline or w:
+        add_outline(obj, outline or w)
+    return obj
+
+
+def proxy_ellipsoid(name, center, radii, rot=(0, 0, 0), sub=4):
+    """Hidden smooth proxy used as a normal source."""
+    bm = bmesh.new()
+    bmesh.ops.create_icosphere(bm, subdivisions=sub, radius=1.0)
+    me = bpy.data.meshes.new(name)
+    bm.to_mesh(me)
+    bm.free()
+    ob = bpy.data.objects.new(name, me)
+    link(ob)
+    ob.location = Vector(center)
+    ob.scale = Vector(radii)
+    ob.rotation_euler = Euler([math.radians(a) for a in rot])
+    for p in me.polygons:
+        p.use_smooth = True
+    ob.hide_render = True
+    ob.hide_viewport = False
+    ob["proxy"] = 1
+    return ob
+
+
+def transfer_normals(obj, proxy, factor=1.0, group=None, mapping='POLYINTERP_NEAREST'):
+    """Copy custom normals from a smooth proxy (optionally masked by a vertex group)."""
+    w = _pop_outline(obj)
+    set_smooth(obj, 180.0)
+    dt = obj.modifiers.new("nrm_" + proxy.name, 'DATA_TRANSFER')
+    dt.object = proxy
+    dt.use_loop_data = True
+    dt.data_types_loops = {'CUSTOM_NORMAL'}
+    dt.loop_mapping = mapping
+    dt.mix_mode = 'REPLACE'
+    dt.mix_factor = factor
+    if group:
+        dt.vertex_group = group
+    if w:
+        add_outline(obj, w)
+    return dt
+
+
+def mask_group(obj, name, fn):
+    """Create a vertex group with weights fn(co) -> 0..1 (object space)."""
+    g = obj.vertex_groups.get(name) or obj.vertex_groups.new(name=name)
+    for v in obj.data.vertices:
+        wt = max(0.0, min(1.0, fn(v.co)))
+        if wt > 0:
+            g.add([v.index], wt, 'REPLACE')
+    return g
+
+
 # ----------------------------------------------------------------------------- materials
 
 class GameMat:

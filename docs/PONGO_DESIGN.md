@@ -20,7 +20,7 @@ An anime-styled 3D endless runner. You play **Pongo**, a freerunner dashing alon
 
 | Name | Role | Look | Unlock |
 |---|---|---|---|
-| **Pongo** | Main hero | 16, spiky navy hair with an ahoge, goggles pushed up, long **orange scarf** that streams in the wind (simulated), white-and-blue hoodie with a "P" patch, black cargo shorts, red high-tops | Free |
+| **Pongo** | Main heroine | 16, petite parkour runner (~1.50 m, about 6.3 heads; Hu Tao-like build and twin-tail silhouette, original outfit). Navy hair fading to teal at the tips with an angel-ring highlight, long low **twin tails** tied with orange bands (spring-bone physics), long side locks, ahoge, orange-lens goggles pushed up, big layered **blue eyes**, band-aid on her left cheek, black choker with a star charm. Cropped white track jacket (blue sleeve stripes, orange collar lining, zip tapes) over a black sports top, indigo shorts with an orange belt and an asymmetric orange wrap panel (physics), white knee socks with blue stripes, red canvas high-tops (laced up the shaft, star ankle patch), fingerless gloves | Free |
 | **Hana Sakurai** | Skater | Pink twin-tails with cherry clips (simulated), sailor-collar top, red plaid skirt over leggings, knee pads, white sneakers | 6,000 |
 | **Kaito Kurogane** | Parkour ninja | Black hair in a short ponytail, navy mask scarf, dark jacket with crimson trims, arm wraps, split-toe tabi shoes | 12,000 |
 | **Yuki Shirane** | Gamer girl | White bob with a blue streak, oversized **cat-ear hoodie** (light blue), big headphones, shorts, striped socks | 20,000 |
@@ -76,7 +76,7 @@ Time moves on as you run (about every 1,100 m) and blends smoothly between five 
 
 - **Falling leaves and petals**: sakura petals in the city, bamboo leaves by the river, maple leaves at sunset. They tumble, flutter and swirl behind you.
 - **Crows**: a boids flock perches, takes off, circles and scatters when you run past.
-- **Trails**: Pongo's scarf, the Kaze Board's hover ribbons, Hayate Rocket flame ribbons, glider wingtip vortices, the board's water spray.
+- **Trails**: Pongo's twin tails and wrap panel, the Kaze Board's hover ribbons, Hayate Rocket flame ribbons, glider wingtip vortices, the board's water spray.
 - **Speed lines** at high speed and during boosts. An **impact frame** (white flash with radial lines) when you crash.
 - Dust puffs on landing and stumbling, sparks when you graze a train, coin glints and pickup starbursts, the Fever aura, the magnet's pull swirl, splash crowns, mist, cave drips, fireflies, cloud wisps.
 
@@ -94,3 +94,21 @@ Every action has its own layered, synthesized sound effect:
 ## 8. Controls
 
 These work the same in every zone: swipe left/right to change lanes, swipe up to jump (climb on the glider), swipe down to roll (duck on the board, dive on the glider), double-tap for the Kaze Board. Arrow keys and WASD also work.
+
+
+## 9. Modelling standards (applied to every asset)
+
+Learned from the tutorials studied for this project (JAEY 3D head/clothing/shoe series, aVersionOfReality
+"Clean Toon Face Shading with Object Normals" and "Flat Modeling Anime Hair", Lightning Boy Studio Ghibli trees):
+
+- **Faces**: lofted quad grids from designed profile curves; normals generated from object coordinates with a
+  jaw bend and flattened vertical curvature, so the face shades in clean shapes from any light angle.
+- **Hair**: lens-section clumps with clean loops, hair-mass normals transferred from a smooth proxy, root-to-tip
+  gradient UVs and a height-mapped angel-ring highlight.
+- **Clothing**: shells with real thickness (solidify), rib bands and trims as separate loops, no intersections.
+- **Shoes and props**: separate overlapping parts (sole / toe cap / upper / tongue), tori eyelets with dark holes,
+  flat band laces.
+- **Hard surfaces**: angle-limited bevel + weighted normals (`erlib.finish_hard`).
+- **Trees**: clustered blobs with normals from a smooth canopy proxy, flattened for the Ghibli look.
+- **Budgets**: hero ~67k tris LOD0 / 27k LOD1 (design renders use subdivision; the game mesh relies on custom
+  normals instead), up to 32 bones including spring chains.
