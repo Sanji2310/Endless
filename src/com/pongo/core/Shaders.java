@@ -176,7 +176,11 @@ public final class Shaders {
             "  fog = fog * fog * (3.0 - 2.0 * fog) * uFog.z;\n" +
             "  fog = max(fog, clamp(uFog.w * (1.0 - vW.y * 0.25), 0.0, 0.8) * clamp(dist * 0.02, 0.0, 1.0));\n" +
             "  col = mix(col, uFogCol, fog);\n" +
+            "#ifdef DECAL\n" +
+            "  gl_FragColor = vec4(col, tx.a * uTint.a);\n" +
+            "#else\n" +
             "  gl_FragColor = vec4(col, uTint.a);\n" +
+            "#endif\n" +
             "}\n";
 
     // ------------------------------------------------------------------ ink outline (inverted hull)
@@ -352,6 +356,8 @@ public final class Shaders {
             {"main_skin", "#define SKIN\n", "MAIN_VS", "MAIN_FS"},
             {"main_double", "#define DOUBLE\n", "MAIN_VS", "MAIN_FS"},
             {"main_cutout", "#define CUTOUT\n#define DOUBLE\n", "MAIN_VS", "MAIN_FS"},
+            {"main_decal", "#define DECAL\n#define DOUBLE\n", "MAIN_VS", "MAIN_FS"},
+            {"main_decal_skin", "#define DECAL\n#define SKIN\n", "MAIN_VS", "MAIN_FS"},
             {"outline", "", "OUTLINE_VS", "OUTLINE_FS"},
             {"outline_skin", "#define SKIN\n", "OUTLINE_VS", "OUTLINE_FS"},
             {"shadow", "", "SHADOW_VS", "SHADOW_FS"},

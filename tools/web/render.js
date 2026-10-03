@@ -268,7 +268,7 @@ function renderFrame(i) {
   gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL); gl.depthMask(true);
   gl.enable(gl.CULL_FACE); gl.cullFace(gl.BACK);
   // opaque, double-sided and cutout parts
-  for (const cls of [0, 1, 2, 3]) {
+  for (const cls of [0, 1, 2, 3]) {  // 4 = decals, drawn after outlines
     for (const D of F.draws) {
       if (D.flags & 4) continue;
       const me = A.meshes[D.mesh];
@@ -292,6 +292,20 @@ function renderFrame(i) {
     drawMesh(pr, me, D, p => (p.flags & 2) && p.cls !== 1 && p.cls !== 2);
   }
   gl.cullFace(gl.BACK);
+  // decals (eyes, mouths, prints): alpha blended over opaque surfaces
+  gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false);
+  gl.enable(gl.POLYGON_OFFSET_FILL); gl.polygonOffset(-1.0, -2.0);
+  gl.disable(gl.CULL_FACE);
+  for (const D of F.draws) {
+    const me = A.meshes[D.mesh];
+    if (!me.parts.some(p => p.cls === 4)) continue;
+    const pr = use(me.skinned ? 'main_decal_skin' : 'main_decal');
+    enableAttribs(pr.skin ? 8 : 6);
+    setGlobals(pr, F, F.vp);
+    drawMesh(pr, me, D, p => p.cls === 4);
+  }
+  gl.disable(gl.POLYGON_OFFSET_FILL);
+  gl.enable(gl.CULL_FACE);
   // blended draws
   gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false);
   for (const D of F.draws) {
