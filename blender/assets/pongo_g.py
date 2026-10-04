@@ -1352,7 +1352,7 @@ def design_pongo_g_sheet():
     for o in objs:
         if o.type == 'MESH' and "face" not in o.name:
             E.add_outline(o, 0.0022)
-    CH.make_clips(arm)
+    girl_clips(arm)
     sc = bpy.context.scene
     arm.animation_data.action = bpy.data.actions["idle"]
     sc.frame_set(10)
@@ -1369,9 +1369,67 @@ def export_pongo_g():
     GAME = True
     E.reset()
     B, arm, objs = build_pongo_g()
-    clips = CH.make_clips(arm)
+    clips = girl_clips(arm)
     body = E.join(objs, "pongo")
     E.export_erm(body, "pongo", arm=arm, clips=clips)
     dec = body.modifiers.new("dec", 'DECIMATE')
     dec.ratio = 0.4
     E.export_erm(body, "pongo@1", arm=arm, clips=clips)
+
+
+# ============================================================================ her own animation
+
+def _replace_action(arm, name):
+    old = bpy.data.actions.get(name)
+    if old:
+        bpy.data.actions.remove(old)
+    E.new_action(arm, name)
+
+
+def girl_clips(arm):
+    """Shared gameplay clips, with Pongo's own run and idle on top."""
+    clips = CH.make_clips(arm)
+    Z = CH.all_bones_zero(arm)
+    # ---- run: 20 frames, forward lean, high knees, compact arm pump, hip roll, light bounce
+    _replace_action(arm, "run")
+    legR = {0: (52, -12, 8), 5: (10, -28, -6), 10: (-38, -22, 28), 14: (4, -130, 40), 17: (62, -95, 5), 20: (52, -12, 8)}
+
+    def leg_at(f):
+        keys = sorted(legR)
+        f = f % 20
+        for i in range(len(keys) - 1):
+            a, b = keys[i], keys[i + 1]
+            if a <= f <= b:
+                t = (f - a) / (b - a)
+                t = t * t * (3 - 2 * t)
+                return tuple(legR[a][j] + (legR[b][j] - legR[a][j]) * t for j in range(3))
+        return legR[0]
+    for f in range(0, 21):
+        th, sh, ft = leg_at(f)
+        th2, sh2, ft2 = leg_at(f + 10)
+        ph = 2 * math.pi * f / 20
+        sw = math.sin(ph)
+        bob = 0.034 * math.cos(2 * ph) - 0.016
+        p = CH._merge(Z, {
+            "root": (0, 3 * math.cos(2 * ph), -9 * sw), "spine": (-14, 0, 7 * sw), "chest": (-4, 0, 10 * sw),
+            "neck": (6, 0, -8 * sw), "head": (8, 0, -9 * sw),
+            "thigh.R": (th, 0, 0), "shin.R": (sh, 0, 0), "foot.R": (ft, 0, 0),
+            "thigh.L": (th2, 0, 0), "shin.L": (sh2, 0, 0), "foot.L": (ft2, 0, 0),
+            "clav.R": (0, 0, 5 * sw), "clav.L": (0, 0, 5 * sw),
+            "upper_arm.R": (-44 * sw + 4, 16, 6), "forearm.R": (100 + 18 * sw, 0, 14), "hand.R": (0, 0, -12),
+            "upper_arm.L": (44 * sw + 4, -16, -6), "forearm.L": (100 - 18 * sw, 0, -14), "hand.L": (0, 0, 12)})
+        CH.pose_key(arm, f + 1, p, (0, 0, bob))
+    # ---- idle: weight on her left leg, head tilt, left hand drifting behind, gentle breathing sway
+    _replace_action(arm, "idle")
+    for f, br in ((1, 0.0), (19, 1.0), (37, 0.0), (55, -0.6), (73, 0.0)):
+        p = CH._merge(Z, {
+            "root": (0, 4, -6), "spine": (-2 - 1.5 * br, -5, 4), "chest": (1.5 * br, 2, -5), "neck": (2, 4, 4),
+            "head": (-4 - br, 6, 8 + 2 * br),
+            "clav.R": (0, 0, 2 * br), "clav.L": (0, 0, -1.5 * br),
+            "upper_arm.R": (-3, 13 + 2 * br, 0), "forearm.R": (18, 0, 0), "hand.R": (0, 0, -8),
+            "upper_arm.L": (14, -11 - 2 * br, 0), "forearm.L": (30, 0, 0), "hand.L": (0, 0, 10),
+            "thigh.L": (2, 0, 2), "shin.L": (-2, 0, 0),
+            "thigh.R": (8, 0, -9), "shin.R": (-16, 0, 0), "foot.R": (6, 0, 6)})
+        CH.pose_key(arm, f, p, (0.012 + 0.004 * br, 0, -0.01 + 0.004 * br))
+    arm.animation_data.action = bpy.data.actions["idle"]
+    return clips
