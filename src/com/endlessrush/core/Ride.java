@@ -34,7 +34,7 @@ public final class Ride {
     // hazards
     public static final int H_BEAM = 0, H_LOG = 1, H_BATS = 2, H_BOULDER = 3, H_ROCKFALL = 4, H_ORE_TRAIN = 5, H_PILLAR = 6,
             H_STONE = 10, H_CROC = 11, H_DRIFTLOG = 12, H_WHIRL = 13, H_ISLAND = 14,
-            H_CROW = 20, H_FLOCK = 21, H_ISLET = 22, H_STORM = 23, H_CABLE = 24, H_SPIRE = 25, H_GUST = 26, H_THERMAL = 27;
+            H_CROW = 20, H_FLOCK = 21, H_ISLET = 22, H_STORM = 23, H_CABLE = 24, H_SPIRE = 25, H_GUST = 26, H_THERMAL = 27, H_CLOUD = 28;
 
     /** Blender metres to game metres for the vehicles and the river/sky kits. 1: they are built at game size, like
      *  the cave kit (its 2.4 m lanes, 1.067 m gauge, 1.25 m beams); Pongo herself is drawn at HERO_SCALE 1.2
@@ -129,6 +129,11 @@ public final class Ride {
     private boolean tiltArmed = true;
     private float tiltHold, lastClackS, genS, nextPowerS, nextForkS, lastMystery;
     public Fork fork;
+    /** Cloud bursts for the effects layer: count goes up by one per burst, at (burstX, burstY, burstS); storm is true
+     *  when the cloud was a thundercloud. Clouds never end a run: the glider punches through them. */
+    public int bursts;
+    public float burstX, burstY, burstS;
+    public boolean burstStorm;
     public float rideTime;
     public final float[] loopVol = new float[RideSfx.LOOP_COUNT], loopPitch = new float[RideSfx.LOOP_COUNT];
 
@@ -606,10 +611,24 @@ public final class Ride {
                     h.y = h.y0 + 0.35f * (float) Math.sin(h.phase * 0.7f + h.seed);
                     if (!h.warned && d < 35f) { h.warned = true; sfx(RideSfx.WATERFALL); }
                     break;
-                case H_STORM:       // a small thundercloud drifting across, rumbling
+                case H_STORM:       // a small thundercloud drifting across, rumbling; bursting through it jolts her
                     h.x += h.vx * dt;
                     if (h.x < -SKY_HALF || h.x > SKY_HALF) h.vx = -h.vx;
                     if (!h.warned && d < 40f) { h.warned = true; sfx(RideSfx.STORM_RUMBLE); }
+                    if (!h.hit && inCloud(h, d)) {
+                        h.hit = true;
+                        burst(h, true);
+                        wobble = 0.6f;
+                        gustX += (x >= h.x ? 1 : -1) * 2.5f;
+                        valt -= 1.5f;
+                    }
+                    break;
+                case H_CLOUD:       // fair-weather puff in the way: she bursts straight through it
+                    if (!h.hit && inCloud(h, d)) {
+                        h.hit = true;
+                        burst(h, false);
+                        wobble = Math.max(wobble, 0.15f);
+                    }
                     break;
                 case H_CABLE:
                     if (!h.warned && d < 35f) { h.warned = true; sfx(RideSfx.CHIMES); }
@@ -636,6 +655,21 @@ public final class Ride {
                 if (h.type == H_BEAM || h.type == H_LOG) sfx(RideSfx.DUCK_WHOOSH);
             }
         }
+    }
+
+    private boolean inCloud(Hazard h, float d) {
+        float dx = (x - h.x) / (h.w + 0.8f), dy = (alt + 1.6f - h.y) / (h.h + 1.4f), ds = d / (h.len * 0.5f + 0.5f);
+        return dx * dx + dy * dy + ds * ds < 1f;
+    }
+
+    private void burst(Hazard h, boolean storm) {
+        bursts++;
+        burstX = h.x;
+        burstY = h.y;
+        burstS = h.s;
+        burstStorm = storm;
+        sfx(RideSfx.CLOUD_POOF);
+        if (storm) sfx(RideSfx.STORM_RUMBLE);
     }
 
     /** Pongo's hit volume: x half width, bottom and top heights (game units) for the current vehicle. */
@@ -673,6 +707,9 @@ public final class Ride {
                 float cy = alt + 1.1f;
                 float dx = Math.abs(x - h.x), dy;
                 switch (h.type) {
+                    case H_CLOUD:
+                    case H_STORM:   // clouds never block: she bursts through (stepHazards)
+                        return false;
                     case H_CABLE:   // a line across the whole way: climb over or dive under (canopy counts)
                         return alt + 3.3f > h.y && alt + 0.2f < h.y;
                     case H_SPIRE:   // rock pillar from the valley floor up to h.y
@@ -932,6 +969,14 @@ public final class Ride {
             add(H_THERMAL, lx, la, at + 10f, 14f, 1.6f, 6f);
             for (int i = 0; i < 6; i++) coin(lx, coinY(la + i * 0.7f), at + 8f + i * 2.4f);
         }
+        // fair-weather clouds drifting through the gorge at flying height: burst through them, coins inside some
+        int nc = 1 + rng.nextInt(2);
+        for (int i = 0; i < nc; i++) {
+            float cx = (rng.nextFloat() * 2 - 1) * (SKY_HALF - 1f), cy = ALT_MIN + 1f + rng.nextFloat() * (ALT_MAX - ALT_MIN);
+            float cs = at + rng.nextFloat() * gap();
+            add(H_CLOUD, cx, cy, cs, 3f, 1.8f + rng.nextFloat(), 1.0f);
+            if (rng.nextFloat() < 0.4f) coinRun(cx, cx, cy - 1.6f, cy - 1.6f, cs - 2f, 3, 2f);
+        }
         genS = at + gap() * 1.1f;
     }
 
@@ -1088,6 +1133,7 @@ public final class Ride {
                     if (d < -2 || d > look) continue;
                     if (h.type == H_THERMAL || h.type == H_GUST) continue;
                     float dx = Math.abs(cx - h.x) - h.w;
+                    if (h.type == H_CLOUD) continue;
                     if (h.type == H_CABLE) { if (ca + 3.3f > h.y && ca + 0.2f < h.y) sc -= 60f; continue; }
                     if (h.type == H_SPIRE) { if (dx < 1.8f && ca < h.y + 0.5f) sc -= 60f; continue; }
                     if (h.type == H_ISLAND) { if (dx < 1.2f) sc -= 40f; continue; }

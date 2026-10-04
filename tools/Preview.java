@@ -228,10 +228,10 @@ public class Preview {
     }
 
     /** Simple look-ahead bot used for previews and generator testing. */
-    static class Autopilot {
+    public static class Autopilot {
         float cooldown;
 
-        void drive(Game g) {
+        public void drive(Game g) {
             if (g.state != Game.RUNNING) return;
             cooldown -= 1 / 60f;
             float look = g.speed * 1.4f + 8;

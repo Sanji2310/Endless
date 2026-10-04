@@ -518,6 +518,13 @@ public final class Game {
             default:
                 break;
         }
+        if (ride.active() && (p.type == JETPACK || p.type == SNEAKERS)) {
+            // ground-only power-ups never start on a ride (none spawn there; this catches one picked up at boarding)
+            profile.coins += 50;
+            sound(SND_COIN);
+            message("+50 COINS");
+            return;
+        }
         sound(SND_POWER);
         mission(Missions.POWERUPS, 1);
         switch (p.type) {
@@ -600,8 +607,8 @@ public final class Game {
             return;
         }
         while (genS < s + 240) {
-            if (Zones.isVehicleZone(Zones.zoneAt(genS))) {
-                genS = Zones.safeTo(Zones.nextBoundary(genS));
+            if (ride.zones.vehicleAt(genS) != Ride.NONE) {
+                genS = Math.max(genS + 1f, Zones.safeTo(ride.zones.nextZoneStart(genS)));
                 continue;
             }
             float skip = Zones.skipSafe(genS);

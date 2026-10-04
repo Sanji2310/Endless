@@ -10,7 +10,8 @@ import java.util.Random;
  * closing, the canopy filling), so they stay in sync with the animation.
  */
 public final class RideSfx {
-    public static final int BASE = 64;
+    /** Above Game.SND_* and the cave thread's zone sounds (Game.SND_ZONE = 100 + CaveSounds). */
+    public static final int BASE = 160;
     public static final int STOW = BASE, BOARD_BACK = BASE + 1, BOARD_CART = BASE + 2, CART_LAND = BASE + 3,
             CART_LAND_SOFT = BASE + 4, CART_BUMP = BASE + 5, TRACK_SWITCH = BASE + 6, RAIL_CLACK = BASE + 7,
             CROUCH = BASE + 8, DUCK_WHOOSH = BASE + 9, BATS = BASE + 10, ROCK_RUMBLE = BASE + 11, ROCKFALL = BASE + 12,
@@ -19,13 +20,13 @@ public final class RideSfx {
             CROC_SURFACE = BASE + 22, CROC_SNAP = BASE + 23, LOG_KNOCK = BASE + 24, WHIRL = BASE + 25, BOAT_CRASH = BASE + 26,
             WATERFALL = BASE + 27, CANOPY_OPEN = BASE + 28, CAW = BASE + 29, FLOCK = BASE + 30, STORM_RUMBLE = BASE + 31,
             CHIMES = BASE + 32, GUST = BASE + 33, THERMAL = BASE + 34, GLIDER_CRASH = BASE + 35, TOUCHDOWN = BASE + 36,
-            HOP_OFF = BASE + 37;
-    public static final int COUNT = 38;
+            HOP_OFF = BASE + 37, CLOUD_POOF = BASE + 38;
+    public static final int COUNT = 39;
     public static final String[] NAMES = {"stow", "board_back", "board_cart", "cart_land", "cart_land_soft", "cart_bump",
             "track_switch", "rail_clack", "crouch", "duck_whoosh", "bats", "rock_rumble", "rockfall", "ore_bell", "fork_bell",
             "cart_crash", "buffer_crash", "boat_land", "paddle_r", "paddle_l", "rudder", "boat_bump", "croc_surface",
             "croc_snap", "log_knock", "whirl", "boat_crash", "waterfall", "canopy_open", "caw", "flock", "storm_rumble",
-            "chimes", "gust", "thermal", "glider_crash", "touchdown", "hop_off"};
+            "chimes", "gust", "thermal", "glider_crash", "touchdown", "hop_off", "cloud_poof"};
 
     public static final int LOOP_CART = 0, LOOP_RIVER = 1, LOOP_WIND = 2, LOOP_CANOPY = 3, LOOP_COUNT = 4;
     public static final String[] LOOP_NAMES = {"loop_cart", "loop_river", "loop_wind", "loop_canopy"};
@@ -281,6 +282,12 @@ public final class RideSfx {
                 b = buf(0.7f); thump(b, 0, 130, 0.6f); band(b, 0, 0.3f, 2200, 1800, 6f, 0.3f, 0.001f, 6);
                 thump(b, 0.14f, 120, 0.5f); band(b, 0.3f, 0.3f, 1200, 2400, 0.8f, 0.3f, 0.02f, 3);
                 return pcm(b, 0.7f);
+            case CLOUD_POOF:    // the glider bursting through a cloud: a soft airy whump and a breathy tail
+                b = buf(0.9f);
+                band(b, 0, 0.5f, 220, 900, 0.7f, 0.9f, 0.04f, 2);
+                band(b, 0.05f, 0.8f, 1800, 600, 1.2f, 0.35f, 0.3f, 1);
+                thump(b, 0f, 90, 0.35f);
+                return pcm(b, 0.6f);
             case HOP_OFF:
                 b = buf(0.4f); band(b, 0, 0.3f, 500, 1500, 0.8f, 0.5f, 0.1f, 2); thump(b, 0.3f, 140, 0.4f);
                 return pcm(b, 0.6f);
