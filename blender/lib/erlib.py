@@ -423,6 +423,8 @@ def _build_toon_nodes(bmat, gm):
         bmat.show_transparent_back = False
     if gm.flags & F_DOUBLE:
         bmat.use_backface_culling = False
+    if gm.flags & F_NOCAST:
+        bmat.shadow_method = 'NONE'
 
 
 def outline_material():

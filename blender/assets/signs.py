@@ -157,6 +157,12 @@ def vending(name="s_vending", w=128, h=256, seed=3, body=0xE8473C):
     return c.save()
 
 
+def blob_shadow(name="s_blob", size=128):
+    c = PT.Canvas(name, size, size)
+    c.radial(size / 2, size / 2, 0, size * 0.48, 0xFFFFFF, 0xFFFFFF, 0.55, 0.0, 64)
+    return c.save()
+
+
 def build_all():
     E.reset()
     window("w_win_a", "curtain", seed=1, curtain=0xF2A6B8)
@@ -169,3 +175,4 @@ def build_all():
     konbini_sign()
     vending("s_vending", body=0xE8473C, seed=3)
     vending("s_vending_b", body=0x2E7AD8, seed=8)
+    blob_shadow()

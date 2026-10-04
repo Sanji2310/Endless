@@ -655,49 +655,116 @@ def konbini(name="konbini", lod=0):
 # ----------------------------------------------------------------------------- sakura tree
 
 def sakura(name="sakura", seed=1, height=6.5, lod=0):
-    """Cherry tree: twisting trunk, forked limbs, blossom clouds at the branch tips."""
+    """Cherry tree, Ghibli method (Lightning Boy Studio): a branching trunk, then for each limb tip a cloud
+    of small blossom puffs scattered through an ellipsoid volume; all puffs take their normals from a smooth
+    hull of the clouds, so the canopy shades as one soft mass with a clean light/shadow split while the
+    silhouette stays bumpy and alive. Returns (trunk, canopy)."""
+    import characters as CH
     rnd = random.Random(seed)
     E.mat("bark", 0x5E4438, "t_wood", soft=0.15, rim=0.2, outline=1.0)
-    E.mat("blossom", 0xFFFFFF, "t_blossom", soft=0.35, rim=0.35, outline=1.0, flags=E.F_FOLIAGE, sway=0.35,
-          shadow=0xC79AC8)
-    m = E.Mesher(name)
+    E.mat("blossom", 0xFFFFFF, "t_blossom", soft=0.3, rim=0.3, outline=0.0, flags=E.F_FOLIAGE | E.F_NOCAST, sway=0.35,
+          shadow=0xC890C4)
+    E.mat("tree_shadow", 0x5A4A7A, "s_blob", flags=E.F_DECAL | E.F_NOCAST, outline=0.0, rim=0.0, soft=0.2)
+    m = E.Mesher(name + "_trunk")
     tips = []
 
     def branch(p, d, length, r, depth):
         pts = [p]
         q = Vector(p)
         dd = Vector(d).normalized()
-        n = 4 if lod == 0 else 2
+        n = 5 if lod == 0 else 2
         for i in range(n):
-            dd = (dd + Vector(((rnd.random() - 0.5) * 0.5, (rnd.random() - 0.5) * 0.5, 0.12))).normalized()
+            dd = (dd + Vector(((rnd.random() - 0.5) * 0.45, (rnd.random() - 0.5) * 0.45, 0.1))).normalized()
             q = q + dd * (length / n)
             pts.append(q.copy())
         m.mat("bark", uvscale=0.6)
-        m.tube([tuple(v) for v in pts], r=r, seg=10 if lod == 0 and depth < 2 else 6, taper=0.55)
-        if depth >= 3 or r < 0.05:
-            tips.append((q, r))
+        m.tube([tuple(v) for v in pts], r=r, seg=12 if lod == 0 and depth < 2 else 7, taper=0.6)
+        if depth == 2:
+            tips.append(q)
+        if depth >= 3 or r < 0.045:
+            tips.append(q)
             return
         k = 2 if depth > 0 else 3
         for j in range(k):
-            a = rnd.random() * 2 * math.pi
-            nd = (dd * 0.6 + Vector((math.cos(a), math.sin(a), 0.35)) * 0.8).normalized()
-            branch(q, nd, length * (0.62 + rnd.random() * 0.15), r * 0.58, depth + 1)
+            a = rnd.random() * 2 * math.pi + j * 2.1
+            nd = (dd * 0.35 + Vector((math.cos(a), math.sin(a), 0.22)) * 0.9).normalized()
+            branch(q, nd, length * (0.68 + rnd.random() * 0.15), r * 0.6, depth + 1)
 
-    trunk_h = height * 0.38
-    branch(Vector((0, 0, -0.1)), Vector((0.05, 0.02, 1)), trunk_h, 0.24, 0)
-    # root flare
+    branch(Vector((0, 0, -0.1)), Vector((0.06, 0.02, 1)), height * 0.3, 0.23, 0)
     m.mat("bark", uvscale=0.6)
-    m.cyl((0, 0, 0.12), r=0.42, r2=0.24, h=0.3, seg=12 if lod == 0 else 6)
-    # blossom clouds: clusters of displaced icospheres around tips
-    m.mat("blossom", uvscale=1.2)
-    for (q, r) in tips:
-        n = 3 if lod == 0 else 1
-        for i in range(n):
-            o = Vector(((rnd.random() - 0.5) * 1.2, (rnd.random() - 0.5) * 1.2, (rnd.random() - 0.2) * 0.6))
-            rad = 0.75 + rnd.random() * 0.5
-            m.ico(tuple(q + o), r=rad, sub=2 if lod == 0 else 1, s=(1.15, 1.15, 0.8))
-    ob = m.obj(name + ("" if lod == 0 else "@1"), smooth_angle=60)
-    return ob
+    m.cyl((0, 0, 0.12), r=0.4, r2=0.23, h=0.3, seg=14 if lod == 0 else 7)
+    trunk = m.obj(name + "_trunk" + ("" if lod == 0 else "@1"), smooth_angle=60)
+    # clouds: one ellipsoid per limb tip (slightly flattened, Ghibli-style)
+    clouds = []
+    for q in tips:
+        c = q + Vector(((rnd.random() - 0.5) * 0.4, (rnd.random() - 0.5) * 0.4, 0.15 + rnd.random() * 0.25))
+        rad = Vector((1.2, 1.2, 0.8)) * (0.9 + 0.4 * rnd.random())
+        clouds.append((c, rad))
+    # canopy = smooth hull of the clouds, scalloped by puff-shaped bumps; shading keeps the hull normals
+    def hull(mm):
+        for (c, rad) in clouds:
+            mm.sphere(tuple(c), 1.0, 20, 12, s=tuple(rad * 1.05))
+    canopy = CH.sculpt_union(name + "_canopy" + ("" if lod == 0 else "@1"), hull, "blossom",
+                             voxel=0.07 if lod == 0 else 0.14, smooth_iter=24, smooth_fac=0.8,
+                             ratio=0.6 if lod == 0 else 0.35)
+    me = canopy.data
+    vs = me.vertices
+    base_n = [v.normal.copy() for v in vs]
+    base_p = [v.co.copy() for v in vs]
+    # puff centres: random hull points, denser on top
+    idx = list(range(len(vs)))
+    rnd.shuffle(idx)
+    centres = []
+    for i in idx[: (130 if lod == 0 else 60)]:
+        rr = 0.28 + 0.26 * rnd.random()
+        centres.append((base_p[i], rr, 0.2 + 0.16 * rnd.random()))
+    from mathutils.kdtree import KDTree
+    kd = KDTree(len(centres))
+    for k, (c, rr, hh) in enumerate(centres):
+        kd.insert(c, k)
+    kd.balance()
+    for i, v in enumerate(vs):
+        bump = 0.0
+        for (co, k, d) in kd.find_range(base_p[i], 0.7):
+            c, rr, hh = centres[k]
+            if d < rr:
+                t = 1 - (d / rr) ** 2
+                bump = max(bump, hh * t ** 0.5)
+        v.co = base_p[i] + base_n[i] * (bump - 0.12)
+    E.set_smooth(canopy, 180)
+    me.normals_split_custom_set_from_vertices([tuple(n) for n in base_n])
+    # uv for the blossom pattern (box projection in world metres)
+    uvl = me.uv_layers.active or me.uv_layers.new(name="UVMap")
+    for poly in me.polygons:
+        n = poly.normal
+        ax = max(range(3), key=lambda j: abs(n[j]))
+        for li in poly.loop_indices:
+            co = vs[me.loops[li].vertex_index].co
+            u, w = (co.y, co.z) if ax == 0 else (co.x, co.z) if ax == 1 else (co.x, co.y)
+            uvl.data[li].uv = (u / 0.3, w / 0.3)
+    # soft blob shadow on the ground under the canopy (the canopy itself does not cast)
+    sm = E.Mesher(name + "_shadow").mat("tree_shadow")
+    cx = sum(c.x for c, r in clouds) / len(clouds)
+    cy = sum(c.y for c, r in clouds) / len(clouds)
+    ext = max(max(abs(c.x - cx), abs(c.y - cy)) + r.x for c, r in clouds)
+    f = sm.poly([(cx - ext, cy - ext, 0.02), (cx + ext, cy - ext, 0.02), (cx + ext, cy + ext, 0.02), (cx - ext, cy + ext, 0.02)], uv=None)
+    sm.uv_rect(f, 0, 0, 1, 1, axis=((1, 0, 0), (0, 1, 0)))
+    shadow = sm.obj(name + "_shadow" + ("" if lod == 0 else "@1"), smooth_angle=0)
+    return trunk, canopy, shadow
+
+
+def design_sakura():
+    import studio
+    E.reset()
+    studio.stage(res=(1200, 1000), floor=True, floor_col=0xB8D88A)
+    for k, x in enumerate((-4.5, 4.5)):
+        t, c, sh = sakura("sakura_%d" % k, seed=k + 3)
+        for o in (t, c, sh):
+            o.location.x = x
+        E.add_outline(t, 0.02)
+    studio.shoot("sakura", target=(0, 0, 3.2), dist=17, yaw=200, pitch=8, lens=40, light=False)
+    studio.aim_sun(200 + 80)
+    studio.shoot("sakura_side", target=(0, 0, 3.2), dist=17, yaw=200, pitch=8, lens=40, light=False)
 
 
 # ----------------------------------------------------------------------------- level crossing
@@ -762,10 +829,21 @@ def crossing(name="crossing", lod=0, seg=12.0):
         # panels between and outside the rails, flush with rail top
         for (a, b) in ((-1.05, -0.565), (-0.505, 0.505), (0.565, 1.05)):
             m.box((lx + (a + b) / 2, seg / 2, 0.08), (b - a, rw, 0.16), smooth=False)
-    for (a, b) in ((-6.4, -3.45), (-1.35, -1.05), (1.05, 1.35), (3.45, 6.4)):
-        m.box(((a + b) / 2, seg / 2, (0.16 + city.GROUND) / 2), (b - a, rw, 0.16 - city.GROUND), smooth=False)
-    for (a, b) in ((-1.35, -1.05),):
-        pass
+    # deck between the tracks (flush with the rail heads)
+    for (a, b) in ((-3.45, -3.35), (-1.35, -1.05), (1.05, 1.35), (3.35, 3.45)):
+        m.box(((a + b) / 2, seg / 2, 0.08), (b - a, rw, 0.16), smooth=False)
+    for sx in (-1, 1):
+        # outer deck to the ditch edge, then a ramp down to the street level across the side road
+        x0, x1 = sx * 3.45, sx * 5.4
+        m.box(((x0 + x1) / 2, seg / 2, 0.08), (abs(x1 - x0), rw, 0.16), smooth=False)
+        xa, xb = sx * 5.4, sx * 8.8
+        za, zb = 0.16, city.GROUND - 0.02
+        y0, y1 = seg / 2 - rw / 2, seg / 2 + rw / 2
+        quad = [(xa, y0, za), (xb, y0, zb), (xb, y1, zb), (xa, y1, za)]
+        m.poly(quad if sx > 0 else quad[::-1])
+        for yy in (y0, y1):
+            side = [(xa, yy, za), (xa, yy, city.GROUND - 0.05), (xb, yy, city.GROUND - 0.05), (xb, yy, zb)]
+            m.poly(side if (sx > 0) == (yy == y0) else side[::-1])
     # stop lines on the approach roads
     m.mat("road_line")
     for sx in (-1, 1):
@@ -832,9 +910,9 @@ def design_street():
         ob = city.wires(); ob.location.y = y0
     for i in range(3):
         ob = city.gantry(); ob.location.y = -6 + i * 24
-    arm = crossing_arm(); arm.location = (6.35, 2 * city.SEG + city.SEG / 2 - 3.0, city.GROUND + 0.9); arm.rotation_euler.z = math.radians(180)
+    arm = crossing_arm(); arm.location = (6.35, city.SEG + city.SEG / 2 - 3.0, city.GROUND + 0.9); arm.rotation_euler.z = math.radians(180)
     arm.rotation_euler.y = math.radians(-70)
-    arm2 = crossing_arm(); arm2.location = (-6.35, 2 * city.SEG + city.SEG / 2 + 3.0, city.GROUND + 0.9); arm2.rotation_euler.y = math.radians(-70)
+    arm2 = crossing_arm(); arm2.location = (-6.35, city.SEG + city.SEG / 2 + 3.0, city.GROUND + 0.9); arm2.rotation_euler.y = math.radians(-70)
     for i in range(3):
         ob = city.utility_pole(); ob.location.y = -10 + i * 24
     # ground beyond the road
@@ -863,8 +941,17 @@ def design_street():
         ob.location = (-11.0 - (1.6 if nm == "apartment" else 2.6), y + w / 2, city.GROUND)
         y += w + 2.5
     for k, (x, yy) in enumerate(((7.8, 3.5), (-8.0, 18.0), (8.2, 30.0), (-8.4, 40.0))):
-        t = sakura("sakura_%d" % k, seed=k + 1)
-        t.location = (x + (1.5 if x > 0 else -1.5), yy, city.GROUND)
+        for t in sakura("sakura_%d" % k, seed=k + 1):
+            t.location = (x + (1.5 if x > 0 else -1.5), yy, city.GROUND)
+    # surface finish: small bevels + weighted normals on buildings/props, ink outlines for the render
+    for ob in list(bpy.data.objects):
+        if ob.type != 'MESH' or ob.hide_render:
+            continue
+        nm = ob.name
+        if any(k in nm for k in ("house", "apartment", "konbini", "crossing", "gantry", "upole")):
+            E.finish_hard(ob, width=0.012, segments=2, angle=35)
+        if not any(k in nm for k in ("canopy", "shadow", "lot", "wires", "side", "track")):
+            E.add_outline(ob, 0.02)
     studio.aim_sun(200)
     studio.shoot("street_overview", target=(0, 16, 1.5), dist=30, yaw=180 + 25, pitch=24, lens=30)
     studio.shoot("street_runner", target=(0, 22, 1.6), dist=7.5, yaw=180, pitch=14, lens=24)
