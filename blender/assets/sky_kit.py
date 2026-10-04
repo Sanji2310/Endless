@@ -1,5 +1,6 @@
 """
-Sky Glide kit, in the Sakura Line look (pastel toon, lilac shadows, thin ink, puffy cloud masses):
+Sky Glide kit. Its own theme and colours, drawn in the Sakura Line art style (soft toon shading,
+lilac shadows, thin ink outlines, puffy cloud masses, dense small detail):
 
   crow_body / crow_wing   Karasu crow; the wing is one side (mirror for the other), hinged at its root
                           -> Ride.H_CROW, H_FLOCK (the game flaps the wings)

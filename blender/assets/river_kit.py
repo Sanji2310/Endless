@@ -1,5 +1,6 @@
 """
-Bamboo River kit, in the Sakura Line look (soft pastel toon, lilac shadows, thin ink, puffy canopies):
+Bamboo River kit. Its own theme and colours, drawn in the Sakura Line art style (soft toon shading,
+lilac shadows, thin ink outlines, puffy foliage masses, dense small detail):
 
   river_seg     20 m of river (water strip with painted flow streaks, grassy banks with stone edging,
                 bamboo clumps, reeds, a stone lantern); the river is RIVER_HALF wide each side (Ride.java)
@@ -8,7 +9,7 @@ Bamboo River kit, in the Sakura Line look (soft pastel toon, lilac shadows, thin
   croc_body / croc_jaw   crocodile in two parts; the jaw hinges at JAW_HINGE   -> Ride.H_CROC
   drift_log     floating log with a broken branch and moss         -> Ride.H_DRIFTLOG
   whirlpool     spiral decal on the water                          -> Ride.H_WHIRL
-  small props   lily pads, koi, reeds, floating sakura petals ring, stone lantern, heron
+  small props   lily pads, koi, reeds, drifting bamboo leaves, stone lantern, heron
 
 Everything faces +Y (the canoe travels +Y), origin at the water line.
 """
@@ -57,7 +58,7 @@ def mats():
     M("rv_koi_o", 0xFF8A3A, rim=0.3, soft=0.1)
     M("rv_heron", 0xF7F8FC, rim=0.35, soft=0.12)
     M("rv_beak", 0xF2B84A, rim=0.2, soft=0.1)
-    M("rv_petal", 0xF9B8CC, rim=0.2, soft=0.2, emis=0.1, outline=0.0, flags=E.F_NOCAST | E.F_DOUBLE, shadow=0xE48CAA)
+    M("rv_leaf_float", 0xC8D86A, rim=0.2, soft=0.2, outline=0.0, flags=E.F_NOCAST | E.F_DOUBLE)
     M("rv_whirl", 0xE8F8FF, emis=0.3, rim=0.0, soft=0.2, flags=E.F_NOCAST | E.F_DECAL, outline=0.0)
 
 
@@ -154,15 +155,16 @@ def torii(m, c, w=1.6, h=1.9, s=1.0):
             [(-0.07, -0.07), (0.07, -0.07), (0.07, 0.07), (-0.07, 0.07)], closed=True, cap=True)
 
 
-def petal_ring(m, c, rnd, n=14, r=0.9):
-    m.mat("rv_petal")
+def leaf_drift(m, c, rnd, n=14, r=0.9):
+    """Fallen bamboo leaves drifting on the current."""
+    m.mat("rv_leaf_float")
     for i in range(n):
         a = rnd.uniform(0, 2 * math.pi)
         rr = r * math.sqrt(rnd.random())
         p = V(c) + V((math.cos(a) * rr, math.sin(a) * rr, 0.02))
         b = rnd.uniform(0, math.pi)
-        d1, d2 = V((math.cos(b), math.sin(b), 0)) * 0.04, V((-math.sin(b), math.cos(b), 0)) * 0.03
-        m.poly([tuple(p - d1), tuple(p + d2), tuple(p + d1), tuple(p - d2 * 0.6)])
+        d1, d2 = V((math.cos(b), math.sin(b), 0)) * 0.12, V((-math.sin(b), math.cos(b), 0)) * 0.025
+        m.poly([tuple(p - d1), tuple(p + d2), tuple(p + d1), tuple(p - d2)])
 
 
 # ----------------------------------------------------------------------------- river segment
@@ -217,7 +219,7 @@ def river_seg(name="river_seg", L=20.0, seed=3, details=True):
                 m.ico((sd * (RIVER_HALF + rnd.uniform(0.8, 3.5)), rnd.uniform(0, L), 0.45), rnd.uniform(0.25, 0.5), 1,
                       s=(1, 1, 0.6))
         stone_lantern(m, (rnd.choice((-1, 1)) * (RIVER_HALF + 1.0), rnd.uniform(4, L - 4), 0.3))
-        petal_ring(m, (rnd.uniform(-2, 2), rnd.uniform(3, L - 3), 0), rnd)
+        leaf_drift(m, (rnd.uniform(-2, 2), rnd.uniform(3, L - 3), 0), rnd)
     ob = m.obj(name, smooth_angle=40)
     return ob
 
