@@ -1,5 +1,8 @@
 package com.endlessrush.core;
 
+import com.pongo.core.CaveSounds;
+import com.pongo.core.Zones;
+
 import java.util.ArrayList;
 import java.util.Random;
 
@@ -16,6 +19,8 @@ public final class Game {
             SND_POWER = 6, SND_BOARD = 7, SND_BREAK = 8, SND_KEY = 9, SND_MISSION = 10, SND_LAND = 11, SND_JET = 12,
             SND_CAUGHT = 13;
     public static final int SOUND_COUNT = 14;
+    /** Zone sounds: SND_ZONE + a CaveSounds id, plus SND_ENTER_TUNNEL (whoosh, sting and lamp in one). */
+    public static final int SND_ZONE = 100, SND_ENTER_TUNNEL = SND_ZONE + CaveSounds.COUNT;
 
     // states
     public static final int MENU = 0, RUNNING = 1, PAUSED = 2, DYING = 3, SAVE_ME = 4, GAME_OVER = 5;
@@ -72,6 +77,17 @@ public final class Game {
     // generation
     private float genS, nextPowerS, lastMystery;
 
+    // zones: the run cycles Sakura Line -> Crystal Cavern -> ... (com.pongo.core.Zones); the set pieces between them
+    // are obstacle-free and harmless, and the cave plays its own ambience and one-shots
+    public final Zones zones = new Zones();
+    /** EV_* bits crossed since the last call to takeZoneEvents() (the vehicle side reads EV_BOARD / EV_LEAVE). */
+    private int zoneEvents;
+    private float caveSoundT;
+    private final Random ambRng = new Random(11);
+    /** Set by the renderer when it draws the zone scenery (pongo.bin has the zone pieces). Without it the run looks
+     *  like the Sakura Line all the way, so the zone sounds stay off too. */
+    public boolean zoneScenery;
+
     public Game(Profile profile, Listener listener) {
         this.profile = profile;
         this.listener = listener;
@@ -112,6 +128,9 @@ public final class Game {
         nextPowerS = 260;
         lastMystery = 0;
         coinLine(0, 18, 8, 3f);
+        zones.reset();
+        zoneEvents = 0;
+        caveSoundT = 2f;
     }
 
     /** Back to the attract screen. */
@@ -291,8 +310,10 @@ public final class Game {
             }
         }
 
+        stepZones(dt);
+
         // vertical
-        boolean lenient = invulnT > 0 || jetT > 0;
+        boolean lenient = invulnT > 0 || jetT > 0 || zones.invulnerable;
         if (jetT > 0) {
             jetT = Math.max(0, jetT - dt);
             y += (JET_Y - y) * Math.min(1, dt * 3f);
@@ -556,7 +577,48 @@ public final class Game {
     // ------------------------------------------------------------------ level generation
 
     private void generate() {
-        while (genS < s + 240) spawnPattern();
+        while (genS < s + 240) {
+            float skip = Zones.skipSafe(genS);
+            if (skip > genS) {
+                // the set piece between zones: no obstacles, a line of coins down the lining
+                coinLine(0, Zones.portalAt(Zones.nextBoundary(genS - 30f)) + 3f, 5, 3f);
+                genS = skip;
+                continue;
+            }
+            spawnPattern();
+        }
+    }
+
+    // ------------------------------------------------------------------ zones
+
+    private void stepZones(float dt) {
+        int ev = zones.update(s, dt);
+        zoneEvents |= ev;
+        if (!zoneScenery) return;
+        float b = Zones.nextBoundary(s), pb = b - Zones.ZONE_LEN;
+        if ((ev & Zones.EV_PORTAL) != 0) sound(Zones.exitAt(b) ? SND_ZONE + CaveSounds.TUNNEL_WHOOSH : SND_ENTER_TUNNEL);
+        if ((ev & Zones.EV_MOUTH) != 0 && Zones.exitAt(pb)) sound(SND_ZONE + CaveSounds.TUNNEL_WHOOSH);
+        // cave one-shots over the ambience loop: drips, a crystal ringing, a bat somewhere up in the dark
+        if (zones.zone == Zones.CAVERN && !zones.invulnerable) {
+            caveSoundT -= dt;
+            if (caveSoundT <= 0) {
+                float r = ambRng.nextFloat();
+                sound(SND_ZONE + (r < 0.6f ? CaveSounds.DRIP : r < 0.85f ? CaveSounds.CRYSTAL_CHIME : CaveSounds.BAT_SQUEAK));
+                caveSoundT = 1.4f + ambRng.nextFloat() * 2.6f;
+            }
+        }
+    }
+
+    /** The EV_* bits crossed since the last call (cleared by the call). */
+    public int takeZoneEvents() {
+        int e = zoneEvents;
+        zoneEvents = 0;
+        return e;
+    }
+
+    /** Volume of the cave ambience loop (0..1): rises through the tunnel in, falls through the tunnel out. */
+    public float caveAmbience() {
+        return zoneScenery && state == RUNNING && zones.paletteZone == Zones.CAVERN ? zones.blend : 0f;
     }
 
     private float difficulty() { return Math.min(1f, genS / 5000f); }

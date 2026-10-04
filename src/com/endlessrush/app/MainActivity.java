@@ -295,6 +295,7 @@ public final class MainActivity extends Activity implements Game.Listener, GameR
     /** GL thread, every frame. */
     @Override
     public void onFrame(Game g) {
+        audio.ambience = g.caveAmbience();
         hScore = g.score();
         hCoins = g.coinsRun;
         hMult = g.multiplier();
