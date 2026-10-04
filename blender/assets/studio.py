@@ -150,3 +150,40 @@ def shoot_pbr(name, target=(0, 0, 1.0), dist=3.0, yaw=0.0, pitch=8.0, lens=50, d
     import os
     os.makedirs(os.path.join(E.OUT_RENDERS, "design"), exist_ok=True)
     E.render(os.path.join(E.OUT_RENDERS, "design", name + ".png"))
+
+
+def haze(col=0xDDEBF5, start=25.0, depth=160.0, amount=0.75):
+    """Aerial perspective for scenery shots: blends toward `col` with distance (mist pass in the compositor), the
+    soft blue distance of Genshin landscapes; the game does the same with RenderFrame fog."""
+    sc = bpy.context.scene
+    vl = bpy.context.view_layer
+    vl.use_pass_mist = True
+    w = sc.world
+    w.mist_settings.start = start
+    w.mist_settings.depth = depth
+    w.mist_settings.falloff = 'QUADRATIC'
+    sc.use_nodes = True
+    nt = sc.node_tree
+    for n in list(nt.nodes):
+        nt.nodes.remove(n)
+    rl = nt.nodes.new("CompositorNodeRLayers")
+    mul = nt.nodes.new("CompositorNodeMath")
+    mul.operation = 'MULTIPLY'
+    mul.inputs[1].default_value = amount
+    mul.use_clamp = True
+    mix = nt.nodes.new("CompositorNodeMixRGB")
+    mix.inputs[2].default_value = E.lin4(col)
+    out = nt.nodes.new("CompositorNodeComposite")
+    vl.use_pass_z = True
+    geo = nt.nodes.new("CompositorNodeMath")          # 1 on geometry, 0 on the sky (keep the sky's own gradient)
+    geo.operation = 'LESS_THAN'
+    geo.inputs[1].default_value = 1.0e5
+    m2 = nt.nodes.new("CompositorNodeMath")
+    m2.operation = 'MULTIPLY'
+    nt.links.new(rl.outputs["Mist"], mul.inputs[0])
+    nt.links.new(rl.outputs["Depth"], geo.inputs[0])
+    nt.links.new(mul.outputs[0], m2.inputs[0])
+    nt.links.new(geo.outputs[0], m2.inputs[1])
+    nt.links.new(m2.outputs[0], mix.inputs[0])
+    nt.links.new(rl.outputs["Image"], mix.inputs[1])
+    nt.links.new(mix.outputs[0], out.inputs[0])

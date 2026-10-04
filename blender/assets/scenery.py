@@ -21,13 +21,14 @@ def round_tree(m, P, c, rnd, h=3.2, r=1.3):
     top = V(c) + lean * h * 0.62
     m.mat(P["trunk"])
     m.tube([tuple(V(c)), tuple(V(c).lerp(top, 0.5) + V((0.08, 0, 0))), tuple(top)], r=0.11 * h / 3.2, seg=7, taper=0.6)
-    for k in range(rnd.randint(5, 8)):
+    for k in range(rnd.randint(7, 10)):
         a = rnd.uniform(0, 2 * math.pi)
-        rr = r * rnd.uniform(0.2, 0.7)
-        p = top + V((math.cos(a) * rr, math.sin(a) * rr, rnd.uniform(0.0, r * 0.8)))
-        m.mat(P["leaf"] if k % 3 else P["leaf2"])
+        rr = r * rnd.uniform(0.2, 0.75)
+        p = top + V((math.cos(a) * rr, math.sin(a) * rr, rnd.uniform(0.0, r * 0.9)))
+        hi = p.z - top.z > r * 0.45
+        m.mat(P.get("leaf_hi", P["leaf"]) if hi else (P["leaf"] if k % 3 else P["leaf2"]))   # sunlit crown on top
         s = rnd.uniform(0.55, 0.85) * r
-        m.ico(tuple(p), s, 1, s=(1, 1, 0.8))
+        m.ico(tuple(p), s, 2, s=(1, 1, 0.8))
 
 
 def pine(m, P, c, rnd, h=4.0):
@@ -42,7 +43,7 @@ def pine(m, P, c, rnd, h=4.0):
     for k in range(1, 5):
         p = pts[k] + V((rnd.uniform(-0.4, 0.4), rnd.uniform(-0.4, 0.4), 0.1))
         w = (1.5 - k * 0.22) * h / 4
-        m.ico(tuple(p), w, 1, s=(1, 0.8, 0.32))
+        m.ico(tuple(p), w, 2, s=(1, 0.8, 0.32))
 
 
 def shrub(m, P, c, rnd, r=0.5, flowers=None):
@@ -50,7 +51,7 @@ def shrub(m, P, c, rnd, r=0.5, flowers=None):
     m.mat(P["leaf2"])
     for k in range(rnd.randint(3, 4)):
         p = V(c) + V((rnd.uniform(-r, r) * 0.6, rnd.uniform(-r, r) * 0.6, r * 0.5))
-        m.ico(tuple(p), r * rnd.uniform(0.6, 0.85), 1, s=(1, 1, 0.8))
+        m.ico(tuple(p), r * rnd.uniform(0.6, 0.85), 2, s=(1, 1, 0.8))
     if flowers:
         m.mat(flowers)
         for k in range(rnd.randint(4, 7)):
@@ -217,3 +218,95 @@ def waterfall(m, P, top, drop=8.0, w=1.2, out=(0.0, -1.0, 0.0)):
 
 def rnd_off(k, w):
     return (k - 2) * w * 0.3
+
+
+# ----------------------------------------------------------------------------- ground cover (Genshin-style lushness)
+
+def grass_carpet(m, P, x0, x1, y0, y1, zfn, rnd, density=2.5, h=0.38, flowers=0.06):
+    """Covers a rectangle with grass clumps (dark base blades, light-tipped tall ones) and scattered wildflowers so no
+    bare ground shows. zfn(x, y) -> ground height. Jittered grid, so it is even without gaps."""
+    mats_ = (P.get("grass_a", P["leaf"]), P.get("grass_b", P["leaf2"]), P.get("grass_tip", P["leaf"]))
+    step = 1.0 / math.sqrt(density)
+    y = y0
+    while y < y1:
+        x = x0
+        while x < x1:
+            px, py = x + rnd.uniform(0, step), y + rnd.uniform(0, step)
+            c = V((px, py, zfn(px, py) - 0.02))
+            for j in range(rnd.randint(4, 6)):
+                a = rnd.uniform(0, math.pi)
+                d = V((math.cos(a), math.sin(a), 0)) * rnd.uniform(0.035, 0.05)
+                hh = h * rnd.uniform(0.55, 1.25)
+                lean = V((rnd.uniform(-0.12, 0.12), rnd.uniform(-0.12, 0.12), 0))
+                base = c + V((rnd.uniform(-0.12, 0.12), rnd.uniform(-0.12, 0.12), 0))
+                m.mat(mats_[2] if hh > h * 1.05 else mats_[j % 2])
+                m.poly([tuple(base - d), tuple(base + d), tuple(base + lean + V((0, 0, hh)))])
+            if rnd.random() < flowers:
+                flower(m, P, c, rnd)
+            x += step
+        y += step
+
+
+def flower(m, P, c, rnd):
+    """A small wildflower: stem and a five-petal head (white, yellow, blue or pink)."""
+    col = rnd.choice([P.get("fl_white", P["flower"]), P.get("fl_yellow", P["flower"]), P["flower"],
+                      P.get("fl_pink", P["flower2"])])
+    hh = rnd.uniform(0.25, 0.45)
+    top = V(c) + V((rnd.uniform(-0.05, 0.05), rnd.uniform(-0.05, 0.05), hh))
+    m.mat(P.get("grass_a", P["leaf"]))
+    m.poly([tuple(V(c) + V((-0.01, 0, 0))), tuple(V(c) + V((0.01, 0, 0))), tuple(top)])
+    m.mat(col)
+    for k in range(5):
+        a = 2 * math.pi * k / 5
+        m.sphere(tuple(top + V((math.cos(a) * 0.035, math.sin(a) * 0.035, 0))), 1.0, 6, 4, s=(0.035, 0.035, 0.012))
+    m.mat(P.get("fl_yellow", P["flower"]))
+    m.sphere(tuple(top + V((0, 0, 0.008))), 0.018, 6, 4)
+
+
+def fern(m, P, c, rnd, r=0.6):
+    """Arching fronds from one crown."""
+    m.mat(P["leaf2"])
+    for k in range(7):
+        a = 2 * math.pi * k / 7 + rnd.uniform(-0.2, 0.2)
+        d = V((math.cos(a), math.sin(a), 0))
+        base = V(c)
+        mid = base + d * r * 0.5 + V((0, 0, r * 0.45))
+        tip = base + d * r + V((0, 0, r * 0.15))
+        sd = d.cross(V((0, 0, 1))) * r * 0.12
+        m.poly([tuple(base), tuple(mid + sd), tuple(tip), tuple(mid - sd)])
+
+
+def canopy_mass(m, P, x0, x1, y0, y1, zfn, rnd, n=20, r=(1.6, 2.6)):
+    """Far forest: tight cluster of canopy blobs (no trunks) that fills the hillside; lighter crowns on top."""
+    for k in range(n):
+        x, y = rnd.uniform(x0, x1), rnd.uniform(y0, y1)
+        rr = rnd.uniform(*r)
+        z = zfn(x, y) + rr * 0.55
+        m.mat(P["leaf2"] if k % 2 else P["leaf3"])
+        m.ico((x, y, z), rr, 2, s=(1, 1, 0.85))
+        m.mat(P.get("leaf_hi", P["leaf"]))
+        m.ico((x + rnd.uniform(-0.3, 0.3), y + rnd.uniform(-0.3, 0.3), z + rr * 0.45), rr * 0.6, 2, s=(1, 1, 0.7))
+
+
+def windmill(m, P, c, rnd, rot=0.0, h=3.4):
+    """Tall timber windmill (a nod to the wind theme): tapered tower, cap, four cloth sails."""
+    m.push(Matrix.Translation(c) @ Matrix.Rotation(rot, 4, 'Z'))
+    m.mat(P["wall"])
+    m.cyl((0, 0, h / 2), r=0.8, h=h, seg=8, r2=0.55)
+    m.mat(P["timber"])
+    for z in (0.2, h * 0.5, h - 0.15):
+        m.cyl((0, 0, z), r=0.82 - 0.27 * z / h, h=0.12, seg=8)
+    m.box((0, -0.81 + 0.27 * 0.3, 0.6), (0.4, 0.06, 0.8), smooth=False)
+    m.mat(P["roof"])
+    m.cyl((0, 0, h + 0.4), r=0.75, h=0.8, seg=8, r2=0.05)
+    m.mat(P["timber"])
+    m.cyl((0, -0.75, h - 0.1), r=0.08, h=0.5, seg=8, axis='Y')
+    a0 = rnd.uniform(0, 90)
+    for k in range(4):
+        m.push(Matrix.Translation((0, -1.0, h - 0.1)) @ Matrix.Rotation(math.radians(a0 + 90 * k), 4, 'Y'))
+        m.mat(P["timber"])
+        m.box((0, 0, 1.3), (0.07, 0.07, 2.6), smooth=False)
+        m.mat(P.get("sail", P["wall"]))
+        m.box((0.22, 0.02, 1.55), (0.36, 0.02, 1.9), smooth=False)
+        m.pop()
+    m.pop()

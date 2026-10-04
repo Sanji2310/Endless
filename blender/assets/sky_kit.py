@@ -4,11 +4,11 @@ lilac shadows, thin ink outlines, puffy cloud masses, dense small detail):
 
   crow_body / crow_wing   Karasu crow; the wing is one side (mirror for the other), hinged at its root
                           -> Ride.H_CROW, H_FLOCK (the game flaps the wings)
-  kite          paper diamond kite with a painted face, ribbon tail and string  -> Ride.H_KITE
-  sky_lantern   glowing paper sky lantern drifting up                            -> Ride.H_LANTERN
+  islet         floating rock islet with a tree, flowers, roots and a trickle   -> Ride.H_ISLET
+  thundercloud  little storm cloud with a spark and rain (burst through, jolt)   -> Ride.H_STORM
   chime_cable   cable strung across the valley with fuurin wind chimes and flags -> Ride.H_CABLE
   spire         rock spire with a pine and a shrine on top                       -> Ride.H_SPIRE
-  cloud         Ghibli cumulus puff (same method as the sakura canopy)
+  cloud         Ghibli cumulus puff (same method as the sakura canopy); the glider bursts through -> Ride.H_CLOUD
   thermal_ring  rising-air ring marker                                           -> Ride.H_THERMAL
   wind_streak   gust ribbon                                                      -> Ride.H_GUST
   terraces      rice-terrace valley tile far below (backdrop)
@@ -64,6 +64,18 @@ def mats():
     M("sk_water", 0xBFEAF6, rim=0.2, soft=0.15, emis=0.15, flags=E.F_WATER | E.F_NOCAST, outline=0.0)
     M("sk_foam", 0xFFFFFF, rim=0.2, soft=0.3, emis=0.2, flags=E.F_NOCAST, outline=0.0)
     M("sk_rope", 0xD8C29A, rim=0.2, soft=0.1)
+    M("sk_grass_a", 0x7CC65C, rim=0.2, soft=0.25, flags=E.F_FOLIAGE | E.F_DOUBLE, sway=0.4, outline=0.0, shadow=0x6E9AB0)
+    M("sk_grass_b", 0x9AD46A, rim=0.2, soft=0.25, flags=E.F_FOLIAGE | E.F_DOUBLE, sway=0.4, outline=0.0, shadow=0x7EA6B0)
+    M("sk_grass_tip", 0xD2E888, rim=0.3, soft=0.25, flags=E.F_FOLIAGE | E.F_DOUBLE, sway=0.5, outline=0.0, shadow=0x92B0A8)
+    M("sk_tree_hi", 0xBAE07C, rim=0.35, soft=0.25, shadow=0x7EA6A8)
+    M("sk_fl_white", 0xFFFBF0, rim=0.3, soft=0.2, emis=0.05, outline=0.0)
+    M("sk_fl_pink", 0xFFB4CC, rim=0.3, soft=0.2, emis=0.05, outline=0.0)
+    M("sk_fl_blue", 0x9EC2FF, rim=0.3, soft=0.2, emis=0.05, outline=0.0)
+    M("sk_sail", 0xFFF8EC, rim=0.3, soft=0.15, flags=E.F_DOUBLE)
+    M("sk_vine", 0x5FA866, rim=0.2, soft=0.25, flags=E.F_FOLIAGE | E.F_DOUBLE, sway=0.5, outline=0.0, shadow=0x5A7AA0)
+    M("sk_storm", 0xC9CCE6, rim=0.45, soft=0.35, flags=E.F_NOCAST, outline=0.0, shadow=0x7E78B8)
+    M("sk_storm_dark", 0x8E88BC, rim=0.3, soft=0.3, flags=E.F_NOCAST, outline=0.0, shadow=0x5E5694)
+    M("sk_bolt", 0xFFF3A8, emis=1.6, rim=0.0, soft=0.05, flags=E.F_NOCAST, outline=0.0)
 
 
 # ----------------------------------------------------------------------------- crow
@@ -102,70 +114,6 @@ def crow():
     return bo, wo
 
 
-# ----------------------------------------------------------------------------- kite
-
-def kite(name="kite"):
-    """Edo-style rectangular kite (tako) with a painted face, bamboo spars, ribbon tail and the string bridle.
-    Faces -Y toward her; the string leaves from the bridle point downward/back."""
-    mats()
-    m = E.Mesher(name)
-    W, H = 1.2, 1.6
-    m.mat("sk_paper")
-    m.box((0, 0, 0), (W, 0.01, H), smooth=False)
-    m.mat("sk_paper_red")
-    m.box((0, -0.008, -H * 0.38), (W * 0.98, 0.004, H * 0.2), smooth=False)
-    m.box((0, -0.008, H * 0.42), (W * 0.98, 0.004, H * 0.12), smooth=False)
-    # painted kabuki-ish face: brows, eyes, mouth
-    m.mat("sk_ink")
-    for sx in (-1, 1):
-        m.push(Matrix.Translation((sx * 0.25, -0.01, 0.25)) @ Matrix.Rotation(math.radians(sx * 15), 4, 'Y'))
-        m.box((0, 0, 0), (0.3, 0.004, 0.05), smooth=False)
-        m.pop()
-        m.cyl((sx * 0.24, -0.01, 0.07), r=0.08, h=0.004, seg=16, axis='Y')
-    m.mat("sk_paper_red")
-    m.cyl((0, -0.012, -0.12), r=0.12, h=0.004, seg=16, axis='Y')
-    m.mat("sk_stick")
-    for x in (-W / 2, 0, W / 2):
-        m.cyl((x, 0.01, 0), r=0.012, h=H, seg=6)
-    m.cyl((0, 0.01, H * 0.3), r=0.012, h=W, seg=6, axis='X')
-    # tail ribbons
-    for sx, mt in ((-0.3, "sk_paper_blue"), (0.3, "sk_paper_pink")):
-        m.mat(mt)
-        pts = [V((sx, 0.0, -H / 2 - 0.05 - k * 0.25)) + V((0.12 * math.sin(k * 0.9), 0, 0)) for k in range(9)]
-        m.sweep(pts, [(-0.05, -0.002), (0.05, -0.002), (0.05, 0.002), (-0.05, 0.002)], closed=True, cap=True,
-                scale=lambda t: 1 - 0.5 * t)
-    # bridle and string (down and back toward the ground, ~8 m drawn)
-    m.mat("sk_string")
-    br = V((0, 0.15, -0.1))
-    for p in (V((-W / 2, 0.01, H / 2)), V((W / 2, 0.01, H / 2)), V((0, 0.01, -H / 2))):
-        m.sweep([p, br], [(math.cos(2 * math.pi * k / 4), math.sin(2 * math.pi * k / 4)) for k in range(4)], closed=True,
-                cap=False, scale=lambda t: 0.006)
-    m.sweep([br, br + V((-1.0, 2.0, -4.0)), br + V((-2.0, 4.5, -9.0))],
-            [(math.cos(2 * math.pi * k / 4), math.sin(2 * math.pi * k / 4)) for k in range(4)], closed=True, cap=False,
-            scale=lambda t: 0.012)
-    return m.obj(name, smooth_angle=0)
-
-
-# ----------------------------------------------------------------------------- sky lantern
-
-def sky_lantern(name="sky_lantern"):
-    mats()
-    m = E.Mesher(name)
-    m.mat("sk_glow")
-    prof = [(0.0, 0.0), (0.2, 0.02), (0.27, 0.25), (0.28, 0.5), (0.24, 0.66), (0.0, 0.7)]
-    m.lathe(prof, seg=16)
-    m.mat("sk_stick")
-    m.torus((0, 0, 0.02), R=0.2, r=0.01, seg=16, sides=4)
-    m.mat("sk_glow_core")
-    m.sphere((0, 0, 0.08), 0.06, 10, 6)
-    m.mat("sk_ink")
-    m.push(Matrix.Translation((0, -0.272, 0.35)) @ Matrix.Rotation(math.radians(90), 4, 'X'))
-    m.text("願", size=0.2, depth=0.004, font=E.FONT_JP, c=(0, 0, 0))
-    m.pop()
-    return m.obj(name, smooth_angle=60)
-
-
-# ----------------------------------------------------------------------------- chime cable
 
 def chime_cable(name="chime_cable", span=24.0, rnd_seed=4, pylon=24.0):
     """Cable across the gorge with glass wind chimes (fuurin), paper strips and small flags. Each end is tied off
@@ -306,7 +254,37 @@ def terraces(name="terraces", seed=2, w=60.0, d=60.0):
 PAL = {"trunk": "sk_bark", "leaf": "sk_tree", "leaf2": "sk_tree2", "leaf3": "sk_pine", "flower": "sk_flower",
        "flower2": "sk_flower2", "wall": "sk_wall", "timber": "sk_timber", "roof": "sk_roof", "stone": "sk_rock",
        "stone2": "sk_rock_dark", "moss": "sk_moss", "far": "sk_far", "far2": "sk_far2", "snow": "sk_snow",
-       "water": "sk_water", "foam": "sk_foam", "rope": "sk_rope", "red": "sk_red", "glow": "sk_glow", "culm": "sk_stick"}
+       "water": "sk_water", "foam": "sk_foam", "rope": "sk_rope", "red": "sk_red", "glow": "sk_glow", "culm": "sk_stick",
+       "grass_a": "sk_grass_a", "grass_b": "sk_grass_b", "grass_tip": "sk_grass_tip", "leaf_hi": "sk_tree_hi",
+       "fl_white": "sk_fl_white", "fl_yellow": "sk_flower", "fl_pink": "sk_fl_pink", "sail": "sk_sail"}
+
+
+def _cap(m, rnd, top, rt, sd=1, dense=True):
+    """Pillar top: grassy dome, then a carpet of grass and flowers over it, bushes round the rim, ivy curtains
+    hanging down the faces so the stone edge never reads bare."""
+    import scenery as SC
+    P = PAL
+    m.mat("sk_grass")
+    m.ico(tuple(top + V((0, 0, 0.1))), rt * 1.05, 2, s=(1, 1, 0.22))
+    zc = top.z + 0.1 + rt * 1.05 * 0.22
+    zf = lambda px, py: zc - min(1.0, ((px - top.x) ** 2 + (py - top.y) ** 2) / (rt * rt * 1.1)) * rt * 0.23
+    if dense:
+        SC.grass_carpet(m, P, top.x - rt * 0.7, top.x + rt * 0.7, top.y - rt * 0.7, top.y + rt * 0.7, zf, rnd,
+                        density=2.0, h=0.4, flowers=0.1)
+    for k in range(rnd.randint(3, 5)):
+        a = rnd.uniform(0, 2 * math.pi)
+        p = top + V((math.cos(a) * rt * 0.85, math.sin(a) * rt * 0.85, 0.12))
+        SC.shrub(m, P, tuple(p), rnd, r=rnd.uniform(0.35, 0.6), flowers=rnd.choice((None, "sk_fl_pink", "sk_flower", "sk_fl_blue")))
+    m.mat("sk_vine")
+    for k in range(rnd.randint(4, 7)):
+        a = rnd.uniform(0, 2 * math.pi)
+        d = V((math.cos(a), math.sin(a), 0))
+        p = top + d * rt * 1.0
+        ln = rnd.uniform(1.5, 4.5)
+        w = rnd.uniform(0.25, 0.5)
+        sd_ = d.cross(V((0, 0, 1))) * w
+        m.poly([tuple(p - sd_ + V((0, 0, 0.1))), tuple(p + sd_ + V((0, 0, 0.1))), tuple(p + d * 0.12 + sd_ * 0.6 + V((0, 0, -ln))),
+                tuple(p + d * 0.12 - sd_ * 0.4 + V((0, 0, -ln * 0.8)))])
 GORGE = 10.5        # cliff faces start this far either side of the glide line (Ride.SKY_HALF is 6 game m = 5 here)
 FLOOR = -14.0       # valley floor below the glide line
 
@@ -349,8 +327,7 @@ def sky_gorge(name="sky_gorge", L=40.0, seed=3):
             if holds:
                 ends[sd] = top + V((-sd * rt * 0.55, 0, 0.15))
             # grassy cap with dressing
-            m.mat("sk_grass")
-            m.ico(tuple(top + V((0, 0, 0.1))), rt * 1.05, 2, s=(1, 1, 0.22))
+            _cap(m, rnd, top, rt, sd)
             k = rnd.random()
             if k < 0.35:
                 SC.pine(m, P, tuple(top + V((-sd * rt * 0.4, 0, 0.2))), rnd, h=rnd.uniform(2.5, 4.0))
@@ -358,13 +335,14 @@ def sky_gorge(name="sky_gorge", L=40.0, seed=3):
             elif k < 0.55:
                 SC.house(m, P, top + V((0, 0, 0.1)), rnd, rot=math.radians(90 * sd), w=2.0, d=1.6, h=1.2)
                 SC.round_tree(m, P, tuple(top + V((0, rt * 0.6, 0.2))), rnd, h=2.4, r=1.0)
-            elif k < 0.7:
+            elif k < 0.62:
                 SC.pagoda(m, P, tuple(top + V((0, 0, 0.1))), tiers=3, s=0.6)
+            elif k < 0.75:
+                SC.windmill(m, P, top + V((0, 0, 0.15)), rnd, rot=math.radians(rnd.uniform(-30, 30)), h=3.2)
             else:
                 for j in range(3):
                     SC.round_tree(m, P, tuple(top + V((rnd.uniform(-1, 1) * rt * 0.5, rnd.uniform(-1, 1) * rt * 0.5, 0.2))),
                                   rnd, h=rnd.uniform(2.0, 3.2), r=rnd.uniform(0.8, 1.2))
-            SC.grass_tufts(m, P, tuple(top + V((0, 0, 0.25))), rnd, n=5, spread=rt * 0.6, h=0.4)
             # ledge pines and moss clinging to the cliff face on the gorge side
             m.mat("sk_moss")
             for j in range(4):                      # moss and ivy patches down the face
@@ -377,9 +355,9 @@ def sky_gorge(name="sky_gorge", L=40.0, seed=3):
                 SC.rock(m, P, tuple(p), rnd, r=0.6)
                 if rnd.random() < 0.5:
                     SC.pine(m, P, tuple(p + V((-sd * 0.2, 0, 0.3))), rnd, h=1.8)
-            if rnd.random() < 0.2:
-                SC.waterfall(m, P, (x - sd * r * 0.98, y + r, top_z - 0.5), drop=top_z - FLOOR - 1, w=1.8,
-                             out=(-sd, 0, 0))
+            if rnd.random() < 0.3:          # falls on the face toward her, so they read head-on
+                SC.waterfall(m, P, (x - sd * r * 0.3, y + r - r * 0.97, top_z - 0.3), drop=top_z - FLOOR - 1,
+                             w=rnd.uniform(1.4, 2.2), out=(0, -1, 0))
             y += 2 * r + rnd.uniform(-0.5, 0.8)
         # second rank behind: taller, simpler
         y = rnd.uniform(-4, 0)
@@ -387,8 +365,7 @@ def sky_gorge(name="sky_gorge", L=40.0, seed=3):
             r = rnd.uniform(3.0, 4.5)
             x = sd * (GORGE + 7 + r + rnd.uniform(0, 4))
             top, rt = _cliff_column(m, rnd, x, y + r, FLOOR, rnd.uniform(8, 20), r)
-            m.mat("sk_grass")
-            m.ico(tuple(top + V((0, 0, 0.1))), rt * 1.05, 1, s=(1, 1, 0.25))
+            _cap(m, rnd, top, rt, sd, dense=False)
             for j in range(2):
                 SC.round_tree(m, P, tuple(top + V((rnd.uniform(-1, 1) * rt * 0.5, rnd.uniform(-1, 1) * rt * 0.5, 0.2))),
                               rnd, h=rnd.uniform(2.4, 3.6), r=rnd.uniform(1.0, 1.5))
@@ -438,70 +415,150 @@ def sky_backdrop(name="sky_far", seed=9):
 
 
 def design_sky_gorge():
+    """The gorge from behind the glider at mid altitude, and a high overview."""
     import studio
     E.reset()
-    studio.stage(res=(1280, 720), floor=False, sky_top=0x8FC8F4, sky_hor=0xEAF6FF)
+    studio.stage(res=(1280, 720), floor=False, sky_top=0x7FC0F2, sky_hor=0xEAF6FF)
     outl = []
     for k in range(4):
         g = sky_gorge("sky_gorge_%d" % k, seed=3 + k)
         g.location = (0, k * 40.0, 0)
         outl.append(g)
     sky_backdrop()
-    for k, (x, y, z, sz) in enumerate(((-4, 30, -6, 6), (5, 55, -5, 7), (-7, 80, 3, 5), (4, 12, 13, 4), (8, 100, -3, 8),
-                                       (-8, 18, -9, 7), (7, 42, -10, 8), (0, 70, -11, 9), (-9, 110, 6, 6))):
+    rnd = random.Random(12)
+    for k in range(14):                     # cloud banks: below in the gorge, in the lane, and big ones far off
+        if k < 5:
+            loc, sz = (rnd.uniform(-8, 8), rnd.uniform(15, 150), rnd.uniform(-11, -6)), rnd.uniform(6, 9)
+        elif k < 9:
+            loc, sz = (rnd.uniform(-5, 5), rnd.uniform(25, 120), rnd.uniform(4, 10)), rnd.uniform(3, 4.5)
+        else:
+            loc, sz = (rnd.uniform(-60, 60), rnd.uniform(160, 220), rnd.uniform(14, 36)), rnd.uniform(18, 30)
         c = cloud("cloud_%d" % k, seed=k + 2, size=sz)
-        c.location = (x, y, z)
-    cab = chime_cable("gorge_cable", span=2 * GORGE + 6, pylon=8.0 - FLOOR)
-    cab.location = (0, 60, 8.0)
-    outl.append(cab)
-    bo, wo = crow()
-    bo.location = (1.5, 22, 6.0)
-    wo.location = (1.6, 22, 6.02)
-    sl = sky_lantern()
-    sl.location = (-2.0, 30, 5.0)
-    k = kite()
-    k.location = (3.0, 38, 8.0)
-    for o in outl + [bo, wo, sl, k]:
-        E.add_outline(o, 0.012)
+        c.location = loc
+    for k, (x, y, z, sc) in enumerate(((-26, 120, 18, 2.4), (30, 150, 22, 3.0), (-40, 180, 10, 3.4), (22, 95, 26, 1.8))):
+        d = islet("far_islet_%d" % k, seed=40 + k)          # distant floating islets
+        d.location = (x, y, z)
+        d.scale = (sc, sc, sc)
+    il = islet("islet_a", seed=6)
+    il.location = (-2.5, 46, 6.5)
+    tc = thundercloud()
+    tc.location = (3.5, 58, 8.0)
+    cab = chime_cable("gorge_cable", span=2 * GORGE + 6, pylon=10.0 - FLOOR)
+    cab.location = (0, 76, 10.0)
+    outl += [il, cab]
+    outl += crow_flight("crow_a", (1.2, 28, 6.6), flap=26)
+    for i, k in enumerate(range(-2, 3)):
+        outl += crow_flight("flock_%d" % i, (-1.5 + k * 1.3, 36 + abs(k) * 1.6, 8.2 + abs(k) * 0.45), flap=12 + 14 * (i % 2))
+    for o in outl:
+        if o.type == 'MESH':
+            E.add_outline(o, 0.012)
+    studio.haze(0xE4F0FA, start=20.0, depth=170.0, amount=0.7)
     studio.aim_sun(150)
-    studio.shoot("sky_gorge_runner", target=(0, 30, 5.0), dist=14, yaw=0, pitch=10, lens=30, light=False)
+    studio.shoot("sky_gorge_runner", target=(0, 30, 6.0), dist=14, yaw=0, pitch=8, lens=30, light=False)
     studio.shoot("sky_gorge_overview", target=(0, 50, 0.0), dist=48, yaw=330, pitch=28, lens=30, light=False)
 
 
-# ----------------------------------------------------------------------------- design render
+def islet(name="islet", seed=5, r=2.2):
+    """Floating rock islet (H_ISLET): an upturned craggy cone of layered sandstone, a grassy top with a tree, bushes
+    and flowers, roots and vines trailing from its underside, and a thread of water spilling off one edge."""
+    import scenery as SC
+    mats()
+    rnd = random.Random(seed)
+    m = E.Mesher(name)
+    P = PAL
+    z = 0.0
+    rr = r
+    for k in range(4):                       # stacked drums tapering downward
+        dh = rnd.uniform(0.45, 0.7)
+        m.mat("sk_rock" if k % 2 == 0 else "sk_rock_dark")
+        m.cyl((rnd.uniform(-0.1, 0.1), rnd.uniform(-0.1, 0.1), z - dh / 2), r=rr, h=dh, seg=10, r2=rr * 0.97)
+        z -= dh * 0.92
+        rr *= 0.7
+    m.mat("sk_rock_dark")
+    m.cyl((0, 0, z - 0.4), r=rr, h=0.8, seg=8, r2=0.05)
+    top = V((0, 0, 0.0))
+    _cap(m, rnd, top, r * 0.95)
+    SC.round_tree(m, P, (r * 0.2, 0.1, 0.25), rnd, h=2.0, r=0.9)
+    m.mat("sk_bark")                        # roots
+    for k in range(7):
+        a = 2 * math.pi * k / 7 + rnd.uniform(-0.2, 0.2)
+        p0 = V((math.cos(a) * r * 0.6, math.sin(a) * r * 0.6, -0.6))
+        pts = [p0, p0 + V((math.cos(a) * 0.3, math.sin(a) * 0.3, -0.7)), p0 + V((math.cos(a) * 0.2, math.sin(a) * 0.2, -1.5))]
+        m.tube([tuple(p) for p in pts], r=0.05, seg=5, taper=0.2)
+    SC.waterfall(m, P, (r * 0.75, -r * 0.45, -0.05), drop=2.6, w=0.45, out=(0.6, -0.8, 0))
+    return m.obj(name, smooth_angle=40)
 
-def design_sky():
-    import studio
-    E.reset()
-    studio.stage(res=(1280, 720), floor=False, sky_top=0x8FC8F4, sky_hor=0xEAF6FF)
+
+def thundercloud(name="thundercloud", seed=3, size=3.0):
+    """Little storm cloud (H_STORM): a soft lilac-grey puff with a darker belly, a zig-zag spark and rain streaks.
+    She bursts through it (no crash), with a jolt."""
+    mats()
+    rnd = random.Random(seed)
+    m = E.Mesher(name)
+    for k in range(11):
+        a = rnd.uniform(0, 2 * math.pi)
+        rr = size * 0.42 * math.sqrt(rnd.random())
+        c = V((math.cos(a) * rr, math.sin(a) * rr * 0.55, rnd.uniform(0, size * 0.25)))
+        m.mat("sk_storm" if c.z > size * 0.08 else "sk_storm_dark")
+        m.ico(tuple(c), size * rnd.uniform(0.2, 0.32), 2, s=(1, 1, 0.8))
+    m.mat("sk_storm_dark")
+    m.ico((0, 0, -size * 0.05), size * 0.5, 2, s=(1.1, 0.6, 0.25))
+    m.mat("sk_bolt")
+    pts = [V((0.2, -0.2, -0.1)), V((-0.15, -0.25, -0.6)), V((0.15, -0.25, -0.75)), V((-0.1, -0.3, -1.3))]
+    m.sweep(pts, [(-0.06, 0), (0.06, 0)], closed=False, cap=False)
+    m.mat("sk_water")
+    for k in range(9):
+        x = rnd.uniform(-size * 0.4, size * 0.4)
+        y = rnd.uniform(-size * 0.2, size * 0.2)
+        m.box((x, y, -size * 0.25 - 0.5), (0.02, 0.02, 0.6 + rnd.uniform(0, 0.4)), smooth=False)
+    return m.obj(name, smooth_angle=180)
+
+
+def crow_flight(prefix, loc, flap=20.0, face=-1):
+    """Crow with both wings set at `flap` degrees, facing -Y (head-on toward the player) when face = -1."""
     bo, wo = crow()
-    bo.location = (-3.2, 0, 2.0)
+    bo.name = prefix
     wl = wo.copy()
     wl.data = wo.data.copy()
     E.link(wl)
-    wo.location = (-3.2 + 0.1, 0, 2.02)
-    wo.rotation_euler = (0, math.radians(-25), 0)
-    wl.location = (-3.2 - 0.1, 0, 2.02)
+    rz = math.pi if face < 0 else 0.0
+    for o in (wo, wl):
+        o.parent = bo
+    wo.location = (0.1, 0, 0.02)
+    wo.rotation_euler = (0, math.radians(-flap), 0)
+    wl.location = (-0.1, 0, 0.02)
     wl.scale = (-1, 1, 1)
-    wl.rotation_euler = (0, math.radians(25), 0)
-    for o in (bo, wo, wl):
-        o.scale = (o.scale[0] * 2, 2, 2)
-    k = kite()
-    k.location = (-0.4, 0, 2.2)
-    k.rotation_euler = (math.radians(-10), 0, math.radians(10))
-    sl = sky_lantern()
-    sl.location = (2.0, 0, 1.4)
-    sl.scale = (2, 2, 2)
+    wl.rotation_euler = (0, math.radians(flap), 0)
+    bo.location = loc
+    bo.rotation_euler = (0, 0, rz)
+    bo.scale = (2, 2, 2)
+    return [bo, wo, wl]
+
+
+def design_sky():
+    """Sheet of the sky-glide obstacles, from where she sees them (they come at her down the gorge)."""
+    import studio
+    E.reset()
+    studio.stage(res=(1280, 720), floor=False, sky_top=0x8FC8F4, sky_hor=0xEAF6FF)
+    outl = []
+    outl += crow_flight("crow_a", (-4.0, 0, 2.4), flap=28)
+    for i, k in enumerate(range(-2, 3)):                  # V flock, head-on
+        outl += crow_flight("flock_%d" % i, (-4.0 + k * 0.9, 4.0 + abs(k) * 0.8, 3.6 + abs(k) * 0.3), flap=10 + 12 * (i % 2))
+    il = islet()
+    il.location = (1.0, 3.0, 1.6)
+    outl.append(il)
+    tc = thundercloud()
+    tc.location = (5.6, 2.0, 3.0)
     cc = chime_cable(span=10, pylon=4.5)
-    cc.location = (0.5, 2.5, 3.6)
-    sp = spire(h=6.0)
-    sp.location = (5.5, 4.0, -3.0)
+    cc.location = (0.5, 7.0, 4.6)
+    outl.append(cc)
     cl = cloud(size=4.0)
-    cl.location = (-6.0, 8.0, 2.0)
+    cl.location = (-7.0, 9.0, 0.6)
     tr = thermal_ring()
-    tr.location = (3.6, -0.5, 0.3)
+    tr.location = (4.8, -1.5, 0.3)
     ws = wind_streak()
-    ws.location = (0.5, -1.0, 0.6)
-    for o in (bo, wo, wl, k, sl, cc, sp):
-        E.add_outline(o, 0.01)
-    studio.shoot("sky_hazards", target=(0.2, 1.0, 2.0), dist=13, yaw=8, pitch=20, lens=35)
+    ws.location = (-1.0, -1.0, 0.4)
+    for o in outl:
+        if o.type == 'MESH':
+            E.add_outline(o, 0.01)
+    studio.shoot("sky_hazards", target=(0.2, 2.0, 2.4), dist=13, yaw=8, pitch=12, lens=35)

@@ -72,6 +72,13 @@ def mats():
     M("rv_far2", 0xB8C8E4, rim=0.1, soft=0.3, outline=0.0, flags=E.F_NOCAST, shadow=0xB0B4E0)
     M("rv_snow", 0xF4F6FF, rim=0.1, soft=0.3, outline=0.0, flags=E.F_NOCAST)
     M("rv_rope", 0xD8C29A, rim=0.2, soft=0.1)
+    M("rv_grass_a", 0x6FBF58, rim=0.2, soft=0.25, flags=E.F_FOLIAGE | E.F_DOUBLE, sway=0.35, outline=0.0, shadow=0x6A9AA8)
+    M("rv_grass_b", 0x8ED066, rim=0.2, soft=0.25, flags=E.F_FOLIAGE | E.F_DOUBLE, sway=0.35, outline=0.0, shadow=0x7AA6A8)
+    M("rv_grass_tip", 0xC2E27C, rim=0.3, soft=0.25, flags=E.F_FOLIAGE | E.F_DOUBLE, sway=0.45, outline=0.0, shadow=0x8EB0A0)
+    M("rv_tree_hi", 0xB2DC78, rim=0.35, soft=0.25, shadow=0x7EA6A0)
+    M("rv_fl_white", 0xFFFBF0, rim=0.3, soft=0.2, emis=0.05, outline=0.0)
+    M("rv_fl_yellow", 0xFFD65A, rim=0.3, soft=0.2, emis=0.05, outline=0.0)
+    M("rv_fl_pink", 0xFFB4CC, rim=0.3, soft=0.2, emis=0.05, outline=0.0)
     M("rv_whirl", 0xE8F8FF, emis=0.3, rim=0.0, soft=0.2, flags=E.F_NOCAST | E.F_DECAL, outline=0.0)
 
 
@@ -190,7 +197,8 @@ PAL = {"trunk": "rv_trunk", "leaf": "rv_tree", "leaf2": "rv_tree2", "leaf3": "rv
        "flower2": "rv_hydrangea2", "wall": "rv_wall", "timber": "rv_timber", "roof": "rv_roof", "stone": "rv_stone",
        "stone2": "rv_stone_dark", "moss": "rv_moss", "far": "rv_far", "far2": "rv_far2", "snow": "rv_snow",
        "water": "rv_water", "foam": "rv_foam", "rope": "rv_rope", "red": "rv_torii", "glow": "rv_lantern_glow",
-       "culm": "rv_bamboo"}
+       "culm": "rv_bamboo", "grass_a": "rv_grass_a", "grass_b": "rv_grass_b", "grass_tip": "rv_grass_tip",
+       "leaf_hi": "rv_tree_hi", "fl_white": "rv_fl_white", "fl_yellow": "rv_fl_yellow", "fl_pink": "rv_fl_pink"}
 
 
 def _bank_profile(side):
@@ -198,12 +206,14 @@ def _bank_profile(side):
     rising into wooded hills so the frame is full either side of the river."""
     e = RIVER_HALF
     return [(side * (e - 0.1), -0.25), (side * e, 0.12), (side * (e + 0.5), 0.3), (side * (e + 1.6), 0.55),
-            (side * (e + 4.0), 0.75), (side * (e + 9.0), 1.2), (side * (e + 14.0), 2.6), (side * (e + 22.0), 6.0)]
+            (side * (e + 4.0), 0.75), (side * (e + 9.0), 1.2), (side * (e + 14.0), 2.6), (side * (e + 22.0), 6.0),
+            (side * (e + 34.0), 13.0)]
 
 
 def _bank_z(d):
     """Ground height at distance d outward from the river's edge (matches _bank_profile)."""
-    prof = [(-0.1, -0.25), (0, 0.12), (0.5, 0.3), (1.6, 0.55), (4.0, 0.75), (9.0, 1.2), (14.0, 2.6), (22.0, 6.0)]
+    prof = [(-0.1, -0.25), (0, 0.12), (0.5, 0.3), (1.6, 0.55), (4.0, 0.75), (9.0, 1.2), (14.0, 2.6), (22.0, 6.0),
+            (34.0, 13.0)]
     for (a, za), (b, zb) in zip(prof, prof[1:]):
         if d <= b:
             return za + (zb - za) * (d - a) / (b - a)
@@ -223,10 +233,14 @@ def river_sides(m, L, rnd, sd):
         lily_pads(m, (sd * (e - 1.0), rnd.uniform(1, L - 1), 0), rnd, n=4)
     for k in range(5):
         SC.rock(m, P, at(rnd.uniform(-0.2, 0.6), rnd.uniform(0, L)), rnd, r=rnd.uniform(0.2, 0.45))
-    # near bank: grass tufts, hydrangea shrubs, a bamboo fence run, lanterns
+    # the whole bank under a carpet of grass and wildflowers (no bare ground), ferns along the edge
+    zf = lambda px, py: _bank_z(abs(px) - e)
+    lo, hi = sorted((sd * (e + 0.35), sd * (e + 16.0)))
+    SC.grass_carpet(m, P, lo, hi, 0.0, L, zf, rnd, density=2.2, h=0.42, flowers=0.07)
     for k in range(6):
-        SC.grass_tufts(m, P, at(rnd.uniform(0.6, 3.5), rnd.uniform(0, L)), rnd, n=6)
-    for k in range(5):
+        d = rnd.uniform(0.6, 3.0)
+        SC.fern(m, P, at(d, rnd.uniform(0, L)), rnd, r=rnd.uniform(0.45, 0.7))
+    for k in range(12):
         y = rnd.uniform(0.5, L - 0.5)
         SC.shrub(m, P, at(rnd.uniform(1.2, 3.8), y), rnd, r=rnd.uniform(0.35, 0.6),
                  flowers=rnd.choice((P["flower"], P["flower2"])))
@@ -242,8 +256,11 @@ def river_sides(m, L, rnd, sd):
         SC.round_tree(m, P, at(d, rnd.uniform(0, L)), rnd, h=rnd.uniform(2.8, 4.5), r=rnd.uniform(1.1, 1.8))
     for k in range(3):
         SC.pine(m, P, at(rnd.uniform(10, 21), rnd.uniform(0, L)), rnd, h=rnd.uniform(3.5, 5.5))
-    for k in range(4):
-        SC.shrub(m, P, at(rnd.uniform(8, 18), rnd.uniform(0, L)), rnd, r=rnd.uniform(0.6, 1.0))
+    for k in range(8):
+        SC.shrub(m, P, at(rnd.uniform(5, 16), rnd.uniform(0, L)), rnd, r=rnd.uniform(0.6, 1.1),
+                 flowers=rnd.choice((None, P["flower"], P["flower2"], P["fl_white"])))
+    # forest on the upper slope: a continuous canopy so the hillside is fully covered
+    SC.canopy_mass(m, P, *sorted((sd * (e + 15.0), sd * (e + 33.0))), 0.0, L, zf, rnd, n=26, r=(1.8, 3.0))
     r = rnd.random()
     if r < 0.45:
         SC.house(m, P, at(rnd.uniform(9, 13), rnd.uniform(4, L - 4)), rnd, rot=math.radians(90 if sd > 0 else -90))
@@ -422,8 +439,8 @@ def croc(name="croc"):
     wo = wl.obj(name + "_wake", smooth_angle=50)
     bo = E.join([bo, wo], name + "_body")
     # sink it 0.1 m so only the back, the scutes, the eyes and the snout ride above the water, and face -Y
-    for o in (bo, jo):
-        o.data.transform(Matrix.Rotation(math.pi, 4, 'Z') @ Matrix.Translation((0, 0, -0.1)))
+    bo.data.transform(Matrix.Rotation(math.pi, 4, 'Z') @ Matrix.Translation((0, 0, -0.1)))
+    jo.data.transform(Matrix.Rotation(math.pi, 4, 'Z'))       # origin = hinge; place it at JAW_HINGE
     return bo, jo
 
 
@@ -523,7 +540,7 @@ def backdrop(name="river_far", seed=7):
     m = E.Mesher(name)
     SC.mountains(m, PAL, (0, 120, -1.0), rnd, n=7, w=160, h=(14, 30), depth=14)
     for sd in (-1, 1):
-        m.push(Matrix.Translation((sd * 46, 50, -1.0)) @ Matrix.Rotation(math.radians(90 * sd), 4, 'Z'))
+        m.push(Matrix.Translation((sd * 62, 50, 4.0)) @ Matrix.Rotation(math.radians(90 * sd), 4, 'Z'))
         SC.mountains(m, PAL, (0, 0, 0), rnd, n=6, w=130, h=(10, 20), depth=12)
         m.pop()
     return m.obj(name, smooth_angle=30)
@@ -550,7 +567,7 @@ def design_river():
     for o in (bo, jo):
         o.location = (1.0, 30, 0)
     jo.rotation_euler = (math.radians(-28), 0, 0)
-    jo.location = (1.0, 30 - 0.62, 0.16)
+    jo.location = (1.0, 30 - JAW_HINGE.y, JAW_HINGE.z)
     lg = drift_log()
     lg.location = (-1.2, 38, 0)
     lg.rotation_euler = (0, 0, math.radians(20))
@@ -560,6 +577,12 @@ def design_river():
     hr.location = (-RIVER_HALF + 0.6, 26, 0)
     for o in [s1, s2, bo, jo, lg, hr, isl]:
         E.add_outline(o, 0.012)
+    import sky_kit as SK
+    rnd = random.Random(21)
+    for k in range(7):                       # big painterly cumulus over the valley
+        c = SK.cloud("river_cloud_%d" % k, seed=30 + k, size=rnd.uniform(16, 28))
+        c.location = (rnd.uniform(-70, 70), rnd.uniform(90, 170), rnd.uniform(22, 40))
+    studio.haze(0xDCEBF4, start=18.0, depth=150.0, amount=0.7)
     studio.aim_sun(160)
     studio.shoot("river_overview", target=(0, 34, 0.0), dist=22, yaw=180 + 160, pitch=26, lens=30, light=False)
     studio.shoot("river_runner", target=(0, 30, 0.8), dist=12, yaw=0, pitch=14, lens=32, light=False)
@@ -573,7 +596,7 @@ def design_river_hazards():
     s1.location = (-3.2, 0, 0)
     bo, jo = croc()
     bo.location = (0, 0, 0)
-    jo.location = (0, -0.62, 0.16)
+    jo.location = (0, -JAW_HINGE.y, JAW_HINGE.z)
     jo.rotation_euler = (math.radians(-32), 0, 0)
     # the jaw is modelled around the hinge at its origin side: place it at the hinge
     lg = drift_log()
@@ -592,7 +615,7 @@ def design_croc(open_deg="30"):
     E.reset()
     studio.stage(res=(900, 600), floor_col=0x8FD3E8)
     bo, jo = croc()
-    jo.location = (0, -JAW_HINGE.y, JAW_HINGE.z - 0.06)
+    jo.location = (0, -JAW_HINGE.y, JAW_HINGE.z)
     jo.rotation_euler = (math.radians(-float(open_deg)), 0, 0)
     for o in (bo, jo):
         E.add_outline(o, 0.01)
