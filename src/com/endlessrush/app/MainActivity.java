@@ -3,8 +3,16 @@ package com.endlessrush.app;
 import android.app.Activity;
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.content.res.ColorStateList;
+import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.ColorFilter;
+import android.graphics.Paint;
+import android.graphics.PixelFormat;
+import android.graphics.Rect;
+import android.graphics.RectF;
 import android.graphics.Typeface;
+import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.LayerDrawable;
 import android.opengl.GLSurfaceView;
@@ -39,8 +47,16 @@ import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.egl.EGLDisplay;
 
 public final class MainActivity extends Activity implements Game.Listener, GameRenderer.Hud {
-    private static final int GOLD = 0xFFFFC928, BLUE = 0xFF2F8CFF, GREEN = 0xFF2BC46B, RED = 0xFFE94B3C,
-            PURPLE = 0xFF9B4DE0, DARK = 0xE6141A2A, WHITE = 0xFFFFFFFF, ORANGE = 0xFFFF8A1F;
+    // Sakura Line palette: cream paper and violet ink with pastel accents (each screen keeps the same style)
+    static final int INK = 0xFF2E2440, PAPER = 0xFFFFF8EE, PAPER_LOW = 0xFFFBE7DA, SOFT_TEXT = 0xFF76698E,
+            SAKURA = 0xFFF27BA8, LEAF = 0xFF5DBE6A, SKY = 0xFF4EAEF0, SUNSET = 0xFFFF9A3D, LILAC = 0xFF9D7FE8,
+            MON = 0xFFFFC93C, MON_DARK = 0xFFD9951E, ROCKET_RED = 0xFFF2645A, OMAMORI_RED = 0xFFE5484D,
+            MUTED = 0xFF9C94B8, WHITE = 0xFFFFFFFF;
+    // power-ups in Profile's upgrade order, then the board (the HUD bars and the shop rows)
+    private static final String[] POWER_NAME = {"HAYATE ROCKET", "TOBI BOOTS", "MANEKI MAGNET", "FEVER STAR 2X", "KAZE BOARD"};
+    private static final String[] UPGRADE_NAME = {"Hayate Rocket", "Tobi Boots", "Maneki Magnet", "Fever Star"};
+    private static final String[] POWER_GLYPH = {"翔", "跳", "招", "倍", "風"};
+    private static final int[] POWER_COL = {ROCKET_RED, LEAF, MON, LILAC, SKY};
 
     private Profile profile;
     private Game game;
@@ -80,7 +96,11 @@ public final class MainActivity extends Activity implements Game.Listener, GameR
         super.onCreate(b);
         requestWindowFeature(Window.FEATURE_NO_TITLE);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN | WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        heavy = Typeface.create("sans-serif-black", Typeface.BOLD);
+        try {
+            heavy = Typeface.createFromAsset(getAssets(), "fonts/Outfit-Bold.ttf");
+        } catch (RuntimeException e) {
+            heavy = Typeface.create("sans-serif-black", Typeface.BOLD);
+        }
 
         final SharedPreferences prefs = getSharedPreferences("endless_rush", Context.MODE_PRIVATE);
         profile = new Profile(new Profile.Store() {
@@ -131,7 +151,7 @@ public final class MainActivity extends Activity implements Game.Listener, GameR
         buildHeroes();
         buildMissions();
 
-        banner = label("", 26, WHITE);
+        banner = label("", 22, INK);
         banner.setGravity(Gravity.CENTER);
         banner.setVisibility(View.GONE);
         FrameLayout.LayoutParams bl = new FrameLayout.LayoutParams(-2, -2, Gravity.CENTER_HORIZONTAL | Gravity.TOP);
@@ -284,7 +304,7 @@ public final class MainActivity extends Activity implements Game.Listener, GameR
 
     @Override
     public void onMessage(final String text) {
-        ui.post(new Runnable() { public void run() { showBanner(text); } });
+        ui.post(new Runnable() { public void run() { showBanner(display(text)); } });
     }
 
     @Override
@@ -322,12 +342,12 @@ public final class MainActivity extends Activity implements Game.Listener, GameR
             if (hMult != lastMult) {
                 lastMult = hMult;
                 multText.setText("x" + hMult);
-                multText.setBackground(pill(hX2 > 0 ? PURPLE : GREEN));
+                multText.setBackground(chip(hX2 > 0 ? LILAC : SAKURA));
                 pop(multText);
             }
             if (hBoards != lastBoards) {
                 lastBoards = hBoards;
-                boardHint.setText("DOUBLE-TAP FOR HOVERBOARD  (" + hBoards + ")");
+                boardHint.setText("DOUBLE-TAP FOR KAZE BOARD  (" + hBoards + ")");
             }
             float[] vals = {hJet, hSneak, hMag, hX2, hBoard};
             for (int i = 0; i < 5; i++) {
@@ -367,7 +387,7 @@ public final class MainActivity extends Activity implements Game.Listener, GameR
             case Game.SAVE_ME:
                 hudLayer.setVisibility(View.VISIBLE);
                 int cost = game.saveMeCost();
-                saveMeBtn.setText("USE " + cost + " KEY" + (cost > 1 ? "S" : "") + "   (YOU HAVE " + profile.keys + ")");
+                saveMeBtn.setText("USE " + cost + " OMAMORI   (YOU HAVE " + profile.keys + ")");
                 fadeIn(saveMeLayer);
                 pop(saveMeTitle);
                 break;
@@ -381,11 +401,11 @@ public final class MainActivity extends Activity implements Game.Listener, GameR
 
     private void buildHud() {
         hudLayer = new FrameLayout(this);
-        TextView pause = circleButton("II", 0xAA000000);
+        TextView pause = circleButton("II", PAPER);
         pause.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) { gl(new Runnable() { public void run() { game.pause(); } }); }
         });
-        FrameLayout.LayoutParams pl = new FrameLayout.LayoutParams(dp(48), dp(48), Gravity.TOP | Gravity.LEFT);
+        FrameLayout.LayoutParams pl = new FrameLayout.LayoutParams(dp(50), dp(50), Gravity.TOP | Gravity.LEFT);
         pl.setMargins(dp(14), dp(18), 0, 0);
         hudLayer.addView(pause, pl);
 
@@ -394,18 +414,18 @@ public final class MainActivity extends Activity implements Game.Listener, GameR
         right.setGravity(Gravity.RIGHT);
         LinearLayout top = hrow();
         top.setGravity(Gravity.CENTER_VERTICAL);
-        multText = label("x1", 18, WHITE);
-        multText.setPadding(dp(10), dp(2), dp(10), dp(2));
-        multText.setBackground(pill(GREEN));
+        multText = label("x1", 17, WHITE);
+        multText.setPadding(dp(10), dp(2), dp(10), dp(3));
+        multText.setBackground(chip(SAKURA));
         top.addView(multText);
-        scoreText = label("0", 36, WHITE);
+        scoreText = label("0", 38, WHITE);
         scoreText.setPadding(dp(10), 0, 0, 0);
         top.addView(scoreText);
         right.addView(top);
         LinearLayout cr = hrow();
         cr.setGravity(Gravity.CENTER_VERTICAL);
-        cr.addView(coinIcon(20));
-        coinText = label("0", 24, GOLD);
+        cr.addView(coinIcon(24));
+        coinText = label("0", 26, MON);
         coinText.setPadding(dp(6), 0, 0, 0);
         cr.addView(coinText);
         right.addView(cr);
@@ -413,39 +433,50 @@ public final class MainActivity extends Activity implements Game.Listener, GameR
         rl.setMargins(0, dp(14), dp(16), 0);
         hudLayer.addView(right, rl);
 
+        // power-up timers: a cream tag per power-up with its kanji badge and a draining bar
         powerBars = new LinearLayout(this);
         powerBars.setOrientation(LinearLayout.VERTICAL);
-        String[] names = {"JETPACK", "SNEAKERS", "MAGNET", "2X", "BOARD"};
-        int[] cols = {RED, GREEN, 0xFFFF5252, PURPLE, 0xFFFF4E8A};
         for (int i = 0; i < 5; i++) {
-            LinearLayout row = new LinearLayout(this);
-            row.setOrientation(LinearLayout.VERTICAL);
-            row.setPadding(dp(8), dp(4), dp(8), dp(6));
-            row.setBackground(rounded(0x88000000, dp(10)));
-            TextView n = label(names[i], 12, WHITE);
-            row.addView(n);
+            LinearLayout row = hrow();
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setPadding(dp(6), dp(5), dp(12), dp(9));
+            row.setBackground(paper(dp(14), false));
+            row.addView(badge(POWER_GLYPH[i], POWER_COL[i], 30), new LinearLayout.LayoutParams(dp(30), dp(30)));
+            LinearLayout txt = new LinearLayout(this);
+            txt.setOrientation(LinearLayout.VERTICAL);
+            txt.setPadding(dp(8), 0, 0, 0);
+            TextView n = label(POWER_NAME[i], 11, INK);
+            n.setGravity(Gravity.LEFT);
+            txt.addView(n);
             FrameLayout track = new FrameLayout(this);
-            track.setBackground(rounded(0x55FFFFFF, dp(4)));
+            track.setBackground(rounded(0x262E2440, dp(5)));
             View fill = new View(this);
-            fill.setBackground(rounded(0xFF000000 | cols[i], dp(4)));
+            GradientDrawable fd = rounded(POWER_COL[i], dp(5));
+            fd.setStroke(dp(1.5f), INK);
+            fill.setBackground(fd);
             fill.setPivotX(0);
-            track.addView(fill, new FrameLayout.LayoutParams(dp(110), dp(8)));
-            row.addView(track, new LinearLayout.LayoutParams(dp(110), dp(8)));
+            track.addView(fill, new FrameLayout.LayoutParams(dp(96), dp(9)));
+            LinearLayout.LayoutParams tl = new LinearLayout.LayoutParams(dp(96), dp(9));
+            tl.topMargin = dp(2);
+            txt.addView(track, tl);
+            row.addView(txt);
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
-            lp.bottomMargin = dp(6);
+            lp.bottomMargin = dp(4);
             powerBars.addView(row, lp);
             row.setVisibility(View.GONE);
             barRow[i] = row;
             barFill[i] = fill;
         }
         FrameLayout.LayoutParams bl = new FrameLayout.LayoutParams(-2, -2, Gravity.LEFT | Gravity.TOP);
-        bl.setMargins(dp(14), dp(80), 0, 0);
+        bl.setMargins(dp(10), dp(80), 0, 0);
         hudLayer.addView(powerBars, bl);
 
-        boardHint = label("DOUBLE-TAP FOR HOVERBOARD", 13, WHITE);
-        boardHint.setAlpha(0.85f);
+        boardHint = label("DOUBLE-TAP FOR KAZE BOARD", 12, INK);
+        boardHint.setPadding(dp(14), dp(6), dp(16), dp(10));
+        boardHint.setBackground(paper(dp(18), false));
+        boardHint.setAlpha(0.92f);
         FrameLayout.LayoutParams hl = new FrameLayout.LayoutParams(-2, -2, Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL);
-        hl.bottomMargin = dp(20);
+        hl.bottomMargin = dp(18);
         hudLayer.addView(boardHint, hl);
         root.addView(hudLayer, match());
     }
@@ -463,35 +494,37 @@ public final class MainActivity extends Activity implements Game.Listener, GameR
 
         LinearLayout stats = hrow();
         stats.setGravity(Gravity.CENTER);
-        menuCoins = statPill(GOLD);
-        menuKeys = statPill(0xFF39B8FF);
-        menuBoards = statPill(0xFFFF4E8A);
+        menuCoins = statPill(new MonCoin());
+        menuKeys = statPill(new Glyph("守", OMAMORI_RED));
+        menuBoards = statPill(new Glyph("風", SKY));
         stats.addView(menuCoins);
         stats.addView(menuKeys);
         stats.addView(menuBoards);
         col.addView(stats);
 
-        TextView t1 = label("ENDLESS", 56, GOLD);
-        t1.setShadowLayer(1, dp(3), dp(4), 0xFFB5480B);
+        // logo: the name in sakura pink with an ink outline, on a sky ribbon
+        TextView t1 = label("PONGO", 70, SAKURA);
         t1.setRotation(-4);
-        TextView t2 = label("RUSH", 64, WHITE);
-        t2.setShadowLayer(1, dp(3), dp(4), 0xFF1B5FC0);
-        t2.setRotation(-4);
         LinearLayout.LayoutParams tl = new LinearLayout.LayoutParams(-2, -2);
-        tl.topMargin = dp(18);
+        tl.topMargin = dp(22);
         col.addView(t1, tl);
+        TextView t2 = label("SAKURA LINE DASH", 16, WHITE);
+        t2.setPadding(dp(16), dp(4), dp(16), dp(8));
+        t2.setBackground(chip(SKY));
+        t2.setRotation(-4);
         LinearLayout.LayoutParams t2l = new LinearLayout.LayoutParams(-2, -2);
-        t2l.topMargin = -dp(22);
+        t2l.topMargin = -dp(12);
         col.addView(t2, t2l);
 
         LinearLayout info = hrow();
         info.setGravity(Gravity.CENTER);
-        menuBest = label("BEST 0", 16, WHITE);
-        menuBest.setPadding(dp(12), dp(4), dp(12), dp(4));
-        menuBest.setBackground(pill(0x99000000));
-        menuMult = label("x1", 16, WHITE);
-        menuMult.setPadding(dp(12), dp(4), dp(12), dp(4));
-        menuMult.setBackground(pill(GREEN));
+        info.setPadding(0, dp(14), 0, 0);
+        menuBest = label("BEST 0", 14, INK);
+        menuBest.setPadding(dp(14), dp(5), dp(16), dp(9));
+        menuBest.setBackground(paper(dp(18), false));
+        menuMult = label("x1", 14, WHITE);
+        menuMult.setPadding(dp(14), dp(5), dp(14), dp(9));
+        menuMult.setBackground(chip(LEAF));
         info.addView(menuBest);
         info.addView(space(dp(8)));
         info.addView(menuMult);
@@ -499,16 +532,16 @@ public final class MainActivity extends Activity implements Game.Listener, GameR
 
         col.addView(new View(this), new LinearLayout.LayoutParams(1, 0, 1f));
 
-        playButton = gameButton("TAP TO PLAY", GREEN, 30);
+        playButton = gameButton("TAP TO RUN", LEAF, 30);
         playButton.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { startRun(); } });
-        col.addView(playButton, new LinearLayout.LayoutParams(-1, dp(72)));
+        col.addView(playButton, new LinearLayout.LayoutParams(-1, dp(76)));
         pulse(playButton);
 
         LinearLayout row = hrow();
         row.setPadding(0, dp(10), 0, 0);
-        TextView shop = gameButton("SHOP", ORANGE, 16);
-        TextView heroes = gameButton("HEROES", BLUE, 16);
-        TextView missions = gameButton("MISSIONS", PURPLE, 16);
+        TextView shop = gameButton("SHOP", SUNSET, 16);
+        TextView heroes = gameButton("HEROES", SKY, 16);
+        TextView missions = gameButton("MISSIONS", LILAC, 16);
         shop.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { openShop(); } });
         heroes.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { openHeroes(); } });
         missions.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { openMissions(); } });
@@ -517,12 +550,12 @@ public final class MainActivity extends Activity implements Game.Listener, GameR
         row.addView(heroes, weight());
         row.addView(space(dp(8)));
         row.addView(missions, weight());
-        col.addView(row, new LinearLayout.LayoutParams(-1, dp(62)));
+        col.addView(row, new LinearLayout.LayoutParams(-1, dp(64)));
 
         LinearLayout row2 = hrow();
         row2.setPadding(0, dp(8), 0, 0);
-        soundBtn = gameButton("", 0xFF5A6478, 13);
-        musicBtn = gameButton("", 0xFF5A6478, 13);
+        soundBtn = gameButton("", MUTED, 13);
+        musicBtn = gameButton("", MUTED, 13);
         soundBtn.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 profile.soundOn = 1 - profile.soundOn;
@@ -542,10 +575,9 @@ public final class MainActivity extends Activity implements Game.Listener, GameR
         row2.addView(soundBtn, weight());
         row2.addView(space(dp(8)));
         row2.addView(musicBtn, weight());
-        col.addView(row2, new LinearLayout.LayoutParams(-1, dp(48)));
+        col.addView(row2, new LinearLayout.LayoutParams(-1, dp(50)));
 
         TextView help = label("Swipe ← → to switch lanes  •  ↑ jump  •  ↓ roll", 12, WHITE);
-        help.setAlpha(0.8f);
         help.setPadding(0, dp(10), 0, 0);
         col.addView(help);
         menuLayer.addView(col, match());
@@ -553,13 +585,13 @@ public final class MainActivity extends Activity implements Game.Listener, GameR
     }
 
     private void refreshMenu() {
-        menuCoins.setText("COINS  " + fmt(profile.coins));
-        menuKeys.setText("KEYS  " + profile.keys);
-        menuBoards.setText("BOARDS  " + profile.boards);
+        menuCoins.setText(fmt(profile.coins));
+        menuKeys.setText(String.valueOf(profile.keys));
+        menuBoards.setText(String.valueOf(profile.boards));
         menuBest.setText("BEST  " + fmt(profile.highScore));
         menuMult.setText("MULTIPLIER x" + profile.missions.multiplier);
-        soundBtn.setText("SOUND: " + (profile.soundOn == 1 ? "ON" : "OFF"));
-        musicBtn.setText("MUSIC: " + (profile.musicOn == 1 ? "ON" : "OFF"));
+        soundBtn.setText("SOUND  " + (profile.soundOn == 1 ? "ON" : "OFF"));
+        musicBtn.setText("MUSIC  " + (profile.musicOn == 1 ? "ON" : "OFF"));
     }
 
     private void startRun() {
@@ -577,15 +609,15 @@ public final class MainActivity extends Activity implements Game.Listener, GameR
     private void buildPause() {
         pauseLayer = dimLayer();
         LinearLayout p = panel();
-        p.addView(label("PAUSED", 40, WHITE));
+        p.addView(label("PAUSED", 38, INK));
         pauseMissions = new LinearLayout(this);
         pauseMissions.setOrientation(LinearLayout.VERTICAL);
-        pauseMissions.setPadding(0, dp(12), 0, dp(12));
+        pauseMissions.setPadding(0, dp(10), 0, dp(14));
         p.addView(pauseMissions, new LinearLayout.LayoutParams(-1, -2));
-        TextView resume = gameButton("RESUME", GREEN, 22);
+        TextView resume = gameButton("RESUME", LEAF, 22);
         resume.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { resumeWithCountdown(); } });
-        p.addView(resume, new LinearLayout.LayoutParams(-1, dp(62)));
-        TextView menu = gameButton("MAIN MENU", RED, 18);
+        p.addView(resume, new LinearLayout.LayoutParams(-1, dp(64)));
+        TextView menu = gameButton("MAIN MENU", SAKURA, 18);
         menu.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 gl(new Runnable() {
@@ -599,10 +631,10 @@ public final class MainActivity extends Activity implements Game.Listener, GameR
                 });
             }
         });
-        LinearLayout.LayoutParams ml = new LinearLayout.LayoutParams(-1, dp(54));
+        LinearLayout.LayoutParams ml = new LinearLayout.LayoutParams(-1, dp(56));
         ml.topMargin = dp(10);
         p.addView(menu, ml);
-        pauseLayer.addView(p, centered(dp(320)));
+        pauseLayer.addView(p, centered(dp(330)));
         root.addView(pauseLayer, match());
     }
 
@@ -630,69 +662,76 @@ public final class MainActivity extends Activity implements Game.Listener, GameR
             public void onClick(View v) { gl(new Runnable() { public void run() { game.declineSaveMe(); } }); }
         });
         LinearLayout p = panel();
-        saveMeTitle = label("SAVE ME!", 44, GOLD);
+        p.addView(badge("守", OMAMORI_RED, 56), new LinearLayout.LayoutParams(dp(56), dp(56)));
+        saveMeTitle = label("KEEP RUNNING?", 34, SAKURA);
+        saveMeTitle.setPadding(0, dp(6), 0, 0);
         p.addView(saveMeTitle);
-        TextView sub = label("Keep your run going", 15, WHITE);
+        TextView sub = label("An omamori charm shakes off the crash", 14, SOFT_TEXT);
         sub.setPadding(0, 0, 0, dp(14));
         p.addView(sub);
-        saveMeBtn = gameButton("USE 1 KEY", 0xFF1F8FE0, 17);
+        saveMeBtn = gameButton("USE 1 OMAMORI", OMAMORI_RED, 17);
         saveMeBtn.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) { gl(new Runnable() { public void run() { game.saveMe(); } }); }
         });
-        p.addView(saveMeBtn, new LinearLayout.LayoutParams(-1, dp(64)));
+        p.addView(saveMeBtn, new LinearLayout.LayoutParams(-1, dp(66)));
         FrameLayout bar = new FrameLayout(this);
-        bar.setBackground(rounded(0x44FFFFFF, dp(5)));
+        GradientDrawable bt = rounded(0x262E2440, dp(6));
+        bt.setStroke(dp(2), INK);
+        bar.setBackground(bt);
         saveMeBar = new View(this);
-        saveMeBar.setBackground(rounded(GOLD, dp(5)));
+        saveMeBar.setBackground(rounded(MON, dp(6)));
         saveMeBar.setPivotX(0);
-        bar.addView(saveMeBar, new FrameLayout.LayoutParams(-1, dp(10)));
-        LinearLayout.LayoutParams bl = new LinearLayout.LayoutParams(-1, dp(10));
+        bar.addView(saveMeBar, new FrameLayout.LayoutParams(-1, dp(12)));
+        LinearLayout.LayoutParams bl = new LinearLayout.LayoutParams(-1, dp(12));
         bl.topMargin = dp(14);
         p.addView(bar, bl);
-        TextView skip = label("tap anywhere to skip", 13, WHITE);
-        skip.setAlpha(0.7f);
+        TextView skip = label("tap anywhere to skip", 12, SOFT_TEXT);
         skip.setPadding(0, dp(10), 0, 0);
         p.addView(skip);
         p.setClickable(true);
-        saveMeLayer.addView(p, centered(dp(320)));
+        saveMeLayer.addView(p, centered(dp(330)));
         root.addView(saveMeLayer, match());
     }
 
     private void buildGameOver() {
         overLayer = dimLayer();
         LinearLayout p = panel();
-        overTitle = label("CRASHED!", 34, RED);
+        overTitle = label("CRASHED!", 36, ROCKET_RED);
         p.addView(overTitle);
-        overNew = label("NEW HIGH SCORE!", 18, GOLD);
-        p.addView(overNew);
-        TextView sl = label("SCORE", 14, 0xFFB8C2D8);
+        overNew = label("NEW HIGH SCORE!", 15, WHITE);
+        overNew.setPadding(dp(14), dp(3), dp(14), dp(7));
+        overNew.setBackground(chip(SAKURA));
+        LinearLayout.LayoutParams nl = new LinearLayout.LayoutParams(-2, -2);
+        nl.topMargin = dp(4);
+        p.addView(overNew, nl);
+        TextView sl = label("SCORE", 13, SOFT_TEXT);
         sl.setPadding(0, dp(8), 0, 0);
         p.addView(sl);
-        overScore = label("0", 52, WHITE);
+        overScore = label("0", 52, INK);
         p.addView(overScore);
         LinearLayout r = hrow();
         r.setGravity(Gravity.CENTER);
-        r.addView(coinIcon(18));
-        overCoins = label("0", 22, GOLD);
+        r.addView(coinIcon(22));
+        overCoins = label("0", 22, MON);
         overCoins.setPadding(dp(6), 0, dp(20), 0);
         r.addView(overCoins);
-        overBest = label("BEST 0", 16, WHITE);
+        overBest = label("BEST 0", 15, SOFT_TEXT);
         r.addView(overBest);
         p.addView(r);
         overMissions = new LinearLayout(this);
         overMissions.setOrientation(LinearLayout.VERTICAL);
-        overMissions.setPadding(0, dp(12), 0, dp(12));
+        overMissions.setPadding(0, dp(10), 0, dp(14));
         p.addView(overMissions, new LinearLayout.LayoutParams(-1, -2));
-        TextView again = gameButton("PLAY AGAIN", GREEN, 22);
+        TextView again = gameButton("RUN AGAIN", LEAF, 22);
         again.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { startRun(); } });
-        p.addView(again, new LinearLayout.LayoutParams(-1, dp(62)));
+        p.addView(again, new LinearLayout.LayoutParams(-1, dp(64)));
         LinearLayout row = hrow();
         row.setPadding(0, dp(10), 0, 0);
-        TextView menu = gameButton("MENU", 0xFF5A6478, 16);
+        TextView menu = gameButton("MENU", MUTED, 16);
         menu.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) { gl(new Runnable() { public void run() { game.toMenu(); } }); }
         });
-        TextView shop = gameButton("SHOP", ORANGE, 16);
+        TextView shop = gameButton("SHOP", SUNSET, 16);
         shop.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 gl(new Runnable() { public void run() { game.toMenu(); } });
@@ -702,8 +741,8 @@ public final class MainActivity extends Activity implements Game.Listener, GameR
         row.addView(menu, weight());
         row.addView(space(dp(8)));
         row.addView(shop, weight());
-        p.addView(row, new LinearLayout.LayoutParams(-1, dp(62)));
-        overLayer.addView(p, centered(dp(330)));
+        p.addView(row, new LinearLayout.LayoutParams(-1, dp(64)));
+        overLayer.addView(p, centered(dp(340)));
         root.addView(overLayer, match());
     }
 
@@ -721,23 +760,26 @@ public final class MainActivity extends Activity implements Game.Listener, GameR
     private void fillMissions(LinearLayout into, boolean big) {
         into.removeAllViews();
         Missions m = profile.missions;
-        TextView h = label("MISSIONS  •  MULTIPLIER x" + m.multiplier, big ? 16 : 13, GOLD);
+        TextView h = flat(label("MISSIONS  •  MULTIPLIER x" + m.multiplier, big ? 15 : 12, LILAC));
         h.setGravity(Gravity.LEFT);
         into.addView(h);
         for (int i = 0; i < 3; i++) {
             LinearLayout row = hrow();
             row.setGravity(Gravity.CENTER_VERTICAL);
-            row.setPadding(dp(10), dp(8), dp(10), dp(8));
-            row.setBackground(rounded(m.done[i] ? 0x552BC46B : 0x33FFFFFF, dp(10)));
-            TextView chk = label(m.done[i] ? "✔" : String.valueOf(i + 1), big ? 20 : 16, m.done[i] ? GREEN : WHITE);
-            chk.setPadding(0, 0, dp(10), 0);
-            row.addView(chk);
+            row.setPadding(dp(8), dp(7), dp(10), dp(7));
+            GradientDrawable bg = rounded(m.done[i] ? 0x405DBE6A : 0x142E2440, dp(12));
+            bg.setStroke(dp(1.5f), m.done[i] ? LEAF : 0x332E2440);
+            row.setBackground(bg);
+            int sz = big ? 30 : 26;
+            row.addView(badge(m.done[i] ? "✔" : String.valueOf(i + 1), m.done[i] ? LEAF : LILAC, sz),
+                    new LinearLayout.LayoutParams(dp(sz), dp(sz)));
             LinearLayout txt = new LinearLayout(this);
             txt.setOrientation(LinearLayout.VERTICAL);
-            TextView d = label(m.describe(i), big ? 16 : 14, WHITE);
+            txt.setPadding(dp(10), 0, 0, 0);
+            TextView d = label(m.describe(i), big ? 15 : 13, INK);
             d.setGravity(Gravity.LEFT);
             txt.addView(d);
-            TextView pr = label(fmt(m.progress[i]) + " / " + fmt(m.target[i]), 12, 0xFFB8C2D8);
+            TextView pr = label(fmt(m.progress[i]) + " / " + fmt(m.target[i]), 11, SOFT_TEXT);
             pr.setGravity(Gravity.LEFT);
             txt.addView(pr);
             row.addView(txt, weight());
@@ -756,19 +798,23 @@ public final class MainActivity extends Activity implements Game.Listener, GameR
         col.setPadding(dp(16), dp(20), dp(16), dp(16));
         LinearLayout head = hrow();
         head.setGravity(Gravity.CENTER_VERTICAL);
-        TextView title = label("SHOP", 36, WHITE);
+        TextView title = label("SHOP", 38, WHITE);
+        title.setGravity(Gravity.LEFT);
         head.addView(title, weight());
-        shopCoins = statPill(GOLD);
+        shopCoins = statPill(new MonCoin());
         head.addView(shopCoins);
         col.addView(head);
         ScrollView sv = new ScrollView(this);
         shopList = new LinearLayout(this);
         shopList.setOrientation(LinearLayout.VERTICAL);
+        shopList.setPadding(0, 0, 0, dp(8));
         sv.addView(shopList);
         col.addView(sv, new LinearLayout.LayoutParams(-1, 0, 1f));
-        TextView back = gameButton("BACK", 0xFF5A6478, 18);
+        TextView back = gameButton("BACK", MUTED, 18);
         back.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { backToMenu(); } });
-        col.addView(back, new LinearLayout.LayoutParams(-1, dp(56)));
+        LinearLayout.LayoutParams bk = new LinearLayout.LayoutParams(-1, dp(58));
+        bk.topMargin = dp(8);
+        col.addView(back, bk);
         shopLayer.addView(col, match());
         root.addView(shopLayer, match());
     }
@@ -780,18 +826,19 @@ public final class MainActivity extends Activity implements Game.Listener, GameR
     }
 
     private void refreshShop() {
-        shopCoins.setText("COINS  " + fmt(profile.coins));
+        shopCoins.setText(fmt(profile.coins));
         shopList.removeAllViews();
-        String[] desc = {"Fly high above the trains, grabbing sky coins.", "Jump super high - even onto train roofs!",
-                "Pulls every nearby coin straight to you.", "Doubles the points you earn."};
-        int[] cols = {RED, GREEN, 0xFFFF5252, PURPLE};
+        String[] desc = {"Blast up over the trains and grab the sky coins.", "Spring so high you land on train roofs.",
+                "The golden lucky cat pulls every nearby coin to you.", "Every point counts double while it shines."};
+        // shop order follows Profile's upgrades (rocket, boots, magnet, star); the HUD bars use the same entries
         for (int i = 0; i < 4; i++) {
             final int up = i;
             int cost = profile.upgradeCost(i);
             StringBuilder pips = new StringBuilder();
-            for (int k = 0; k < Profile.MAX_UP; k++) pips.append(k < profile.upgrades[i] ? "■ " : "□ ");
-            shopRow(Profile.UP_NAMES[i], desc[i] + "\nDuration " + (int) profile.powerDuration(i) + "s   " + pips,
-                    cols[i], cost < 0 ? "MAX" : fmt(cost), cost >= 0 && profile.coins >= cost, new Runnable() {
+            for (int k = 0; k < Profile.MAX_UP; k++) pips.append(k < profile.upgrades[i] ? "● " : "○ ");
+            shopRow(POWER_GLYPH[i], POWER_COL[i], UPGRADE_NAME[i],
+                    desc[i] + "\nLasts " + (int) profile.powerDuration(i) + "s   " + pips,
+                    cost < 0 ? "MAX" : fmt(cost), cost >= 0 && profile.coins >= cost, new Runnable() {
                         public void run() {
                             int c = profile.upgradeCost(up);
                             if (c < 0 || profile.coins < c) return;
@@ -801,25 +848,25 @@ public final class MainActivity extends Activity implements Game.Listener, GameR
                         }
                     });
         }
-        shopRow("Hoverboard", "Double-tap while running. Survives one crash.\nOwned: " + profile.boards, 0xFFFF4E8A,
+        shopRow("風", SKY, "Kaze Board", "Double-tap while running. Rides out one crash.\nOwned: " + profile.boards,
                 fmt(Profile.BOARD_COST), profile.coins >= Profile.BOARD_COST, new Runnable() {
                     public void run() {
                         if (profile.coins < Profile.BOARD_COST) return;
                         profile.coins -= Profile.BOARD_COST;
                         profile.boards++;
-                        done("+1 HOVERBOARD");
+                        done("+1 KAZE BOARD");
                     }
                 });
-        shopRow("Key", "Spend keys to keep running after a crash.\nOwned: " + profile.keys, 0xFF39B8FF,
+        shopRow("守", OMAMORI_RED, "Omamori", "A lucky charm that keeps your run going after a crash.\nOwned: " + profile.keys,
                 fmt(Profile.KEY_COST), profile.coins >= Profile.KEY_COST, new Runnable() {
                     public void run() {
                         if (profile.coins < Profile.KEY_COST) return;
                         profile.coins -= Profile.KEY_COST;
                         profile.keys++;
-                        done("+1 KEY");
+                        done("+1 OMAMORI");
                     }
                 });
-        shopRow("Mystery Box", "Coins, hoverboards or even keys inside!", 0xFF8A4CE0,
+        shopRow("福", SAKURA, "Gacha Capsule", "Coins, Kaze Boards or even an omamori inside!",
                 fmt(Profile.BOX_COST), profile.coins >= Profile.BOX_COST, new Runnable() {
                     public void run() {
                         if (profile.coins < Profile.BOX_COST) return;
@@ -827,8 +874,8 @@ public final class MainActivity extends Activity implements Game.Listener, GameR
                         Random r = new Random();
                         float x = r.nextFloat();
                         String msg;
-                        if (x < 0.1f) { profile.keys++; msg = "JACKPOT! +1 KEY"; }
-                        else if (x < 0.4f) { profile.boards += 2; msg = "+2 HOVERBOARDS"; }
+                        if (x < 0.1f) { profile.keys++; msg = "JACKPOT! +1 OMAMORI"; }
+                        else if (x < 0.4f) { profile.boards += 2; msg = "+2 KAZE BOARDS"; }
                         else if (x < 0.5f) { profile.coins += 2000; msg = "+2000 COINS!"; }
                         else { int c = 200 + r.nextInt(5) * 100; profile.coins += c; msg = "+" + c + " COINS"; }
                         done(msg);
@@ -843,31 +890,29 @@ public final class MainActivity extends Activity implements Game.Listener, GameR
         refreshShop();
     }
 
-    private void shopRow(String name, String desc, int color, String price, boolean enabled, final Runnable buy) {
+    private void shopRow(String glyph, int color, String name, String desc, String price, boolean enabled, final Runnable buy) {
         LinearLayout row = hrow();
         row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setPadding(dp(12), dp(12), dp(12), dp(12));
-        row.setBackground(rounded(0x33FFFFFF, dp(14)));
-        View sw = new View(this);
-        sw.setBackground(rounded(color, dp(10)));
-        row.addView(sw, new LinearLayout.LayoutParams(dp(44), dp(44)));
+        row.setPadding(dp(12), dp(12), dp(15), dp(17));
+        row.setBackground(paper(dp(18), true));
+        row.addView(badge(glyph, color, 48), new LinearLayout.LayoutParams(dp(48), dp(48)));
         LinearLayout txt = new LinearLayout(this);
         txt.setOrientation(LinearLayout.VERTICAL);
         txt.setPadding(dp(12), 0, dp(8), 0);
-        TextView n = label(name, 18, WHITE);
+        TextView n = label(name, 17, INK);
         n.setGravity(Gravity.LEFT);
         txt.addView(n);
         TextView d = new TextView(this);
         d.setText(desc);
         d.setTextSize(12);
-        d.setTextColor(0xFFCDD5E6);
+        d.setTextColor(SOFT_TEXT);
         txt.addView(d);
         row.addView(txt, weight());
-        TextView b = gameButton(price, enabled ? GREEN : 0xFF5A6478, 15);
+        TextView b = gameButton(price, enabled ? LEAF : MUTED, 15);
         b.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) { buy.run(); }
         });
-        row.addView(b, new LinearLayout.LayoutParams(dp(92), dp(48)));
+        row.addView(b, new LinearLayout.LayoutParams(dp(92), dp(50)));
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, -2);
         lp.topMargin = dp(10);
         shopList.addView(row, lp);
@@ -880,29 +925,29 @@ public final class MainActivity extends Activity implements Game.Listener, GameR
         LinearLayout p = panel();
         LinearLayout row = hrow();
         row.setGravity(Gravity.CENTER_VERTICAL);
-        TextView prev = circleButton("◀", BLUE);
-        TextView next = circleButton("▶", BLUE);
+        TextView prev = circleButton("◀", SKY);
+        TextView next = circleButton("▶", SKY);
         prev.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { showHero(heroIdx - 1); } });
         next.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { showHero(heroIdx + 1); } });
         LinearLayout mid = new LinearLayout(this);
         mid.setOrientation(LinearLayout.VERTICAL);
         mid.setGravity(Gravity.CENTER);
-        heroName = label("", 30, WHITE);
-        heroTag = label("", 13, 0xFFCDD5E6);
+        heroName = label("", 30, INK);
+        heroTag = label("", 13, SOFT_TEXT);
         mid.addView(heroName);
         mid.addView(heroTag);
-        row.addView(prev, new LinearLayout.LayoutParams(dp(48), dp(48)));
+        row.addView(prev, new LinearLayout.LayoutParams(dp(50), dp(50)));
         row.addView(mid, weight());
-        row.addView(next, new LinearLayout.LayoutParams(dp(48), dp(48)));
+        row.addView(next, new LinearLayout.LayoutParams(dp(50), dp(50)));
         p.addView(row, new LinearLayout.LayoutParams(-1, -2));
-        heroBtn = gameButton("", GREEN, 20);
+        heroBtn = gameButton("", LEAF, 20);
         heroBtn.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { heroAction(); } });
-        LinearLayout.LayoutParams hb = new LinearLayout.LayoutParams(-1, dp(60));
+        LinearLayout.LayoutParams hb = new LinearLayout.LayoutParams(-1, dp(62));
         hb.topMargin = dp(12);
         p.addView(heroBtn, hb);
-        TextView back = gameButton("BACK", 0xFF5A6478, 16);
+        TextView back = gameButton("BACK", MUTED, 16);
         back.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { backToMenu(); } });
-        LinearLayout.LayoutParams bl = new LinearLayout.LayoutParams(-1, dp(50));
+        LinearLayout.LayoutParams bl = new LinearLayout.LayoutParams(-1, dp(52));
         bl.topMargin = dp(8);
         p.addView(back, bl);
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM);
@@ -927,13 +972,13 @@ public final class MainActivity extends Activity implements Game.Listener, GameR
         heroTag.setText(d.tagline);
         if (profile.selected == heroIdx) {
             heroBtn.setText("SELECTED");
-            heroBtn.setBackground(buttonBg(0xFF5A6478));
+            heroBtn.setBackground(buttonBg(MUTED));
         } else if (profile.owned[heroIdx]) {
             heroBtn.setText("SELECT");
-            heroBtn.setBackground(buttonBg(GREEN));
+            heroBtn.setBackground(buttonBg(LEAF));
         } else {
             heroBtn.setText("UNLOCK  " + fmt(d.price));
-            heroBtn.setBackground(buttonBg(profile.coins >= d.price ? ORANGE : 0xFF5A6478));
+            heroBtn.setBackground(buttonBg(profile.coins >= d.price ? SUNSET : MUTED));
         }
     }
 
@@ -956,19 +1001,19 @@ public final class MainActivity extends Activity implements Game.Listener, GameR
     private void buildMissions() {
         missionsLayer = dimLayer();
         LinearLayout p = panel();
-        p.addView(label("MISSIONS", 36, WHITE));
-        TextView sub = label("Complete all three to raise your score multiplier!", 13, 0xFFCDD5E6);
+        p.addView(label("MISSIONS", 36, INK));
+        TextView sub = label("Finish all three to raise your score multiplier!", 13, SOFT_TEXT);
         sub.setPadding(0, 0, 0, dp(10));
         p.addView(sub);
         missionsList = new LinearLayout(this);
         missionsList.setOrientation(LinearLayout.VERTICAL);
         p.addView(missionsList, new LinearLayout.LayoutParams(-1, -2));
-        TextView back = gameButton("BACK", 0xFF5A6478, 18);
+        TextView back = gameButton("BACK", MUTED, 18);
         back.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { backToMenu(); } });
-        LinearLayout.LayoutParams bl = new LinearLayout.LayoutParams(-1, dp(54));
+        LinearLayout.LayoutParams bl = new LinearLayout.LayoutParams(-1, dp(56));
         bl.topMargin = dp(16);
         p.addView(back, bl);
-        missionsLayer.addView(p, centered(dp(340)));
+        missionsLayer.addView(p, centered(dp(350)));
         root.addView(missionsLayer, match());
     }
 
@@ -987,12 +1032,20 @@ public final class MainActivity extends Activity implements Game.Listener, GameR
 
     // ------------------------------------------------------------------ view helpers
 
+    /** The game's messages use the old item names; the screens show the Pongo names. */
+    private static String display(String msg) {
+        return msg.replace("SUPER SNEAKERS", "TOBI BOOTS").replace("COIN MAGNET", "MANEKI MAGNET")
+                .replace("2X MULTIPLIER", "FEVER STAR  2X").replace("JETPACK", "HAYATE ROCKET")
+                .replace("MYSTERY BOX", "GACHA").replace("HOVERBOARDS", "KAZE BOARDS").replace("HOVERBOARD", "KAZE BOARD")
+                .replace("KEYS", "OMAMORI").replace("KEY", "OMAMORI");
+    }
+
     private void showBanner(String text) {
         banner.setText(text);
         banner.setVisibility(View.VISIBLE);
-        banner.setBackground(rounded(0xAA000000, dp(16)));
-        banner.setPadding(dp(18), dp(10), dp(18), dp(10));
-        banner.setTextSize(text.length() > 22 ? 18 : 24);
+        banner.setBackground(paper(dp(20), false));
+        banner.setPadding(dp(20), dp(10), dp(22), dp(16));
+        banner.setTextSize(text.length() > 22 ? 17 : 22);
         banner.animate().cancel();
         banner.setAlpha(1);
         banner.setScaleX(0.6f);
@@ -1032,14 +1085,26 @@ public final class MainActivity extends Activity implements Game.Listener, GameR
         return l;
     }
 
+    /** Text in the heavy face. Ink text sits on paper as it is; any other colour gets a violet ink outline and a
+     *  little drop below it, so it reads over the 3D scene and on the pastel buttons. */
     private TextView label(String s, float sp, int color) {
-        TextView t = new TextView(this);
+        InkText t = new InkText(this);
         t.setText(s);
         t.setTextSize(sp);
         t.setTextColor(color);
         t.setTypeface(heavy);
         t.setGravity(Gravity.CENTER);
-        t.setShadowLayer(dp(3), 0, dp(2), 0xAA000000);
+        if (color != INK && color != SOFT_TEXT) {
+            float px = sp * getResources().getDisplayMetrics().scaledDensity;
+            t.stroke = Math.max(dp(1.8f), px * 0.16f);
+            t.drop = Math.max(dp(1f), px * 0.06f);
+        }
+        return t;
+    }
+
+    /** A coloured label printed straight on the paper, without the ink outline. */
+    private static TextView flat(TextView t) {
+        if (t instanceof InkText) ((InkText) t).stroke = 0;
         return t;
     }
 
@@ -1050,23 +1115,54 @@ public final class MainActivity extends Activity implements Game.Listener, GameR
         return g;
     }
 
-    private GradientDrawable pill(int color) { return rounded(color, dp(40)); }
+    /** A pastel chip with an ink rim (multiplier, ribbons, tags). */
+    private GradientDrawable chip(int color) {
+        GradientDrawable g = rounded(color, dp(40));
+        g.setStroke(dp(2.5f), INK);
+        return g;
+    }
 
+    /** Cream paper card with an ink rim and a violet drop shadow; framed cards add a thin sakura line inside. */
+    private LayerDrawable paper(float r, boolean framed) {
+        int sh = dp(4);
+        GradientDrawable shadow = rounded(0x552E2440, r);
+        GradientDrawable face = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[]{PAPER, PAPER_LOW});
+        face.setCornerRadius(r);
+        face.setStroke(dp(2.5f), INK);
+        Drawable[] layers;
+        if (framed) {
+            GradientDrawable line = new GradientDrawable();
+            line.setColor(0);
+            line.setCornerRadius(Math.max(dp(4), r - dp(5)));
+            line.setStroke(dp(1.5f), 0xAAF5A9C6);
+            layers = new Drawable[]{shadow, face, line};
+        } else {
+            layers = new Drawable[]{shadow, face};
+        }
+        LayerDrawable ld = new LayerDrawable(layers);
+        ld.setLayerInset(0, sh / 2, sh, 0, 0);
+        ld.setLayerInset(1, 0, 0, sh / 2, sh);
+        if (framed) ld.setLayerInset(2, dp(6), dp(6), sh / 2 + dp(6), sh + dp(6));
+        return ld;
+    }
+
+    /** Raised pastel button: ink-rimmed face over a darker lip, lit from the top. */
     private LayerDrawable buttonBg(int color) {
-        GradientDrawable shadow = rounded(darken(color), dp(16));
+        GradientDrawable lip = rounded(darken(color), dp(18));
+        lip.setStroke(dp(3), INK);
         GradientDrawable face = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[]{lighten(color), color});
-        face.setCornerRadius(dp(16));
-        face.setStroke(dp(2), 0x55FFFFFF);
-        LayerDrawable ld = new LayerDrawable(new android.graphics.drawable.Drawable[]{shadow, face});
-        ld.setLayerInset(1, 0, 0, 0, dp(5));
+                new int[]{lighten(lighten(color)), lighten(color), color});
+        face.setCornerRadius(dp(18));
+        face.setStroke(dp(3), INK);
+        LayerDrawable ld = new LayerDrawable(new Drawable[]{lip, face});
+        ld.setLayerInset(1, 0, 0, 0, dp(6));
         return ld;
     }
 
     private TextView gameButton(String s, int color, float sp) {
         final TextView t = label(s, sp, WHITE);
         t.setBackground(buttonBg(color));
-        t.setPadding(dp(8), 0, dp(8), dp(4));
+        t.setPadding(dp(8), 0, dp(8), dp(6));
         t.setClickable(true);
         t.setOnTouchListener(new View.OnTouchListener() {
             public boolean onTouch(View v, MotionEvent e) {
@@ -1080,20 +1176,33 @@ public final class MainActivity extends Activity implements Game.Listener, GameR
     }
 
     private TextView circleButton(String s, int color) {
-        TextView t = label(s, 18, WHITE);
+        TextView t = label(s, 18, color == PAPER ? INK : WHITE);
         GradientDrawable g = new GradientDrawable();
         g.setShape(GradientDrawable.OVAL);
         g.setColor(color);
-        g.setStroke(dp(2), 0x88FFFFFF);
+        g.setStroke(dp(3), INK);
         t.setBackground(g);
         t.setClickable(true);
         return t;
     }
 
-    private TextView statPill(int color) {
-        TextView t = label("", 14, color);
-        t.setPadding(dp(12), dp(6), dp(12), dp(6));
-        t.setBackground(pill(0xAA000000));
+    /** A rounded square badge with a glyph (power-up kanji, mission number). */
+    private TextView badge(String glyph, int color, int sizeDp) {
+        TextView t = label(glyph, sizeDp * 0.46f, WHITE);
+        GradientDrawable g = rounded(color, dp(sizeDp * 0.3f));
+        g.setStroke(dp(2.5f), INK);
+        t.setBackground(g);
+        t.setPadding(0, 0, 0, dp(1));
+        return t;
+    }
+
+    private TextView statPill(Drawable icon) {
+        TextView t = label("", 15, INK);
+        t.setPadding(dp(8), dp(5), dp(15), dp(9));
+        t.setBackground(paper(dp(18), false));
+        icon.setBounds(0, 0, dp(22), dp(22));
+        t.setCompoundDrawables(icon, null, null, null);
+        t.setCompoundDrawablePadding(dp(6));
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
         lp.setMargins(dp(4), 0, dp(4), 0);
         t.setLayoutParams(lp);
@@ -1102,18 +1211,14 @@ public final class MainActivity extends Activity implements Game.Listener, GameR
 
     private View coinIcon(int size) {
         View v = new View(this);
-        GradientDrawable g = new GradientDrawable();
-        g.setShape(GradientDrawable.OVAL);
-        g.setColor(GOLD);
-        g.setStroke(dp(3), 0xFFE0A000);
-        v.setBackground(g);
+        v.setBackground(new MonCoin());
         v.setLayoutParams(new LinearLayout.LayoutParams(dp(size), dp(size)));
         return v;
     }
 
     private FrameLayout dimLayer() {
         FrameLayout f = new FrameLayout(this);
-        f.setBackgroundColor(0x88000000);
+        f.setBackgroundColor(0x802E2440);
         f.setClickable(true);
         return f;
     }
@@ -1122,16 +1227,13 @@ public final class MainActivity extends Activity implements Game.Listener, GameR
         LinearLayout p = new LinearLayout(this);
         p.setOrientation(LinearLayout.VERTICAL);
         p.setGravity(Gravity.CENTER_HORIZONTAL);
-        p.setPadding(dp(18), dp(18), dp(18), dp(18));
-        GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[]{0xF0233152, DARK});
-        g.setCornerRadius(dp(24));
-        g.setStroke(dp(3), 0x66FFFFFF);
-        p.setBackground(g);
+        p.setPadding(dp(20), dp(18), dp(22), dp(24));
+        p.setBackground(paper(dp(26), true));
         return p;
     }
 
     private static int darken(int c) {
-        int r = (int) (((c >> 16) & 255) * 0.6f), g = (int) (((c >> 8) & 255) * 0.6f), b = (int) ((c & 255) * 0.6f);
+        int r = (int) (((c >> 16) & 255) * 0.72f), g = (int) (((c >> 8) & 255) * 0.68f), b = (int) ((c & 255) * 0.78f);
         return Color.argb(255, r, g, b);
     }
 
@@ -1161,5 +1263,99 @@ public final class MainActivity extends Activity implements Game.Listener, GameR
                         }).start();
                     }
                 }).start();
+    }
+
+    /** TextView that draws its text twice: an ink stroke (with a small drop) under the coloured fill. */
+    static final class InkText extends TextView {
+        float stroke, drop;
+        private boolean inDraw;
+
+        InkText(Context c) { super(c); }
+
+        @Override
+        protected void onDraw(Canvas c) {
+            if (stroke <= 0) { super.onDraw(c); return; }
+            inDraw = true;
+            ColorStateList fill = getTextColors();
+            Paint p = getPaint();
+            p.setStyle(Paint.Style.STROKE);
+            p.setStrokeJoin(Paint.Join.ROUND);
+            p.setStrokeWidth(stroke);
+            p.setShadowLayer(0.5f, 0, drop, INK);
+            setTextColor(INK);
+            super.onDraw(c);
+            p.setStyle(Paint.Style.FILL);
+            p.clearShadowLayer();
+            setTextColor(fill);
+            super.onDraw(c);
+            inDraw = false;
+        }
+
+        @Override
+        public void invalidate() { if (!inDraw) super.invalidate(); }
+    }
+
+    /** A gold Mon coin: ink rim, raised inner ring and the square hole. */
+    static final class MonCoin extends Drawable {
+        private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+
+        @Override
+        public void draw(Canvas c) {
+            Rect b = getBounds();
+            float cx = b.exactCenterX(), cy = b.exactCenterY(), r = Math.min(b.width(), b.height()) / 2f;
+            float w = Math.max(1.5f, r * 0.16f);
+            p.setStyle(Paint.Style.FILL);
+            p.setColor(INK);
+            c.drawCircle(cx, cy, r, p);
+            p.setColor(MON);
+            c.drawCircle(cx, cy, r - w, p);
+            p.setColor(0xFFFFE08A);
+            c.drawCircle(cx - r * 0.12f, cy - r * 0.12f, r * 0.52f, p);
+            p.setStyle(Paint.Style.STROKE);
+            p.setStrokeWidth(w * 0.6f);
+            p.setColor(MON_DARK);
+            c.drawCircle(cx, cy, r * 0.6f, p);
+            p.setStyle(Paint.Style.FILL);
+            float h = r * 0.24f;
+            p.setColor(INK);
+            c.drawRoundRect(new RectF(cx - h - w * 0.5f, cy - h - w * 0.5f, cx + h + w * 0.5f, cy + h + w * 0.5f), w, w, p);
+            p.setColor(MON_DARK);
+            c.drawRect(cx - h + w * 0.3f, cy - h + w * 0.3f, cx + h - w * 0.3f, cy + h - w * 0.3f, p);
+        }
+
+        @Override public void setAlpha(int a) { p.setAlpha(a); }
+        @Override public void setColorFilter(ColorFilter f) { p.setColorFilter(f); }
+        @Override public int getOpacity() { return PixelFormat.TRANSLUCENT; }
+    }
+
+    /** A small round icon with a kanji on it (for the stat pills). */
+    final class Glyph extends Drawable {
+        private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final String s;
+        private final int col;
+
+        Glyph(String s, int col) { this.s = s; this.col = col; }
+
+        @Override
+        public void draw(Canvas c) {
+            Rect b = getBounds();
+            float cx = b.exactCenterX(), cy = b.exactCenterY(), r = Math.min(b.width(), b.height()) / 2f;
+            float w = Math.max(1.5f, r * 0.16f);
+            p.setStyle(Paint.Style.FILL);
+            p.setColor(INK);
+            c.drawCircle(cx, cy, r, p);
+            p.setColor(col);
+            c.drawCircle(cx, cy, r - w, p);
+            p.setColor(WHITE);
+            p.setTypeface(heavy);
+            p.setTextAlign(Paint.Align.CENTER);
+            p.setTextSize(r * 1.1f);
+            Paint.FontMetrics fm = p.getFontMetrics();
+            c.drawText(s, cx, cy - (fm.ascent + fm.descent) / 2, p);
+        }
+
+        @Override public void setAlpha(int a) { p.setAlpha(a); }
+        @Override public void setColorFilter(ColorFilter f) { p.setColorFilter(f); }
+        @Override public int getOpacity() { return PixelFormat.TRANSLUCENT; }
     }
 }

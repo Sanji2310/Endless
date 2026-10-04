@@ -31,6 +31,7 @@ def mats():
     M("pu_teal", 0x37B4C8, spec=0.4, rim=0.4, soft=0.08)
     M("pu_pink", 0xFF9AB8, spec=0.3, rim=0.4, soft=0.1, shadow=0xB86A9A)
     M("pu_ink", 0x2A2433, rim=0.1, soft=0.05, outline=0.0)
+    M("pu_etch", 0xA8620E, spec=0.25, rim=0.05, soft=0.1, outline=0.0, shadow=0x7A3A10)    # engraved line in gold
     M("pu_steel", 0xB9C1CC, spec=0.8, rim=0.4, soft=0.05, flags=E.F_METAL)
     M("pu_flame", 0xFFB23A, emis=1.0, rim=0.2, soft=0.04, outline=0.0)
     M("pu_glow_cyan", 0x7FF0FF, emis=1.0, rim=0.3, soft=0.04, outline=0.3)
@@ -48,7 +49,7 @@ def _finish(m, name, bevel=0.006):
 
 # ----------------------------------------------------------------------------- Maneki Magnet
 
-def magnet(name="pu_magnet"):
+def magnet(name="pu_magnet", etched=True):
     mats()
     m = E.Mesher(name)
     # body: pear-shaped sitting cat
@@ -76,7 +77,7 @@ def magnet(name="pu_magnet"):
     m.torus((0, -0.005, 0.06), R=0.19, r=0.025, seg=24, sides=8, axis='Z')        # collar
     m.mat("pu_gold_deep")
     m.sphere((0, -0.2, 0.02), 0.045, 12, 8)                                      # bell
-    # raised beckoning paw (right) and the horseshoe magnet held in the left
+    # raised beckoning paw (right)
     m.mat("pu_gold")
     m.push(Matrix.Translation((0.2, -0.05, 0.12)) @ Matrix.Rotation(math.radians(-20), 4, 'Y'))
     m.cyl((0, 0, 0.12), r=0.06, h=0.24, seg=14)
@@ -84,22 +85,51 @@ def magnet(name="pu_magnet"):
     m.mat("pu_pink")
     m.sphere((0, -0.06, 0.26), 0.03, 10, 6)
     m.pop()
-    m.push(Matrix.Translation((-0.16, -0.24, -0.08)) @ Matrix.Rotation(math.radians(90), 4, 'X'))
-    m.mat("pu_red")
-    m.torus((0, 0, 0), R=0.12, r=0.035, seg=20, sides=8, arc=180, axis='Z')
-    for sx in (-1, 1):
+    if not etched:
+        # the first design: a little red horseshoe magnet held in the left paw, the koban on the belly
+        m.push(Matrix.Translation((-0.16, -0.24, -0.08)) @ Matrix.Rotation(math.radians(90), 4, 'X'))
         m.mat("pu_red")
-        m.cyl((sx * 0.12, -0.04, 0), r=0.035, h=0.08, seg=10, axis='Y')
-        m.mat("pu_steel")
-        m.cyl((sx * 0.12, -0.1, 0), r=0.036, h=0.05, seg=10, axis='Y')
-    m.pop()
-    # coin it guards (小判) on its belly
+        m.torus((0, 0, 0), R=0.12, r=0.035, seg=20, sides=8, arc=180, axis='Z')
+        for sx in (-1, 1):
+            m.mat("pu_red")
+            m.cyl((sx * 0.12, -0.04, 0), r=0.035, h=0.08, seg=10, axis='Y')
+            m.mat("pu_steel")
+            m.cyl((sx * 0.12, -0.1, 0), r=0.036, h=0.05, seg=10, axis='Y')
+        m.pop()
+        m.mat("pu_gold_deep")
+        m.sphere((0.04, -0.23, -0.16), 0.11, 18, 8, s=(0.75, 0.2, 1.0))
+        m.mat("pu_ink")
+        m.push(Matrix.Translation((0.04, -0.255, -0.16)) @ Matrix.Rotation(math.radians(90), 4, 'X'))
+        m.text("福", size=0.09, depth=0.004, font=E.FONT_JP)
+        m.pop()
+        return _finish(m, name, 0)
+    # the left paw holds the koban (小判) the way maneki-neko do, resting on the lap
+    m.mat("pu_gold")
+    m.sphere((-0.15, -0.17, -0.06), 0.065, 14, 8, s=(1.0, 1.1, 0.85))
     m.mat("pu_gold_deep")
-    m.sphere((0.04, -0.23, -0.16), 0.11, 18, 8, s=(0.75, 0.2, 1.0))
+    m.push(Matrix.Translation((-0.17, -0.235, -0.13)) @ Matrix.Rotation(math.radians(-12), 4, 'Y'))
+    m.sphere((0, 0, 0), 0.085, 18, 8, s=(0.72, 0.2, 1.0))
     m.mat("pu_ink")
-    m.push(Matrix.Translation((0.04, -0.255, -0.16)) @ Matrix.Rotation(math.radians(90), 4, 'X'))
-    m.text("福", size=0.09, depth=0.004, font=E.FONT_JP)
+    m.push(Matrix.Translation((0, -0.02, 0)) @ Matrix.Rotation(math.radians(90), 4, 'X'))
+    m.text("福", size=0.07, depth=0.004, font=E.FONT_JP)
     m.pop()
+    m.pop()
+    # the magnet is engraved into the belly: a horseshoe groove with its two pole bands, following the curve
+    belly_c, belly_r, belly_s = Vector((0, 0, -0.12)), 0.26, Vector((1.0, 0.85, 1.05))
+    def on_belly(x, z, sink=0.003):
+        # point on the belly surface (front, -Y) at (x, z), pushed `sink` inward
+        dx, dz = x / (belly_r * belly_s.x), (z - belly_c.z) / (belly_r * belly_s.z)
+        y = -belly_r * belly_s.y * math.sqrt(max(0.0, 1 - dx * dx - dz * dz))
+        return V((x, y + sink, z))
+    ex, ez, R, leg = 0.06, -0.07, 0.075, 0.075
+    arc = [on_belly(ex + R * math.cos(math.radians(a)), ez + R * math.sin(math.radians(a))) for a in range(0, 181, 10)]
+    right = [on_belly(ex + R, ez - leg * t) for t in (1.0, 0.66, 0.33)]
+    left = [on_belly(ex - R, ez - leg * t) for t in (0.33, 0.66, 1.0)]
+    m.mat("pu_etch")
+    m.tube(right + arc + left, r=0.011, seg=8)
+    # pole marks: a short cut across each leg near its end
+    for x in (ex - R, ex + R):
+        m.tube([on_belly(x - 0.022, ez - leg * 0.72), on_belly(x + 0.022, ez - leg * 0.72)], r=0.008, seg=6)
     return _finish(m, name, 0)
 
 
@@ -340,6 +370,20 @@ def design_powerups():
     E.add_outline(b, 0.008)
     studio.shoot("powerups", target=(0, 0.3, 0.6), dist=8.2, yaw=0, pitch=12, lens=40)
     studio.shoot("powerups_close", target=(-1.27, 0, 0.75), dist=2.4, yaw=-15, pitch=8, lens=50)
+
+
+def design_maneki():
+    """Before and after for the Maneki Magnet: the held magnet replaced by one engraved into the cat."""
+    import studio
+    for nm, et in (("maneki_before", False), ("maneki_after", True)):
+        E.reset()
+        studio.stage(res=(900, 900))
+        ob = magnet(etched=et)
+        ob.location = (0, 0, 0.75)
+        ob.rotation_euler.z = math.radians(-14)
+        E.add_outline(ob, 0.008)
+        h = halo(); h.location = (0, 0, 0.04)
+        studio.shoot(nm, target=(0, 0, 0.78), dist=1.9, yaw=-14, pitch=8, lens=50)
 
 
 def export_powerups():

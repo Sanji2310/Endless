@@ -647,6 +647,10 @@ def design_obstacles():
 
 
 def export_trains():
-    for nm, fn in ALL:
-        E.reset()
-        E.export_erm(fn(), nm)
+    """Three game tiers (blender/lib/gamelod.py). The cab ends and the track obstacles keep their edge bevel up
+    close, where the highlight still reads; the middle cars are flat-shaded at every tier."""
+    import obstacles, gamelod as GL
+    for nm, fn in ALL + [("ob_barricade", obstacles.barricade), ("ob_gantry", obstacles.gantry)]:
+        for lv in (0, 1, 2):
+            E.reset()
+            E.export_erm(GL.tier(fn(), lv, 0.3, keep_bevel="_mid" not in nm), nm + GL.sfx(lv))

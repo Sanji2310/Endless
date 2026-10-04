@@ -18,6 +18,13 @@ run tex_city build_all          # Sakura Line tiles the tunnel set piece uses (t
 run tex_cave build_all          # cave tiles and the effect sprites (fx_*)
 run cave export_cave            # Crystal Cavern kit: track, shells, deco, props, frames, parting, obstacles
 run tunnel export_transition    # tunnel set piece, city_track and the zone title cards
+run signs build_all             # window, shopfront, konbini and vending textures, blob shadow
+run sakura_line export_world    # Sakura Line pieces: sides, wires, lots, gantry, poles, houses, sakura, crossing
+run sakura_line export_density  # roadside clutter strips, far town rows, horizon hills
+run sakura_line export_chasers  # Inspector Daigo and Kuro (rigid parts animated in SakuraWorld)
+run sakura_line fx_sprites      # run effects: speed lines, petals, puffs, rings, glow, stars, impact
+run trains export_trains        # commuter + express cars, ramp, track-works barrier, barricade, slide gantry
+run powerups export_powerups    # power-ups, pickups, Kaze Board, worn rocket pack, pickup halo
 echo "==> AssetBuilder"
 mkdir -p build/assetbuilder
 javac -nowarn -d build/assetbuilder tools/assetbuilder/AssetBuilder.java

@@ -1,0 +1,64 @@
+<!doctype html>
+<html><head><meta charset="utf-8"></head><body style="margin:0;background:#888">
+<canvas id="c" width="512" height="512"></canvas>
+<script>
+// Frames renders/design/icon_bust.png (blender/assets/ui_icon.py) as the launcher icon: a sky-to-sakura tile with a
+// soft sun disc and drifting petals behind Pongo, an ink rim, and the same violet ink as the game's outlines.
+const INK = '#2E2440';
+function petal(g, x, y, r, rot) {
+  g.save(); g.translate(x, y); g.rotate(rot);
+  g.beginPath();
+  g.moveTo(0, r);
+  g.bezierCurveTo(r * 0.9, r * 0.5, r * 0.75, -r * 0.7, r * 0.18, -r);
+  g.lineTo(0, -r * 0.72);
+  g.lineTo(-r * 0.18, -r);
+  g.bezierCurveTo(-r * 0.75, -r * 0.7, -r * 0.9, r * 0.5, 0, r);
+  g.closePath();
+  g.fillStyle = '#FFD3E2'; g.fill();
+  g.lineWidth = r * 0.16; g.strokeStyle = INK; g.stroke();
+  g.beginPath(); g.moveTo(0, r * 0.55); g.lineTo(0, -r * 0.2);
+  g.lineWidth = r * 0.08; g.strokeStyle = '#F27BA8'; g.stroke();
+  g.restore();
+}
+function rrect(g, x, y, w, h, r) {
+  g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r);
+  g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath();
+}
+window.compose = async (src) => {
+  const img = new Image(); img.src = src; await img.decode();
+  const c = document.getElementById('c'), g = c.getContext('2d'), S = 512, m = 14, R = 112;
+  g.clearRect(0, 0, S, S);
+  g.save();
+  rrect(g, m, m, S - 2 * m, S - 2 * m, R); g.clip();
+  const bg = g.createLinearGradient(0, 0, 0, S);
+  bg.addColorStop(0, '#6EC3F6'); bg.addColorStop(0.55, '#BFE3FA'); bg.addColorStop(1, '#F8B9D2');
+  g.fillStyle = bg; g.fillRect(0, 0, S, S);
+  const sun = g.createRadialGradient(S * 0.5, S * 0.42, 10, S * 0.5, S * 0.42, S * 0.42);
+  sun.addColorStop(0, 'rgba(255,255,255,0.95)'); sun.addColorStop(0.55, 'rgba(255,250,240,0.55)'); sun.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = sun; g.fillRect(0, 0, S, S);
+  [[70, 120, 26, 0.5], [440, 90, 22, -0.7], [455, 300, 18, 1.9], [60, 330, 20, 2.6], [120, 460, 16, -1.2], [400, 455, 24, 0.9]]
+    .forEach(([x, y, r, a]) => petal(g, x, y, r, a));
+  // the bust, scaled so the head fills the upper two thirds and the shoulders run off the bottom
+  const k = 1.02, w = img.width * k * S / 1024, h = img.height * k * S / 1024;
+  g.drawImage(img, (S - w) / 2, S - h + 18, w, h);
+  g.restore();
+  rrect(g, m, m, S - 2 * m, S - 2 * m, R);
+  g.lineWidth = 14; g.strokeStyle = INK; g.stroke();
+  const out = {};
+  for (const n of [48, 72, 96, 144, 192, 512]) {
+    const o = document.createElement('canvas'); o.width = o.height = n;
+    const og = o.getContext('2d'); og.imageSmoothingQuality = 'high';
+    // step down in halves for a clean small icon
+    let cur = c, cw = S;
+    while (cw / 2 >= n * 1.5) {
+      const t = document.createElement('canvas'); t.width = t.height = cw / 2;
+      const tg = t.getContext('2d'); tg.imageSmoothingQuality = 'high'; tg.drawImage(cur, 0, 0, cw / 2, cw / 2);
+      cur = t; cw = cw / 2;
+    }
+    og.drawImage(cur, 0, 0, n, n);
+    out[n] = o.toDataURL('image/png');
+  }
+  return out;
+};
+window.ready = true;
+</script></body></html>

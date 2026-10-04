@@ -21,7 +21,6 @@ public class PongoPreview {
 
     public static void main(String[] a) throws Exception {
         int w = a.length > 2 ? Integer.parseInt(a[1]) : 540, h = a.length > 2 ? Integer.parseInt(a[2]) : 960;
-        Models.build();
         Profile prof = new Profile(null);
         prof.boards = 5;
         game = new Game(prof, null);
@@ -117,5 +116,36 @@ public class PongoPreview {
         game.update(DT);
         renderer.drawFrame(DT);
         GLES20.present(name);
+        stats(renderer, name);
+    }
+
+    /** Draw calls and triangles in the shot's frame (the colour pass; outlines and shadows draw subsets again). */
+    static void stats(GameRenderer r, String name) {
+        com.pongo.core.RenderFrame f = r.frame();
+        com.pongo.core.PongoAssets as = r.assets();
+        long tris = 0, chunks = 0;
+        for (int d = 0; d < f.count; d++) {
+            com.pongo.core.PongoAssets.Mesh me = as.meshes[f.mesh[d]];
+            for (com.pongo.core.PongoAssets.Part p : me.parts)
+                for (com.pongo.core.PongoAssets.Chunk c : p.chunks) { tris += c.nIdx / 3; chunks++; }
+        }
+        System.out.printf("%-20s draws %4d  chunks %5d  tris %8d  quads %4d%n", name, f.count, chunks, tris,
+                f.alphaCount + f.addCount);
+        if (Boolean.getBoolean("pongo.stats")) {
+            java.util.Map<String, long[]> by = new java.util.TreeMap<String, long[]>();
+            for (int d = 0; d < f.count; d++) {
+                com.pongo.core.PongoAssets.Mesh me = as.meshes[f.mesh[d]];
+                long[] v = by.get(me.name);
+                if (v == null) by.put(me.name, v = new long[2]);
+                v[0]++;
+                for (com.pongo.core.PongoAssets.Part p : me.parts) for (com.pongo.core.PongoAssets.Chunk c : p.chunks) v[1] += c.nIdx / 3;
+            }
+            java.util.List<java.util.Map.Entry<String, long[]>> l = new java.util.ArrayList<java.util.Map.Entry<String, long[]>>(by.entrySet());
+            java.util.Collections.sort(l, new java.util.Comparator<java.util.Map.Entry<String, long[]>>() {
+                public int compare(java.util.Map.Entry<String, long[]> x, java.util.Map.Entry<String, long[]> y) { return Long.compare(y.getValue()[1], x.getValue()[1]); }
+            });
+            for (int i = 0; i < Math.min(18, l.size()); i++)
+                System.out.printf("    %-22s x%-3d %8d%n", l.get(i).getKey(), l.get(i).getValue()[0], l.get(i).getValue()[1]);
+        }
     }
 }

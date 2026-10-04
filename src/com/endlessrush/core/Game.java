@@ -30,7 +30,8 @@ public final class Game {
     // pickup types
     public static final int COIN = 0, MAGNET = 1, JETPACK = 2, SNEAKERS = 3, X2 = 4, MYSTERY = 5, KEY = 6;
 
-    public static final float LANE_W = Models.LANE_W, TRAIN_H = Models.TRAIN_H;
+    /** Lane spacing, train roof height, carriage length and ramp length (the Blender kit is built to these). */
+    public static final float LANE_W = 2.4f, TRAIN_H = 3.3f, CAR_LEN = 12f, RAMP_LEN = 8f;
     public static final float GRAVITY = 58f, JUMP_V = 16.5f, SNEAK_V = 24f, LAT_SPEED = 15f;
     public static final float BASE_SPEED = 17f, MAX_SPEED = 31f, TRAIN_SPEED = 12f;
     public static final float JET_Y = 8.5f, ROLL_TIME = 0.65f, BOARD_TIME = 30f;
@@ -653,7 +654,7 @@ public final class Game {
     }
 
     private Obstacle addTrain(int lane, float s0, int cars) {
-        Obstacle o = add(TRAIN, lane, s0, cars * Models.CAR_LEN);
+        Obstacle o = add(TRAIN, lane, s0, cars * CAR_LEN);
         o.cars = cars;
         return o;
     }
@@ -765,13 +766,13 @@ public final class Game {
             int cars = 1 + rng.nextInt(i == rampIdx ? 3 : 2);
             float start = genS + rng.nextFloat() * (i == rampIdx ? 4 : 12);
             if (i == rampIdx) {
-                add(RAMP, l, start, Models.RAMP_LEN);
-                start += Models.RAMP_LEN;
+                add(RAMP, l, start, RAMP_LEN);
+                start += RAMP_LEN;
             }
             Obstacle o = addTrain(l, start, cars);
             maxEnd = Math.max(maxEnd, o.s0 + o.len);
             if (i == rampIdx) {
-                coinLine(l, start - Models.RAMP_LEN + 1, (int) ((Models.RAMP_LEN + o.len - 2) / 3f), 3f);
+                coinLine(l, start - RAMP_LEN + 1, (int) ((RAMP_LEN + o.len - 2) / 3f), 3f);
                 coinLaneDone = 1;
                 if (rng.nextFloat() < 0.5f) maybeExtra(l, o.s0 + o.len - 3, TRAIN_H + 1.1f);
             }
@@ -804,7 +805,7 @@ public final class Game {
         if (r < 0.5f) {
             boolean ramp = rng.nextBoolean();
             float st = genS + 20;
-            if (ramp) { add(RAMP, a, st, Models.RAMP_LEN); st += Models.RAMP_LEN; }
+            if (ramp) { add(RAMP, a, st, RAMP_LEN); st += RAMP_LEN; }
             addTrain(a, st, 2 + rng.nextInt(2));
             if (ramp) coinLine(a, genS + 21, 10, 3f);
         } else {
