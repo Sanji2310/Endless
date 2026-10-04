@@ -13,6 +13,7 @@ import com.endlessrush.core.Models;
 import com.endlessrush.core.PongoScene;
 import com.endlessrush.core.Scene;
 import com.endlessrush.core.ZoneWorld;
+import com.endlessrush.core.FxLayer;
 import com.pongo.app.GLRenderer;
 import com.pongo.core.PongoAssets;
 import com.pongo.core.RenderFrame;
@@ -77,6 +78,7 @@ public final class GameRenderer implements GLSurfaceView.Renderer {
     private boolean pongoTried;
     private PongoScene pongo;
     private ZoneWorld zoneWorld;
+    private FxLayer fxLayer;
     private GLRenderer toon;
     private final RenderFrame frame = new RenderFrame();
     private int prog, uVP, uModel, uLight, uCam, uTint, uEmis, uFogColor, uFog, uUnlit, aPos, aNrm, aCol;
@@ -90,6 +92,9 @@ public final class GameRenderer implements GLSurfaceView.Renderer {
         this.hud = hud;
         this.assetManager = assets;
     }
+
+    /** The effects layer (null when pongo.bin has no fx sprites): the vehicle side triggers its presets through it. */
+    public FxLayer fxLayer() { return fxLayer; }
 
     /** Runs r on the GL thread before the next frame (all game mutations go through here). */
     public void post(Runnable r) { queue.add(r); }
@@ -128,6 +133,7 @@ public final class GameRenderer implements GLSurfaceView.Renderer {
                 pongoAssets = PongoAssets.load(in, true);
                 pongo = new PongoScene(pongoAssets);
                 if (ZoneWorld.available(pongoAssets)) zoneWorld = new ZoneWorld(pongoAssets);
+                if (FxLayer.available(pongoAssets)) fxLayer = new FxLayer(pongoAssets);
             } catch (Exception e) {
                 Log.w("EndlessRush", "toon renderer off: " + e);
                 pongoAssets = null;
@@ -142,11 +148,12 @@ public final class GameRenderer implements GLSurfaceView.Renderer {
             toon.onSurfaceCreated();
             pongo.attach(scene);
             if (zoneWorld != null) zoneWorld.attach(scene);
+            scene.toonFx = fxLayer != null;
             game.zoneScenery = zoneWorld != null;
         } catch (RuntimeException e) {
             Log.w("EndlessRush", "toon renderer off: " + e);
             toon = null;
-            scene.toonHero = scene.toonCoins = scene.toonWorld = false;
+            scene.toonHero = scene.toonCoins = scene.toonWorld = scene.toonFx = false;
             game.zoneScenery = false;
         }
     }
@@ -178,6 +185,7 @@ public final class GameRenderer implements GLSurfaceView.Renderer {
         if (toon != null) {
             pongo.build(game, scene, dl, frame, width, height, dt);
             if (zoneWorld != null) zoneWorld.build(game, dl, frame, dt);
+            if (fxLayer != null) fxLayer.build(game, frame, dt);
         }
         if (hud != null) hud.onFrame(game);
 

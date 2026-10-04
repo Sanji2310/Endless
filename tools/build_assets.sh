@@ -16,6 +16,7 @@ run pongo_g export_pongo_g      # Pongo LOD0/LOD1, 30 bones, 15 clips -> build/m
 run pickups export_coin         # Mon coin LOD0/LOD1 + test floor
 run tex_city build_all          # Sakura Line tiles the tunnel set piece uses (track, cutting, hill)
 run tex_cave build_all          # cave tiles and the effect sprites (fx_*)
+run tex_fx build_all            # effect sprites for every zone, vehicle, pickup and power-up (Fx.java)
 run cave export_cave            # Crystal Cavern kit: track, shells, deco, props, frames, parting, obstacles
 run tunnel export_transition    # tunnel set piece, city_track and the zone title cards
 echo "==> AssetBuilder"

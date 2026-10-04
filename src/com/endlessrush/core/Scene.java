@@ -14,6 +14,8 @@ public final class Scene {
     /** Set when ZoneWorld draws the set pieces and the cavern: city segments are then left out where it owns the
      *  world (com.pongo.core.Zones.cityWorldAt / cityTrackAt). */
     public boolean toonWorld;
+    /** Set when FxLayer draws the effects (speed lines, power-up trails) through the toon renderer. */
+    public boolean toonFx;
 
     /** Character shown on the menu / shop (overrides profile selection when >= 0). */
     public void setPreviewCharacter(int idx) { menuChar = idx; }
@@ -178,7 +180,7 @@ public final class Scene {
         }
 
         // speed lines when fast / on a jetpack
-        if (!menu && g.state == Game.RUNNING && (g.speed > 26 || g.jetT > 0)) {
+        if (!toonFx && !menu && g.state == Game.RUNNING && (g.speed > 26 || g.jetT > 0)) {
             for (int i = 0; i < 10; i++) {
                 float lx = g.x + ((hash(i * 31 + (int) (menuT * 6)) % 100) / 100f - 0.5f) * 9;
                 float ly = g.y + 0.5f + (hash(i * 17 + (int) (menuT * 6)) % 100) / 100f * 4;
@@ -307,7 +309,7 @@ public final class Scene {
             float[] jm = dl.add(Models.jetBack, 1, 1, 1, 1, 0.1f, 0);
             Mat4.copy(jm, torso);
             Mat4.translate(jm, 0, 0.3f, 0.36f);
-            for (int s = -1; s <= 1; s += 2) {
+            for (int s = -1; s <= 1 && !toonFx; s += 2) {
                 float fl = 0.8f + 0.4f * (float) Math.abs(Math.sin(t * 40 + s));
                 float[] fm = dl.add(Models.flame, 1, 1, 1, 1, 1.2f, DrawList.F_NOFOG);
                 Mat4.copy(fm, torso);
@@ -315,7 +317,7 @@ public final class Scene {
                 Mat4.scale(fm, 1, fl, 1);
             }
         }
-        if (g.sneakT > 0 && !menu) {
+        if (g.sneakT > 0 && !menu && !toonFx) {
             // glowing feet trail
             float[] sm = dl.add(Models.shadow, 0.2f, 1f, 0.5f, 0.5f, 2f, DrawList.F_BLEND);
             Mat4.translate(sm, px, py + 0.05f, pz + 0.6f);
