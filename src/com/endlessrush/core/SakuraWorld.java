@@ -433,11 +433,7 @@ public final class SakuraWorld {
             float[] m = f.draw(rocketPack, 0, 1, 1, 1, 1, 0.05f);
             Mat4.translate(m, px, py + 1.02f * hs, pz + 0.2f * hs);
             Mat4.scale(m, hs, hs, hs);
-            for (int s = -1; s <= 1; s += 2) {
-                float fl = 0.75f + 0.25f * (float) Math.abs(Math.sin(time * 40 + s));
-                f.quad(true, px + s * 0.15f * hs, py + 0.55f * hs, pz + 0.22f * hs, 0.16f, 0.42f * fl, 0, uvGlow, 1f, 0.7f, 0.25f, 1f);
-                f.quad(true, px + s * 0.15f * hs, py + 0.62f * hs, pz + 0.22f * hs, 0.08f, 0.2f * fl, 0, uvGlow, 1f, 1f, 0.85f, 1f);
-            }
+            // the thruster plume is drawn by the effects layer (FxLayer), not here
         }
         if (g.magT > 0 && puMagnet >= 0) {
             // the Maneki cat rides along at her shoulder, waving
@@ -453,11 +449,7 @@ public final class SakuraWorld {
                         0.16f, 0.16f, time * 2, uvStar, 1f, 0.85f, 0.3f, 1f);
             }
         }
-        if (g.sneakT > 0) {
-            // spring boots: little wind wings at the heels
-            for (int s = -1; s <= 1; s += 2)
-                f.quad(true, px + s * 0.18f, py + 0.15f, pz + 0.2f, 0.2f, 0.1f, s * 0.4f, uvGlow, 0.6f, 1f, 0.8f, 0.85f);
-        }
+        // the Tobi Boots' heel glow is the effects layer's too
         if (g.invulnT > 0 && ((int) (g.invulnT * 12)) % 2 == 0)
             f.quad(true, px, py + 0.9f * hs, pz, 0.9f, 1.2f, 0, uvGlow, 1f, 1f, 1f, 0.35f);
     }

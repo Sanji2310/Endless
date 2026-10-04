@@ -176,11 +176,12 @@ def rocket(name="pu_rocket"):
 
 
 def rocket_pack(name="rocket_pack"):
-    """The pack as worn: built at Pongo's back (origin on her spine, thrusters pointing down)."""
+    """The pack as worn: built at Pongo's back (origin on her spine, thrusters pointing down).
+    No flame on the model: the thruster plume is the effects thread's (FxLayer)."""
     mats()
     m = E.Mesher(name)
     for x in (-0.13, 0.13):
-        _thruster(m, x, z0=-0.28, h=0.5, r=0.085, flame=True)
+        _thruster(m, x, z0=-0.28, h=0.5, r=0.085, flame=False)
     m.mat("pu_white")
     m.rbox((0, -0.02, 0.0), (0.3, 0.1, 0.36), r=0.04, seg=2)
     return _finish(m, name)
