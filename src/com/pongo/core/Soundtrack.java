@@ -5,13 +5,11 @@ package com.pongo.core;
  * for the menu and one per zone, plus one-shot stingers for zone entries and game over. Every theme is rendered at the
  * same loudness so MusicPlayer can crossfade between them.
  *
- *   MENU      "Hanami Platform"  D major, 86 BPM. Piano, music box, flute and strings: a quiet morning on the platform.
- *   SAKURA    "Hanami Express"   E major, 132 BPM. Anime-opening pop: royal road chorus (IV-V-iii-vi), e-piano, synth
- *                                lead doubled by glockenspiel, four-on-the-floor drums, octave synth bass.
- *   CAVERN    "Hotaru Lamp"      D minor, 104 BPM. Celesta and glockenspiel crystals over a choir pad; woodblock
- *                                "da-dum" rail clacks once the ore cart is rolling. Sits under the cave ambience.
- *   RIVER     "Sasabune"         D yonanuki (pentatonic), 96 BPM. Shakuhachi over flowing koto, taiko, shamisen.
- *   SKY       "Kaze no Michi"    F major / Lydian waltz, 168 BPM in 3/4. Harp, flute, soaring strings, choir.
+ *   MENU      "Hanami Platform"  G major, 124 BPM. City-pop turnaround on clean guitar, synth bass and lead.
+ *   SAKURA    "Hanami Express"   E major, 172 BPM. Anime-opening rock: royal road chorus, power chords, lead + glockenspiel.
+ *   CAVERN    "Hotaru Lamp"      D minor, 150 BPM. Darker driving rock, celesta and ringing glockenspiel crystals.
+ *   RIVER     "Sasabune"         B minor / yo scale, 156 BPM. Wagakki rock: the band plus shamisen riff, koto and taiko.
+ *   SKY       "Kaze no Michi"    D major, 176 BPM. Soaring rock with a supersaw sky and harp arpeggios.
  *   ROOFTOPS  "Rooftop Rush"     B minor, 160 BPM. J-rock finale: overdriven guitars, synth lead hook, driving drums.
  *
  * Stingers: ST_SAKURA .. ST_ROOFTOPS play with each zone's title card and hand over to that zone's theme at
@@ -187,223 +185,223 @@ public final class Soundtrack {
         s.mel(inst, bar0 * s.beatsPerBar, notes.replace("|", " "), vel, pan, rv, dl, tr);
     }
 
+    // ================================================================== the band (Rooftop Rush's sound, shared)
+
+    /**
+     * One section of the Rooftop Rush band: double-tracked power-chord guitars, synth bass and drums.
+     * style: INTRO (driving 8ths), VERSE (chugs), CHORUS (open hits, ride, offbeat hats), SOFT (menu: clean guitar
+     * arpeggios, lighter drums). A tom fill closes the section unless fill is false.
+     */
+    private static final int INTRO = 0, VERSE = 1, CHORUS = 2, SOFT = 3;
+
+    private static void band(MusicSynth s, int bar0, String[] prog, int style, float gtVel, boolean fill) {
+        int n = prog.length, last = fill ? n - 1 : n;
+        switch (style) {
+            case INTRO:
+                powerChords(s, bar0, prog, "x-o-o-x-o-o-x-o-", gtVel);
+                line(s, SB, bar0, prog, 35, 0, "r-r-r-r-r-r-r-r-", 0.7f, 0f, 0f, 0.7f);
+                drums(s, KICK, bar0, n, "x-----x-x-------", 1f, 0f, 0f, 0);
+                drums(s, SNR, bar0, last, "----x-------x---", 0.8f, 0f, 0.2f, 0);
+                drums(s, HAT, bar0, n, "x-o-x-o-x-o-x-o-", 0.45f, 0.25f, 0.1f, 0);
+                break;
+            case VERSE:
+                powerChords(s, bar0, prog, "x-o-o-o-x-o-o-o-", gtVel);
+                line(s, SB, bar0, prog, 35, 0, "r-r-r-r-r-r-r-r-", 0.7f, 0f, 0f, 0.7f);
+                drums(s, KICK, bar0, n, "x-----x-x-----x-", 1f, 0f, 0f, 0);
+                drums(s, SNR, bar0, last, "----x-------x---", 0.8f, 0f, 0.2f, 0);
+                drums(s, HAT, bar0, n, "x.o.x.o.x.o.x.o.", 0.42f, 0.25f, 0.1f, 0);
+                break;
+            case CHORUS:
+                powerChords(s, bar0, prog, "x-----o-x-o-x-o-", gtVel);
+                line(s, SB, bar0, prog, 35, 0, "r-r-o-r-r-r-o-r-", 0.75f, 0f, 0f, 0.7f);
+                drums(s, KICK, bar0, n, "x-----x-x-x---x-", 1f, 0f, 0f, 0);
+                drums(s, SNR, bar0, last, "----x-------x---", 0.85f, 0f, 0.2f, 0);
+                drums(s, RIDE, bar0, n, "x-o-x-o-x-o-x-o-", 0.38f, -0.25f, 0.2f, 0);
+                drums(s, OHAT, bar0, n, "--x---x---x---x-", 0.3f, 0.25f, 0.1f, 0);
+                break;
+            default:
+                arp(s, MusicSynth.CLEANGTR, bar0, prog, 62, 40, "b0120312", 0.5f, gtVel, 2f, 0.3f, 0.15f);
+                line(s, SB, bar0, prog, 35, 0, "r--r--o-r-r---o-", 0.6f, 0f, 0f, 0.6f);
+                drums(s, KICK, bar0, n, "x-----x-x-------", 0.85f, 0f, 0f, 0);
+                drums(s, CLAP, bar0, last, "----x-------x---", 0.55f, 0f, 0.3f, 0);
+                drums(s, HAT, bar0, n, "x.o.x.o.x.o.x.o.", 0.35f, 0.25f, 0.1f, 0);
+                break;
+        }
+        if (fill) fill(s, bar0 + n - 1);
+    }
+
+    private static void crashes(MusicSynth s, int bars, int... strong) {
+        for (int b = 0; b < bars; b += 4) s.note(CRASH, b * 4, 4, 60, 0.6f, b % 8 == 0 ? -0.3f : 0.3f, 0.25f);
+        for (int b : strong) s.note(CRASH, b * 4, 4, 60, 0.85f, 0.3f, 0.25f);
+    }
+
     // ================================================================== MENU: "Hanami Platform"
 
     private static MusicSynth menu() {
-        MusicSynth s = new MusicSynth(86, 4, 16, 101);
-        s.revSize = 0.86f; s.revWet = 1.0f; s.humanize = 0.009f;
-        String[] A = bars("DM7 A/C# Bm7 F#m7 GM7 D/F# Em7 A7sus4,A7");
-        String[] B = bars("GM7 A F#m7 Bm7 Em7 A/C# D,G/D D");
-        String mA = "F#5/1.5 E5/.5 F#5/1 A5/1 | E5/2 r/.5 C#5/.5 D5/.5 E5/.5 | D5/1.5 C#5/.5 D5/1 F#5/1 | C#5/3 r/1 |"
-                + " B4/.5 D5/.5 G5/1.5 F#5/.5 E5/.5 D5/.5 | F#5/1.5 E5/.5 D5/1 A4/1 | G5/1 F#5/.5 E5/.5 D5/1 E5/1 |"
-                + " E5/2.5 r/.5 A4/.5 C#5/.5";
-        String mB = "D6/1.5 C#6/.5 D6/1 B5/1 | C#6/1.5 B5/.5 A5/2 | A5/1.5 G5/.5 F#5/1 E5/1 | F#5/3 D5/.5 E5/.5 |"
-                + " G5/1.5 F#5/.5 E5/1 G5/1 | A5/1.5 B5/.5 C#6/1 E6/1 | D6/2 C#6/.5 B5/.5 A5/1 | F#5/2 D5/2";
-        // piano: low bass then a rising broken chord, the classic film-score left hand
-        arp(s, P, 0, A, 62, 38, "b0123210", 0.5f, 0.42f, -0.15f, 0.35f, 0f);
-        arp(s, P, 8, B, 62, 38, "b0123210", 0.5f, 0.46f, -0.15f, 0.35f, 0f);
-        // A: music box melody an octave up, a soft string bed
-        mel(s, MB, 0, mA, 0.75f, 0.25f, 0.5f, 0.12f, 12);
-        hold(s, STR, 0, A, 57, 0.18f, 0f, 0.5f);
-        // B: flute sings it, celesta shadows an octave up, strings fuller, a low cello line
-        mel(s, FL, 8, mB, 0.62f, 0.15f, 0.45f, 0.1f, 0);
-        mel(s, CE, 8, mB, 0.22f, 0.4f, 0.5f, 0f, 12);
-        hold(s, STR, 8, B, 62, 0.26f, -0.1f, 0.5f);
-        line(s, STR, 8, B, 38, 0, "r---------------", 0.3f, 0f, 0.4f, 1f);
-        drums(s, SHK, 8, 8, "-o-o-o-o", 0.35f, 0.4f, 0.3f, 60);
-        drums(s, TRI, 8, 1, "x-------", 0.4f, -0.4f, 0.6f, 100);
-        drums(s, TRI, 12, 1, "x-------", 0.35f, -0.4f, 0.6f, 100);
-        s.note(CHIME, 0, 3, 90, 0.35f, 0.3f, 0.7f);
-        s.note(SWELL, 6 * 4 + 2, 6, 60, 0.25f, 0f, 0.6f);
+        MusicSynth s = new MusicSynth(124, 4, 20, 101);
+        s.revSize = 0.75f; s.revWet = 0.8f; s.dlyBeats = 0.75f; s.dlyFb = 0.3f;
+        // city pop turnaround (the "Just the Two of Us" family) in G
+        String[] prog = bars("GM7 F#m7,B7 Em7 Dm7,G7 CM7 B7 Em7,A7 D7");
+        String[] intro = bars("GM7 F#m7,B7 Em7 Dm7,G7");
+        String m = "B5/.5 A5/.5 B5/.5 D6/.5 _F#6/1 E6/.5 D6/.5 | E6/1 C#6/.5 A5/.5 _D#6/1 B5/1 |"
+                + " B5/1.5 G5/.5 B5/1 D6/1 | C6/1 A5/.5 F5/.5 B5/1 G5/1 |"
+                + " E6/1.5 D6/.5 E6/1 G6/1 | _F#6/1.5 E6/.5 D#6/1 B5/1 | G6/1 F#6/.5 E6/.5 C#6/1 A5/1 | _D6/3 r/1";
+        band(s, 0, intro, SOFT, 0.7f, true);
+        band(s, 4, prog, SOFT, 0.7f, true);
+        band(s, 12, prog, SOFT, 0.75f, true);
+        hold(s, SAW, 0, intro, 64, 0.16f, 0f, 0.35f);
+        hold(s, SAW, 4, prog, 64, 0.18f, 0f, 0.35f);
+        hold(s, SAW, 12, prog, 64, 0.22f, 0f, 0.35f);
+        mel(s, LD, 4, m, 0.55f, 0f, 0.3f, 0.2f, -12);
+        mel(s, LD, 12, m, 0.65f, 0f, 0.3f, 0.2f, 0);
+        mel(s, GL, 12, m, 0.22f, 0.3f, 0.3f, 0.1f, 0);
+        s.note(CRASH, 4 * 4, 4, 60, 0.45f, -0.3f, 0.25f);
+        s.note(CRASH, 12 * 4, 4, 60, 0.55f, 0.3f, 0.25f);
         return s;
     }
 
     // ================================================================== SAKURA LINE: "Hanami Express"
 
     private static MusicSynth sakura() {
-        MusicSynth s = new MusicSynth(132, 4, 28, 202);
-        s.revSize = 0.78f; s.dlyBeats = 0.75f; s.dlyFb = 0.3f;
-        String[] intro = bars("AM7 B G#m7 C#m7");
-        String[] verse = bars("EM7 G#m7 AM7 B EM7 G#m7,C#m7 F#m7 B7sus4,B7");
-        String[] chorus = bars("AM7 B G#m7 C#m7 F#m7 G#m7 A B AM7 B G#m7 C#m7 F#m7 B7 E E");
+        MusicSynth s = new MusicSynth(172, 4, 28, 202);
+        s.revSize = 0.7f; s.revWet = 0.7f; s.dlyBeats = 0.75f; s.dlyFb = 0.3f;
+        String[] intro = bars("A B G#m C#m");
+        String[] verse = bars("E B/D# C#m A E B/D# A B");
+        String[] chorus = bars("A B G#m C#m A B E E A B G#m C#m F#m B E E");
         int I = 0, V = 4, C = 12;
-        String mV = "r/.5 B4/.5 E5/.5 F#5/.5 G#5/1 F#5/.5 E5/.5 | D#5/1.5 E5/.5 F#5/1 B4/1 |"
-                + " r/.5 C#5/.5 E5/.5 F#5/.5 G#5/1 A5/.5 G#5/.5 | F#5/3 r/1 |"
-                + " r/.5 B4/.5 E5/.5 F#5/.5 G#5/1 B5/.5 A5/.5 | G#5/1.5 F#5/.5 E5/1 G#5/1 |"
-                + " A5/1.5 G#5/.5 F#5/1 E5/1 | F#5/1 E5/1 D#5/2";
-        String c1 = "E5/.5 F#5/.5 G#5/.5 _C#6/1 B5/.5 G#5/1 | F#5/.5 G#5/.5 A5/.5 _B5/1 A5/.5 F#5/1 |"
-                + " F#5/.5 G#5/.5 B5/.5 _D#6/1 C#6/.5 B5/1 | C#6/1.5 B5/.5 G#5/1 E5/1 |";
-        String mC = c1
-                + " A5/.5 G#5/.5 A5/.5 _C#6/1 B5/.5 A5/1 | G#5/.5 F#5/.5 G#5/.5 _B5/1 F#5/.5 G#5/1 |"
-                + " E5/.5 F#5/.5 A5/.5 _C#6/1 E6/1 C#6/.5 | _D#6/2 B5/.5 C#6/.5 D#6/1 |"
-                + c1
-                + " A5/.5 G#5/.5 A5/.5 _C#6/1 B5/.5 A5/1 | G#5/.5 A5/.5 B5/.5 _D#6/1 C#6/.5 B5/1 |"
-                + " B5/.5 C#6/.5 _E6/3 | r/4";
-        // --- intro: glockenspiel hook over e-piano, drums build
-        arp(s, GL, I, intro, 76, 40, "0123212301232123", 0.25f, 0.32f, 2f, 0.35f, 0.25f);
-        line(s, EP, I, intro, 40, 64, "c-----c-----c---", 0.42f, -0.2f, 0.3f, 0.95f);
-        line(s, SB, I + 2, bars("G#m7 C#m7"), 28, 0, "r-o-r-o-r-o-r-o-", 0.6f, 0f, 0f, 0.6f);
-        drums(s, HAT, I, 4, "x-o-x-o-x-o-x-o-", 0.5f, 0.25f, 0.1f, 0);
-        drums(s, KICK, I + 2, 1, "x---x---x---x---", 0.9f, 0f, 0f, 0);
-        drums(s, KICK, I + 3, 1, "x---x---x-------", 0.9f, 0f, 0f, 0);
-        drums(s, SNR, I + 3, 1, "--------..oooxxx", 0.7f, 0f, 0.2f, 0);
-        s.note(SWELL, (I + 2) * 4, 8, 60, 0.35f, 0f, 0.3f);
-        // --- verse
-        mel(s, LD, V, mV, 0.5f, 0f, 0.3f, 0.18f, 0);
-        line(s, EP, V, verse, 40, 64, "c-----c---c-----", 0.45f, -0.2f, 0.3f, 0.9f);
-        hold(s, STR, V, verse, 60, 0.16f, 0.2f, 0.5f);
-        line(s, BS, V, verse, 28, 0, "r-----r-r-----o-", 0.75f, 0f, 0f, 0.8f);
-        drums(s, KICK, V, 7, "x-----x-x-------", 0.95f, 0f, 0f, 0);
-        drums(s, SNAP, V, 7, "----x-------x---", 0.55f, 0.1f, 0.35f, 0);
-        drums(s, SHK, V, 8, "xo.oxo.oxo.oxo.o", 0.45f, -0.3f, 0.15f, 0);
-        drums(s, KICK, V + 7, 1, "x-----x---------", 0.95f, 0f, 0f, 0);
-        drums(s, SNR, V + 7, 1, "----x---x-x-xxxx", 0.7f, 0f, 0.2f, 0);
-        // --- chorus
-        mel(s, LD, C, mC, 0.72f, 0f, 0.3f, 0.22f, 0);
-        mel(s, GL, C, mC, 0.3f, 0.3f, 0.35f, 0.1f, 12);
-        hold(s, SAW, C, chorus, 64, 0.32f, 0f, 0.35f);
-        line(s, EP, C, chorus, 40, 62, "--c--c----c--c--", 0.42f, -0.3f, 0.25f, 0.8f);
-        line(s, SB, C, chorus, 28, 0, "r-o-r-o-r-o-r-o-", 0.7f, 0f, 0f, 0.55f);
-        drums(s, KICK, C, 15, "x---x---x---x---", 1f, 0f, 0f, 0);
-        drums(s, CLAP, C, 15, "----x-------x---", 0.7f, 0f, 0.3f, 0);
-        drums(s, HAT, C, 16, "x.o.x.o.x.o.x.o.", 0.42f, 0.25f, 0.1f, 0);
-        drums(s, OHAT, C, 16, "--x---x---x---x-", 0.35f, -0.25f, 0.1f, 0);
-        drums(s, KICK, C + 15, 1, "x-----x---------", 1f, 0f, 0f, 0);
-        drums(s, SNR, C + 15, 1, "--------x-x-xxxx", 0.75f, 0f, 0.2f, 0);
-        s.note(CRASH, C * 4, 4, 60, 0.8f, -0.3f, 0.3f);
-        s.note(CRASH, (C + 8) * 4, 4, 60, 0.7f, 0.3f, 0.3f);
-        s.note(CHIME, (C + 15) * 4, 2, 90, 0.3f, 0.3f, 0.5f);
+        String hook = "E5/.5 F#5/.5 G#5/.5 B5/.5 _C#6/1 B5/.5 G#5/.5 | F#5/.5 G#5/.5 B5/.5 _D#6/1.5 C#6/.5 B5/.5 |"
+                + " G#5/.5 B5/.5 D#6/.5 _F#6/1 E6/.5 D#6/.5 B5/.5 | _C#6/2 B5/.5 G#5/.5 E5/1";
+        String mV = "G#5/.5 G#5/.5 G#5/.5 F#5/.5 E5/1 B4/1 | D#5/.5 D#5/.5 E5/.5 F#5/.5 D#5/2 |"
+                + " E5/.5 E5/.5 G#5/.5 E5/.5 C#5/1 B4/1 | C#5/3 r/1 |"
+                + " G#5/.5 G#5/.5 G#5/.5 F#5/.5 E5/1 G#5/1 | F#5/.5 F#5/.5 F#5/.5 E5/.5 D#5/1 B4/1 |"
+                + " C#5/1 E5/1 A5/1 G#5/1 | F#5/1.5 G#5/.5 A5/1 B5/1";
+        String k1 = "_C#6/1.5 B5/.5 C#6/1 E6/1 | D#6/1.5 C#6/.5 B5/1 F#5/1 | B5/1.5 G#5/.5 B5/1 D#6/1 |"
+                + " _E6/2 D#6/.5 C#6/.5 B5/1 |";
+        String mC = k1 + " A5/1.5 B5/.5 C#6/1 E6/1 | _F#6/1.5 E6/.5 D#6/1 B5/1 | G#5/1.5 F#5/.5 E5/1 B5/1 | _E6/3 r/1 |"
+                + k1 + " A5/1 C#6/1 F#6/1 E6/1 | D#6/1.5 E6/.5 F#6/2 | _G#6/2 F#6/1 E6/1 | B5/2 r/2";
+        band(s, I, intro, INTRO, 0.65f, true);
+        band(s, V, verse, VERSE, 0.58f, true);
+        band(s, C, chorus, CHORUS, 0.72f, true);
+        mel(s, LD, I, hook, 0.7f, 0f, 0.25f, 0.2f, 0);
+        mel(s, GL, I, hook, 0.22f, 0.3f, 0.3f, 0.1f, 12);
+        mel(s, LD, V, mV, 0.6f, 0f, 0.25f, 0.18f, 0);
+        mel(s, LD, C, mC, 0.75f, 0f, 0.25f, 0.2f, 0);
+        mel(s, GL, C, mC, 0.25f, 0.3f, 0.3f, 0.1f, 12);
+        hold(s, SAW, C, chorus, 66, 0.28f, 0f, 0.3f);
+        hold(s, STR, V, verse, 62, 0.15f, 0f, 0.4f);
+        crashes(s, 28, C, C + 8);
+        s.note(CHIME, C * 4, 2, 90, 0.3f, 0.3f, 0.5f);
         return s;
     }
 
     // ================================================================== CRYSTAL CAVERN: "Hotaru Lamp"
 
     private static MusicSynth cavern() {
-        MusicSynth s = new MusicSynth(104, 4, 24, 303);
-        s.revSize = 0.93f; s.revDamp = 0.25f; s.revWet = 1.25f; s.dlyBeats = 0.75f; s.dlyFb = 0.45f;
-        String[] A = bars("Dm9 Dm9 BbM7 BbM7 Gm9 Gm9 A7sus4 A7");
-        String[] B = bars("BbM7 C Am7 Dm9 BbM7 C A7sus4 A7");
-        String mA = "A4/1.5 C5/.5 D5/1 E5/1 | F5/1.5 E5/.5 D5/1 A4/1 | D5/1.5 F5/.5 A5/1 G5/1 | F5/3 r/1 |"
-                + " Bb4/1.5 D5/.5 F5/1 A5/1 | G5/1.5 F5/.5 D5/1 Bb4/1 | D5/1.5 E5/.5 G5/1 E5/1 | C#5/2 E5/1 A4/1";
-        String mB = "D6/1.5 C6/.5 A5/1 F5/1 | E5/1.5 G5/.5 C6/1 G5/1 | A5/1.5 G5/.5 E5/1 C5/1 | D5/3 r/1 |"
-                + " F5/1.5 A5/.5 D6/1 C6/1 | C6/1.5 Bb5/.5 G5/1 E5/1 | D5/1.5 E5/.5 A5/2 | A5/1.5 G5/.5 E5/1 C#5/1";
-        // pads and low drone throughout
-        hold(s, CH, 0, A, 62, 0.3f, 0f, 0.6f);
-        hold(s, CH, 8, B, 62, 0.32f, 0f, 0.6f);
-        hold(s, CH, 16, A, 62, 0.34f, 0f, 0.6f);
-        line(s, SUB, 0, A, 26, 0, "r---------------", 0.55f, 0f, 0f, 1f);
-        line(s, SUB, 8, B, 26, 0, "r---------------", 0.55f, 0f, 0f, 1f);
-        line(s, SUB, 16, A, 26, 0, "r---------------", 0.55f, 0f, 0f, 1f);
-        // A: celesta melody, sparse crystal arpeggio, far-off rail clacks
-        mel(s, CE, 0, mA, 0.7f, 0.1f, 0.55f, 0.2f, 12);
-        arp(s, GL, 0, A, 74, 38, "0-2-1-3-", 0.5f, 0.16f, 2f, 0.6f, 0.3f);
-        drums(s, WOOD, 4, 4, "x--o------------", 0.35f, -0.3f, 0.5f, 74);
-        // B: the cart is rolling: da-dum clacks, a soft kick, shaker, plucked bass
-        mel(s, CE, 8, mB, 0.72f, 0.1f, 0.55f, 0.2f, 0);
-        mel(s, FL, 8, mB, 0.3f, -0.2f, 0.5f, 0.1f, -12);
-        arp(s, GL, 8, B, 74, 38, "0-2-1-3-", 0.5f, 0.16f, 2f, 0.6f, 0.3f);
-        line(s, BS, 8, B, 26, 0, "r-----r---r-----", 0.6f, 0f, 0.1f, 0.8f);
-        line(s, BS, 16, A, 26, 0, "r-----r---r---f-", 0.6f, 0f, 0.1f, 0.8f);
-        drums(s, KICK, 8, 16, "x-----x---x-----", 0.65f, 0f, 0.15f, 0);
-        drums(s, WOOD, 8, 16, "x--o----x--o----", 0.4f, -0.3f, 0.4f, 74);
-        drums(s, WOOD, 8, 16, "-------------o--", 0.3f, 0.3f, 0.4f, 79);
-        drums(s, SHK, 8, 16, "-o-o-o-o", 0.32f, 0.35f, 0.3f, 0);
-        drums(s, RIM, 8, 16, "------------x---", 0.4f, 0.1f, 0.5f, 0);
-        // C: strings take the tune low, glockenspiel runs 16ths with echoes
-        mel(s, STR, 16, mA, 0.45f, -0.1f, 0.5f, 0f, 0);
-        mel(s, CE, 16, mA, 0.3f, 0.3f, 0.6f, 0.2f, 12);
-        arp(s, GL, 16, A, 74, 38, "0123123423413210", 0.25f, 0.14f, 2f, 0.55f, 0.35f);
-        s.note(REV, 7 * 4, 4, 60, 0.3f, 0f, 0.4f);
-        s.note(CHIME, 8 * 4, 3, 90, 0.3f, -0.3f, 0.8f);
-        s.note(REV, 15 * 4, 4, 60, 0.3f, 0f, 0.4f);
-        s.note(TAIKO, 16 * 4, 2, 38, 0.5f, 0f, 0.6f);
+        MusicSynth s = new MusicSynth(150, 4, 28, 303);
+        s.revSize = 0.85f; s.revWet = 0.9f; s.dlyBeats = 0.75f; s.dlyFb = 0.38f;
+        String[] intro = bars("Dm Bb C A");
+        String[] verse = bars("Dm Bb F C Dm Bb Gm A");
+        String[] chorus = bars("Bb C Am Dm Gm Am Bb C Bb C Am Dm Gm C Dm A");
+        int I = 0, V = 4, C = 12;
+        String hook = "D5/.5 A5/.5 D6/.5 E6/.5 _F6/1 E6/.5 D6/.5 | D6/.5 Bb5/.5 F5/.5 G5/.5 _A5/1 G5/.5 F5/.5 |"
+                + " E5/.5 G5/.5 C6/.5 D6/.5 _E6/1 D6/.5 C6/.5 | _C#6/1 E6/1 A5/1 C#6/.5 E6/.5";
+        String mV = "A5/.5 A5/.5 A5/.5 G5/.5 F5/1 D5/1 | F5/.5 F5/.5 F5/.5 G5/.5 D5/2 |"
+                + " A5/.5 A5/.5 C6/.5 A5/.5 G5/1 F5/1 | G5/3 r/1 |"
+                + " A5/.5 A5/.5 A5/.5 G5/.5 F5/1 A5/1 | Bb5/.5 Bb5/.5 Bb5/.5 A5/.5 F5/1 D5/1 |"
+                + " Bb5/1 A5/1 G5/1 F5/1 | E5/1.5 G5/.5 A5/2";
+        String k1 = "_D6/1.5 C6/.5 D6/1 F6/1 | E6/1.5 D6/.5 C6/1 G5/1 | A5/1.5 C6/.5 E6/1 G6/1 | _F6/2 E6/.5 D6/.5 A5/1 |";
+        String mC = k1 + " Bb5/1.5 A5/.5 G5/1 D6/1 | C6/1.5 A5/.5 E5/1 E6/1 | F6/1.5 E6/.5 D6/1 C6/1 | _E6/3 r/1 |"
+                + k1 + " Bb5/1 D6/1 G6/1 F6/1 | E6/1.5 F6/.5 G6/2 | _A6/2 G6/1 F6/1 | E6/2 C#6/1 E6/1";
+        band(s, I, intro, INTRO, 0.62f, true);
+        band(s, V, verse, VERSE, 0.58f, true);
+        band(s, C, chorus, CHORUS, 0.7f, true);
+        mel(s, LD, I, hook, 0.7f, 0f, 0.28f, 0.22f, 0);
+        mel(s, CE, I, hook, 0.25f, 0.3f, 0.4f, 0.15f, 12);
+        mel(s, LD, V, mV, 0.6f, 0f, 0.28f, 0.2f, 0);
+        mel(s, CE, V, mV, 0.2f, -0.3f, 0.4f, 0.15f, 12);
+        mel(s, LD, C, mC, 0.75f, 0f, 0.28f, 0.22f, 0);
+        mel(s, GL, C, mC, 0.22f, 0.3f, 0.35f, 0.1f, 12);
+        // crystals: glockenspiel 16ths ringing through the chorus with echoes
+        arp(s, GL, C, chorus, 74, 38, "0123123423413210", 0.25f, 0.13f, 2f, 0.45f, 0.3f);
+        hold(s, SAW, C, chorus, 64, 0.24f, 0f, 0.35f);
+        hold(s, STR, V, verse, 60, 0.15f, 0f, 0.45f);
+        crashes(s, 28, C, C + 8);
         return s;
     }
 
     // ================================================================== BAMBOO RIVER: "Sasabune"
 
     private static MusicSynth river() {
-        MusicSynth s = new MusicSynth(96, 4, 24, 404);
-        s.revSize = 0.84f; s.revWet = 1.0f; s.humanize = 0.01f;
-        String[] A = bars("D Bm7 G A D Bm7 Em7 A7sus4,A");
-        String[] B = bars("G A F#m7 Bm7 G A D D");
-        String mA = "A4/1 D5/1 E5/1 F#5/1 | A5/3 F#5/1 | E5/1.5 F#5/.5 E5/1 D5/1 | E5/4 |"
-                + " A4/1 D5/1 E5/1 F#5/1 | B5/2 A5/1 F#5/1 | A5/1.5 B5/.5 A5/1 F#5/.5 E5/.5 | E5/4";
-        String mB = "B5/1.5 A5/.5 B5/1 D6/1 | E6/3 D6/.5 B5/.5 | A5/1.5 B5/.5 A5/1 F#5/1 | B5/3 A5/.5 F#5/.5 |"
-                + " E5/1.5 F#5/.5 A5/1 B5/1 | A5/1.5 F#5/.5 E5/1 D5/.5 E5/.5 | D5/4 | r/4";
-        // koto water: 8ths in A, 16ths from B on
-        arp(s, KO, 0, A, 67, 38, "b1230123", 0.5f, 0.42f, 2f, 0.35f, 0f);
-        arp(s, KO, 8, B, 67, 38, "0123432101234321", 0.25f, 0.34f, 2f, 0.35f, 0.15f);
-        arp(s, KO, 16, A, 67, 38, "b123432101234321", 0.25f, 0.3f, 2f, 0.35f, 0.15f);
-        hold(s, STR, 0, A, 62, 0.16f, 0f, 0.5f);
-        hold(s, STR, 8, B, 62, 0.2f, 0f, 0.5f);
-        hold(s, STR, 16, A, 62, 0.2f, 0f, 0.5f);
-        line(s, BS, 0, A, 26, 0, "r-------f-------", 0.5f, 0f, 0.1f, 0.9f);
-        line(s, BS, 8, B, 26, 0, "r-----r-f-------", 0.55f, 0f, 0.1f, 0.9f);
-        line(s, BS, 16, A, 26, 0, "r-----r-f-----o-", 0.55f, 0f, 0.1f, 0.9f);
-        // shakuhachi sings A and B; in C the koto takes the tune and shamisen answers
-        mel(s, SK, 0, mA, 0.7f, 0.05f, 0.5f, 0.15f, 0);
-        mel(s, SK, 8, mB, 0.75f, 0.05f, 0.5f, 0.15f, 0);
-        mel(s, KO, 16, mA, 0.75f, -0.15f, 0.4f, 0.1f, 0);
-        mel(s, SK, 16, "A5/16 | A5/8 | B5/4 | A5/4", 0.35f, 0.3f, 0.6f, 0f, 0);
-        line(s, SH, 8, B, 50, 0, "-------------r-f", 0.5f, 0.3f, 0.3f, 0.5f);
-        line(s, SH, 16, A, 50, 0, "----------r-f-o-", 0.5f, 0.3f, 0.3f, 0.5f);
-        // percussion: taiko pulse grows; kakko ticks once the river picks up
-        drums(s, TAIKO, 0, 8, "x-------", 0.45f, 0f, 0.4f, 33);
-        drums(s, TAIKO, 8, 8, "x-----o-----o---", 0.5f, 0f, 0.4f, 33);
-        drums(s, TAIKO, 16, 8, "x---o-o-x---o-..", 0.55f, 0f, 0.4f, 33);
-        drums(s, KAKKO, 8, 16, "o-.-o-.-o-.-o-.-", 0.35f, -0.35f, 0.3f, 86);
-        drums(s, SHK, 16, 8, "-o-o-o-o", 0.25f, 0.35f, 0.3f, 0);
-        s.note(CHIME, 0, 3, 90, 0.35f, -0.3f, 0.7f);
-        s.note(CHIME, 16 * 4, 3, 90, 0.3f, 0.3f, 0.7f);
+        MusicSynth s = new MusicSynth(156, 4, 28, 404);
+        s.revSize = 0.75f; s.revWet = 0.75f; s.dlyBeats = 0.75f; s.dlyFb = 0.3f;
+        // wagakki rock: the band plus shamisen and koto, melodies in the Japanese yo scale (B D E F# A)
+        String[] intro = bars("Bm G A Bm");
+        String[] verse = bars("Bm G A Bm Bm G Em F#");
+        String[] chorus = bars("G A F#m Bm G A Bm Bm G A F#m Bm Em F# Bm Bm");
+        int I = 0, V = 4, C = 12;
+        String riff = "B4/.25 D5/.25 E5/.25 F#5/.25 A5/.5 F#5/.5 E5/.5 D5/.5 B4/1 |"
+                + " D5/.25 E5/.25 F#5/.25 A5/.25 B5/.5 A5/.5 F#5/.5 E5/.5 D5/1 |"
+                + " E5/.25 F#5/.25 A5/.25 B5/.25 D6/.5 B5/.5 A5/.5 F#5/.5 E5/1 | F#5/.5 E5/.5 D5/.5 E5/.5 B4/2";
+        String mV = "F#5/.5 F#5/.5 E5/.5 D5/.5 E5/1 B4/1 | D5/.5 D5/.5 E5/.5 F#5/.5 B4/2 |"
+                + " E5/.5 E5/.5 F#5/.5 A5/.5 E5/1 A4/1 | B4/3 r/1 |"
+                + " F#5/.5 F#5/.5 A5/.5 B5/.5 A5/1 F#5/1 | D5/.5 E5/.5 D5/.5 B4/.5 D5/2 |"
+                + " E5/1 G5/1 B5/1 A5/1 | F#5/1.5 E5/.5 C#5/1 F#5/1";
+        String k1 = "_B5/1.5 A5/.5 B5/1 D6/1 | E6/1.5 D6/.5 B5/1 A5/1 | A5/1.5 F#5/.5 A5/1 C#6/1 | _B5/3 A5/.5 F#5/.5 |";
+        String mC = k1 + " D6/1.5 B5/.5 D6/1 E6/1 | E6/1.5 D6/.5 C#6/1 A5/1 | B5/1.5 A5/.5 F#5/1 E5/1 | _F#5/3 r/1 |"
+                + k1 + " G5/1 B5/1 E6/1 D6/1 | C#6/1.5 A#5/.5 C#6/1 E6/1 | _F#6/2 E6/1 D6/1 | B5/2 r/2";
+        band(s, I, intro, INTRO, 0.6f, true);
+        band(s, V, verse, VERSE, 0.55f, true);
+        band(s, C, chorus, CHORUS, 0.68f, true);
+        // the riff on shamisen and lead together; shamisen answers in the verse; koto runs through the chorus
+        mel(s, SH, I, riff, 1.1f, -0.35f, 0.25f, 0f, 0);
+        mel(s, LD, I, riff, 0.55f, 0.1f, 0.25f, 0.15f, 0);
+        mel(s, LD, V, mV, 0.6f, 0f, 0.25f, 0.18f, 0);
+        line(s, SH, V, verse, 59, 0, "--------------r-", 0.9f, -0.35f, 0.2f, 0.5f);
+        mel(s, LD, C, mC, 0.75f, 0f, 0.25f, 0.2f, 0);
+        mel(s, SH, C, mC, 0.55f, -0.35f, 0.25f, 0f, 0);
+        arp(s, KO, C, chorus, 71, 38, "0123432101234321", 0.25f, 0.4f, 2f, 0.35f, 0.1f);
+        hold(s, SAW, C, chorus, 66, 0.25f, 0f, 0.3f);
+        hold(s, STR, V, verse, 62, 0.15f, 0f, 0.4f);
+        crashes(s, 28, C, C + 8);
+        s.note(TAIKO, C * 4, 2, 33, 0.8f, 0f, 0.3f);
+        s.note(TAIKO, (C + 8) * 4, 2, 33, 0.75f, 0f, 0.3f);
+        s.note(TAIKO, 0, 2, 33, 0.7f, 0f, 0.3f);
         return s;
     }
 
-    // ================================================================== SKY GLIDE: "Kaze no Michi" (waltz)
+    // ================================================================== SKY GLIDE: "Kaze no Michi"
 
     private static MusicSynth sky() {
-        MusicSynth s = new MusicSynth(168, 3, 40, 505);
-        s.revSize = 0.88f; s.revWet = 1.1f; s.humanize = 0.008f;
-        String[] A = bars("F F C/E C/E Dm Dm Bb C F F Am Am Bb Gm7 C7sus4 C7");
-        String[] B = bars("Bb C Am7 Dm Gm7 C F F/A Bb C/Bb Am7 Dm7 Gm7 Bb/C F F");
-        String[] A2 = bars("F F Am Am Bb Gm7 C7sus4 C7");
-        String mA = "A4/1 C5/1 F5/1 | A5/2 G5/1 | G5/2 E5/1 | C5/3 | D5/1 F5/1 A5/1 | D6/2 C6/1 | Bb5/1 A5/1 G5/1 |"
-                + " G5/1.5 A5/.5 Bb5/1 | A4/1 C5/1 F5/1 | C6/2 Bb5/1 | E5/1 A5/1 B5/1 | C6/3 | D6/1.5 C6/.5 Bb5/1 |"
-                + " A5/1 G5/1 F5/1 | F5/2 G5/1 | E5/3";
-        String mA2 = "A4/1 C5/1 F5/1 | C6/2 Bb5/1 | E5/1 A5/1 B5/1 | C6/3 | D6/1.5 C6/.5 Bb5/1 | A5/1 G5/1 F5/1 |"
-                + " F5/2 G5/1 | E5/3";
-        String mB = "F5/1 Bb5/1 D6/1 | E6/2 C6/1 | C6/1 B5/1 A5/1 | A5/2 F5/1 | G5/1 Bb5/1 D6/1 | C6/2 Bb5/1 | A5/3 |"
-                + " r/1 A5/1 C6/1 | F6/1.5 E6/.5 D6/1 | E6/2 C6/1 | C6/2 A5/1 | A5/1 D6/1 F6/1 | D6/1.5 C6/.5 Bb5/1 |"
-                + " G5/1 A5/1 Bb5/1 | C6/3 | A5/3";
-        // oom-pah-pah: harp in A, piano and harp in B, everything in A'
-        arp(s, HP, 0, A, 65, 41, "b01", 1f, 0.5f, -0.2f, 0.45f, 0f);
-        arp(s, HP, 16, B, 65, 41, "b01", 1f, 0.45f, -0.25f, 0.45f, 0f);
-        arp(s, P, 16, B, 62, 29, "b12", 1f, 0.35f, 0.15f, 0.4f, 0f);
-        arp(s, P, 32, A2, 62, 29, "b12", 1f, 0.4f, 0.15f, 0.4f, 0f);
-        arp(s, HP, 32, A2, 72, 41, "012345", 0.5f, 0.3f, 2f, 0.5f, 0f);
-        // A: flute, light strings; B: strings soar in octaves, flute answers; A': choir, glockenspiel, timpani
-        mel(s, FL, 0, mA, 0.68f, 0.1f, 0.45f, 0.1f, 0);
-        hold(s, STR, 0, A, 60, 0.15f, 0f, 0.5f);
-        mel(s, STR, 16, mB, 0.6f, 0.15f, 0.45f, 0f, 0);
-        mel(s, STR, 16, mB, 0.4f, -0.2f, 0.45f, 0f, -12);
-        mel(s, FL, 16, mB, 0.28f, 0.35f, 0.5f, 0f, 0);
-        hold(s, CH, 16, B, 60, 0.18f, 0f, 0.5f);
-        line(s, STR, 16, B, 29, 0, "r-----------", 0.28f, 0f, 0.4f, 1f);
-        mel(s, STR, 32, mA2, 0.62f, 0.15f, 0.45f, 0f, 12);
-        mel(s, FL, 32, mA2, 0.6f, -0.15f, 0.45f, 0.1f, 12);
-        mel(s, GL, 32, mA2, 0.25f, 0.35f, 0.5f, 0.1f, 12);
-        hold(s, CH, 32, A2, 64, 0.28f, 0f, 0.55f);
-        line(s, STR, 32, A2, 29, 0, "r-----------", 0.35f, 0f, 0.4f, 1f);
-        drums(s, TOM, 16, 1, "x--", 0.55f, 0f, 0.5f, 31);
-        drums(s, TOM, 32, 1, "x-o", 0.6f, 0f, 0.5f, 31);
-        drums(s, TOM, 36, 1, "x--", 0.55f, 0f, 0.5f, 31);
-        drums(s, SHK, 16, 24, "-oo", 0.25f, 0.4f, 0.3f, 0);
-        for (int b = 0; b < 16; b += 4) s.note(TRI, b * 3, 1, 100, 0.35f, -0.4f, 0.6f);
-        s.note(REV, 14 * 3, 6, 60, 0.35f, 0f, 0.4f);
-        s.note(REV, 30 * 3, 6, 60, 0.35f, 0f, 0.4f);
-        s.note(CRASH, 32 * 3, 3, 60, 0.45f, 0.3f, 0.5f);
-        s.note(CHIME, 0, 3, 90, 0.35f, 0.3f, 0.7f);
-        s.note(CHIME, 16 * 3, 3, 90, 0.3f, -0.3f, 0.7f);
+        MusicSynth s = new MusicSynth(176, 4, 28, 505);
+        s.revSize = 0.8f; s.revWet = 0.85f; s.dlyBeats = 0.75f; s.dlyFb = 0.35f;
+        String[] intro = bars("D A/C# Bm G");
+        String[] verse = bars("D A/C# Bm F#m G D/F# Em A");
+        String[] chorus = bars("D A Bm F#m G D G A D A Bm F#m Em A D D");
+        int I = 0, V = 4, C = 12;
+        String hook = "A5/.5 D6/.5 E6/.5 F#6/.5 _A6/1 F#6/.5 E6/.5 | E6/.5 C#6/.5 A5/.5 B5/.5 _C#6/1 B5/.5 A5/.5 |"
+                + " F#5/.5 B5/.5 D6/.5 E6/.5 _F#6/1 E6/.5 D6/.5 | _B5/1 D6/1 G5/1 A5/.5 B5/.5";
+        String mV = "F#5/.5 F#5/.5 F#5/.5 E5/.5 D5/1 A4/1 | C#5/.5 C#5/.5 D5/.5 E5/.5 A4/2 |"
+                + " D5/.5 D5/.5 F#5/.5 D5/.5 B4/1 A4/1 | C#5/3 r/1 |"
+                + " B4/.5 D5/.5 G5/.5 F#5/.5 D5/1 B4/1 | A4/.5 D5/.5 F#5/.5 A5/.5 F#5/2 |"
+                + " G5/1 F#5/1 E5/1 D5/1 | C#5/1.5 E5/.5 A5/2";
+        String k1 = "_F#6/1.5 E6/.5 D6/1 A5/1 | C#6/1.5 B5/.5 A5/1 E5/1 | D6/1.5 C#6/.5 B5/1 F#5/1 | A5/1.5 F#5/.5 C#6/2 |";
+        String mC = k1 + " B5/1.5 A5/.5 G5/1 D6/1 | _F#6/1.5 E6/.5 D6/1 A5/1 | G5/1 B5/1 D6/1 E6/1 | _E6/3 r/1 |"
+                + k1 + " G5/1 B5/1 E6/1 D6/1 | C#6/1.5 D6/.5 E6/2 | _F#6/2 E6/1 D6/1 | D6/2 r/2";
+        band(s, I, intro, INTRO, 0.6f, true);
+        band(s, V, verse, VERSE, 0.55f, true);
+        band(s, C, chorus, CHORUS, 0.7f, true);
+        mel(s, LD, I, hook, 0.7f, 0f, 0.3f, 0.22f, 0);
+        mel(s, GL, I, hook, 0.22f, 0.3f, 0.35f, 0.1f, 12);
+        mel(s, LD, V, mV, 0.6f, 0f, 0.3f, 0.2f, 0);
+        mel(s, LD, C, mC, 0.75f, 0f, 0.3f, 0.22f, 0);
+        mel(s, GL, C, mC, 0.25f, 0.3f, 0.35f, 0.1f, 12);
+        // open sky: supersaw bed everywhere, harp-like clean arpeggios in the verse
+        hold(s, SAW, I, intro, 66, 0.2f, 0f, 0.35f);
+        hold(s, SAW, V, verse, 64, 0.18f, 0f, 0.35f);
+        hold(s, SAW, C, chorus, 66, 0.3f, 0f, 0.35f);
+        arp(s, HP, V, verse, 71, 38, "01230123", 0.5f, 0.22f, 2f, 0.35f, 0.15f);
+        crashes(s, 28, C, C + 8);
+        s.note(CHIME, C * 4, 2, 90, 0.3f, -0.3f, 0.5f);
         return s;
     }
 
@@ -471,6 +469,7 @@ public final class Soundtrack {
                 while (j < 16 && pat.charAt(j) == '-') j++;
                 float beat = i * 0.25f;
                 String c = chordAt(prog, b, beat, bpb);
+                if (c.indexOf('/') > 0) c = c.substring(0, c.indexOf('/'));   // power chords sit on the chord root
                 int r = MusicSynth.bassOf(c, 40);
                 boolean mute = ch == 'o';
                 float len = mute ? 0.2f : (j - i) * 0.25f * 0.95f;
@@ -498,57 +497,57 @@ public final class Soundtrack {
         return s;
     }
 
+    /**
+     * Band stinger in the Rooftop Rush mould: a tom pickup, three power-chord hits (the last one held) with kick and
+     * synth bass, a crash, and the lead ringing out. root: the power chord's MIDI root (E2..D3).
+     */
+    private static MusicSynth bandSting(float bpm, long seed, int root, String lead, float hand) {
+        MusicSynth s = sting(bpm, 8, seed);
+        s.masterTarget = 0.13f;
+        s.handoffBeats = hand;
+        float[] tp = {50, 45, 41, 38};
+        for (int i = 0; i < 4; i++) s.note(TOM, i * 0.25f, 0.25f, tp[i], 0.7f, (i - 1.5f) * 0.2f, 0.2f);
+        float[] at = {1f, 1.75f, 2.5f};
+        for (float a : at)
+            for (int side = -1; side <= 1; side += 2) {
+                float len = a == 2.5f ? 3f : 0.6f;
+                s.note(GT, a, len, root, 0.8f, side * 0.7f, 0.15f);
+                s.note(GT, a, len, root + 7, 0.65f, side * 0.7f, 0.15f);
+                s.note(GT, a, len, root + 12, 0.5f, side * 0.7f, 0.15f);
+            }
+        int b = root - 12;
+        while (b < 28) b += 12;
+        for (float a : at) { s.note(KICK, a, 1, 0, 1f, 0f, 0f); s.note(SB, a, a == 2.5f ? 2f : 0.5f, b, 0.8f, 0f, 0f); }
+        s.note(SNR, 2.5f, 1, 0, 0.9f, 0f, 0.2f);
+        s.note(CRASH, 2.5f, 4, 60, 0.9f, 0.2f, 0.3f);
+        s.mel(LD, 1f, lead, 0.7f, 0f, 0.25f, 0.25f, 0);
+        return s;
+    }
+
     private static MusicSynth stSakura() {
-        MusicSynth s = sting(132, 8, 1);
-        s.handoffBeats = 5f;
-        s.mel(GL, 0, "B5/.25 E6/.25 G#6/.25 B6/.25 r/1 E6+G#6+B6/2", 0.5f, 0.3f, 0.4f, 0.2f, 0);
-        s.mel(LD, 0, "r/1 B5/.5 C#6/.5 _E6/3", 0.75f, 0f, 0.3f, 0.25f, 0);
-        s.mel(SAW, 0, "r/1 E4+G#4+B4+F#5/4", 0.4f, 0f, 0.35f, 0f, 0);
-        s.mel(SB, 0, "r/1 E2/2", 0.8f, 0f, 0f, 0f, 0);
-        s.note(KICK, 1, 1, 0, 1f, 0f, 0f);
-        s.note(CLAP, 1, 1, 0, 0.5f, 0f, 0.3f);
-        s.note(CRASH, 1, 4, 60, 0.6f, -0.2f, 0.3f);
-        s.note(CHIME, 1.5f, 2, 90, 0.35f, 0.3f, 0.5f);
+        MusicSynth s = bandSting(172, 1, 40, "B5/.5 C#6/.25 E6/.75 _G#6/3", 5f);
+        s.mel(GL, 1f, "B5/.5 C#6/.25 E6/.75 G#6/3", 0.25f, 0.3f, 0.3f, 0.1f, 12);
+        s.note(CHIME, 2.5f, 2, 90, 0.3f, 0.3f, 0.5f);
         return s;
     }
 
     private static MusicSynth stCavern() {
-        MusicSynth s = sting(104, 8, 2);
-        s.handoffBeats = 5.5f;
-        s.revSize = 0.93f; s.revWet = 1.3f; s.dlyFb = 0.45f;
-        s.note(REV, 0, 1, 60, 0.35f, 0f, 0.4f);
-        s.mel(CE, 1, "D5/.25 F5/.25 A5/.25 C6/.25 E6/.25 F6/.25 A6/1.5", 0.7f, 0.2f, 0.6f, 0.3f, 0);
-        s.mel(CH, 1, "D4+A4+C5+E5+F5/5", 0.4f, 0f, 0.6f, 0f, 0);
-        s.mel(SUB, 1, "D2/5", 0.6f, 0f, 0f, 0f, 0);
-        s.note(TAIKO, 1, 2, 38, 0.6f, 0f, 0.5f);
-        s.note(CHIME, 2, 2, 90, 0.3f, -0.3f, 0.7f);
+        MusicSynth s = bandSting(150, 2, 50, "A5/.5 C6/.25 D6/.75 _F6/3", 5f);
+        s.mel(CE, 2.5f, "D6/.25 F6/.25 A6/.25 C7/.25 E7/2", 0.4f, 0.3f, 0.5f, 0.3f, 0);
         return s;
     }
 
     private static MusicSynth stRiver() {
-        MusicSynth s = sting(96, 8, 3);
-        s.handoffBeats = 5.5f;
-        s.mel(KO, 0, "D6/.125 B5/.125 A5/.125 F#5/.125 E5/.125 D5/.125 B4/.125 A4/.125", 0.6f, -0.2f, 0.4f, 0f, 0);
-        s.note(TAIKO, 1, 1, 33, 0.8f, 0f, 0.4f);
-        s.note(TAIKO, 1.75f, 1, 36, 0.5f, 0f, 0.4f);
-        s.note(KAKKO, 1.5f, 1, 86, 0.4f, -0.3f, 0.3f);
-        s.mel(SK, 1, "A5/1 B5/.5 _A5/3.5", 0.8f, 0.05f, 0.5f, 0.15f, 0);
-        s.mel(STR, 1, "D4+A4+E5/5", 0.3f, 0f, 0.5f, 0f, 0);
-        s.mel(KO, 1, "D3+A3/4", 0.5f, -0.2f, 0.4f, 0f, 0);
+        MusicSynth s = bandSting(156, 3, 47, "F#5/.5 A5/.25 B5/.75 _D6/1.5 B5/1.5", 5f);
+        s.mel(SH, 1f, "F#5/.5 A5/.25 B5/.75 D6/1.5 B5/1.5", 0.6f, -0.35f, 0.25f, 0f, 0);
+        s.note(TAIKO, 2.5f, 2, 33, 0.8f, 0f, 0.3f);
         return s;
     }
 
     private static MusicSynth stSky() {
-        MusicSynth s = sting(120, 8, 4);
-        s.handoffBeats = 6f;
-        s.revSize = 0.88f; s.revWet = 1.1f;
-        s.mel(HP, 0, "F4/.125 G4/.125 A4/.125 B4/.125 C5/.125 D5/.125 E5/.125 F5/.125 G5/.125 A5/.125 B5/.125 C6/.125"
-                + " D6/.125 E6/.125 F6/.5", 0.45f, -0.2f, 0.5f, 0f, 0);
-        s.mel(STR, 2, "F4+C5+G5+A5/5", 0.45f, 0f, 0.5f, 0f, 0);
-        s.mel(STR, 2, "F3/5", 0.35f, 0f, 0.4f, 0f, 0);
-        s.mel(FL, 2, "C6/1 G6/.5 _A6/3.5", 0.6f, 0.2f, 0.5f, 0.1f, 0);
-        s.note(CHIME, 2, 3, 90, 0.4f, 0.3f, 0.7f);
-        s.note(TOM, 2, 1, 31, 0.55f, 0f, 0.5f);
+        MusicSynth s = bandSting(176, 4, 50, "A5/.5 D6/.25 E6/.75 _F#6/3", 5f);
+        s.mel(SAW, 2.5f, "D4+A4+E5+F#5/3", 0.35f, 0f, 0.35f, 0f, 0);
+        s.mel(GL, 1f, "A5/.5 D6/.25 E6/.75 F#6/3", 0.22f, 0.3f, 0.35f, 0.1f, 12);
         return s;
     }
 
@@ -573,14 +572,26 @@ public final class Soundtrack {
         return s;
     }
 
+    /** Game over: the band slows to a halt, C - D - E minor, the lead falling to the root. */
     private static MusicSynth stGameOver() {
-        MusicSynth s = sting(84, 8, 6);
+        MusicSynth s = sting(100, 8, 6);
+        s.masterTarget = 0.13f;
         s.handoffBeats = 7f;
-        s.revSize = 0.86f; s.revWet = 1.0f;
-        s.mel(P, 0, "A2+E3/2 A2+E3/2 E2+B2/4", 0.45f, -0.1f, 0.4f, 0f, 0);
-        s.mel(P, 0, "C#4+E4+G#4/2 C4+E4+F#4/2 B3+E4+F#4+G#4/4", 0.4f, 0.05f, 0.45f, 0f, 0);
-        s.mel(MB, 0, "G#6/.5 E6/.5 C#6/1 C6/.5 A5/.5 F#5/1 G#5/4", 0.6f, 0.2f, 0.55f, 0.1f, 0);
-        s.mel(STR, 0, "E4+A4/2 E4+A4/2 E4+B4/4", 0.18f, 0f, 0.5f, 0f, 0);
+        int[] roots = {48, 50, 40};
+        float[] at = {0f, 1.5f, 3f}, len = {1.4f, 1.4f, 4f};
+        for (int k = 0; k < 3; k++) {
+            for (int side = -1; side <= 1; side += 2) {
+                s.note(GT, at[k], len[k], roots[k], 0.75f, side * 0.7f, 0.2f);
+                s.note(GT, at[k], len[k], roots[k] + 7, 0.6f, side * 0.7f, 0.2f);
+                s.note(GT, at[k], len[k], roots[k] + 12, 0.45f, side * 0.7f, 0.2f);
+            }
+            s.note(KICK, at[k], 1, 0, 0.95f, 0f, 0f);
+            s.note(SNR, at[k], 1, 0, 0.7f, 0f, 0.25f);
+            s.note(SB, at[k], len[k], roots[k] - 12 < 28 ? roots[k] : roots[k] - 12, 0.75f, 0f, 0f);
+        }
+        s.note(CRASH, 3f, 4, 60, 0.75f, 0.2f, 0.3f);
+        s.mel(LD, 0f, "G5/1.5 F#5/1.5 _E5/4", 0.65f, 0f, 0.3f, 0.25f, 0);
+        s.mel(SAW, 3f, "E4+G4+B4/4", 0.25f, 0f, 0.35f, 0f, 0);
         return s;
     }
 }
