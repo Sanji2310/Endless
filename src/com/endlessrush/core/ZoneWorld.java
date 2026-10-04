@@ -176,8 +176,8 @@ public final class ZoneWorld {
         if (z.paletteZone < 0 || z.blend <= 0f) return;
         float t = z.blend;
         float[] p = Zones.PALETTE[z.paletteZone].light;
-        // the old shader has no lamp, so the cave light is lifted a little for it
-        for (int c = 0; c < 3; c++) light[c] = 1f + (Math.min(1f, p[c] * 1.35f) - 1f) * t;
+        // draws still on the old shader take the cave's lantern-warm light
+        for (int c = 0; c < 3; c++) light[c] = 1f + (Math.min(1f, p[c]) - 1f) * t;
         for (int i = 0; i < dl.count; i++) {
             boolean sky = (dl.flags[i] & DrawList.F_NODEPTH) != 0;
             for (int c = 0; c < 3; c++) {
