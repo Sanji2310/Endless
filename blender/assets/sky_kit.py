@@ -167,11 +167,29 @@ def sky_lantern(name="sky_lantern"):
 
 # ----------------------------------------------------------------------------- chime cable
 
-def chime_cable(name="chime_cable", span=18.0, rnd_seed=4):
-    """Cable across the valley with glass wind chimes (fuurin) with paper strips and small flags."""
+def chime_cable(name="chime_cable", span=24.0, rnd_seed=4, pylon=24.0):
+    """Cable across the gorge with glass wind chimes (fuurin), paper strips and small flags. Each end is tied off
+    on a braced timber pylon that stands on the valley floor (`pylon` m tall below the cable), so the cable is
+    held up wherever the game strings it; the pylons stand outside the glide (Ride: SKY_HALF + 3)."""
     mats()
     rnd = random.Random(rnd_seed)
     m = E.Mesher(name)
+    for sx in (-1, 1):
+        x = sx * span / 2
+        m.mat("sk_timber")
+        for dy in (-0.35, 0.35):
+            m.cyl((x, dy, 0.9 - pylon / 2), r=0.11, h=pylon + 0.6, seg=7)
+        z = 0.2
+        while z > -pylon + 1.5:
+            m.box((x, 0, z), (0.16, 0.85, 0.12), smooth=False)                           # rungs
+            m.push(Matrix.Translation((x, 0, z - 1.0)) @ Matrix.Rotation(math.radians(55), 4, 'X'))
+            m.box((0, 0, 0), (0.08, 0.08, 2.3), smooth=False)                            # cross brace
+            m.pop()
+            z -= 2.0
+        m.mat("sk_red")
+        m.box((x, 0, 1.25), (0.5, 1.1, 0.12), smooth=False)                             # painted cap
+        m.mat("sk_rope")
+        m.torus((x, 0, 0.62), R=0.16, r=0.035, seg=12, sides=5, axis='Y')               # tie-off wrap
     m.mat("sk_cable")
     pts = E.catenary(V((-span / 2, 0, 0.6)), V((span / 2, 0, 0.6)), sag=0.6, n=24)
     m.sweep(pts, [(math.cos(2 * math.pi * k / 6), math.sin(2 * math.pi * k / 6)) for k in range(6)], closed=True, cap=True,
@@ -314,13 +332,22 @@ def sky_gorge(name="sky_gorge", L=40.0, seed=3):
     rnd = random.Random(seed)
     m = E.Mesher(name)
     P = PAL
+    # a rope bridge between two tall pillars, its lowest plank above the canopy at the glide ceiling
+    # (ALT_MAX 12 + 2.6 m of lines and wing)
+    bridge_y = rnd.uniform(8, L - 8) if rnd.random() < 0.6 else None
+    ends = {}
     for sd in (-1, 1):
         y = 0.0
         while y < L:
             r = rnd.uniform(2.0, 3.4)
             x = sd * (GORGE + r + rnd.uniform(0.0, 2.5))
             top_z = rnd.uniform(-6.0, 9.0)
+            holds = bridge_y is not None and sd not in ends and y <= bridge_y <= y + 2 * r
+            if holds:
+                top_z = 18.0
             top, rt = _cliff_column(m, rnd, x, y + r, FLOOR, top_z, r)
+            if holds:
+                ends[sd] = top + V((-sd * rt * 0.55, 0, 0.15))
             # grassy cap with dressing
             m.mat("sk_grass")
             m.ico(tuple(top + V((0, 0, 0.1))), rt * 1.05, 2, s=(1, 1, 0.22))
@@ -351,7 +378,8 @@ def sky_gorge(name="sky_gorge", L=40.0, seed=3):
                 if rnd.random() < 0.5:
                     SC.pine(m, P, tuple(p + V((-sd * 0.2, 0, 0.3))), rnd, h=1.8)
             if rnd.random() < 0.2:
-                SC.waterfall(m, P, (x - sd * r * 0.98, y + r, top_z - 0.5), drop=top_z - FLOOR - 1, w=1.8)
+                SC.waterfall(m, P, (x - sd * r * 0.98, y + r, top_z - 0.5), drop=top_z - FLOOR - 1, w=1.8,
+                             out=(-sd, 0, 0))
             y += 2 * r + rnd.uniform(-0.5, 0.8)
         # second rank behind: taller, simpler
         y = rnd.uniform(-4, 0)
@@ -365,21 +393,28 @@ def sky_gorge(name="sky_gorge", L=40.0, seed=3):
                 SC.round_tree(m, P, tuple(top + V((rnd.uniform(-1, 1) * rt * 0.5, rnd.uniform(-1, 1) * rt * 0.5, 0.2))),
                               rnd, h=rnd.uniform(2.4, 3.6), r=rnd.uniform(1.0, 1.5))
             y += 2 * r
-    # rope bridge across, well above the glide ceiling (ALT_MAX 12 game = 10 here) so it is scenery, not a hazard
-    if rnd.random() < 0.6:
-        y = rnd.uniform(8, L - 8)
-        a, b = V((-GORGE - 1.5, y, 13.0)), V((GORGE + 1.5, y, 13.0))
+    if len(ends) == 2:
+        a, b = ends[-1], ends[1]
         n = 24
-        pts = [a.lerp(b, k / n) + V((0, 0, -1.6 * math.sin(math.pi * k / n))) for k in range(n + 1)]
+        pts = [a.lerp(b, k / n) + V((0, 0, -1.4 * math.sin(math.pi * k / n))) for k in range(n + 1)]
+        side = (b - a).cross(V((0, 0, 1))).normalized()
         m.mat("sk_timber")
         for p in pts[1:-1]:
-            m.box(tuple(p), (0.5, 1.0, 0.06), smooth=False)
+            m.push(Matrix.Translation(p) @ (b - a).to_track_quat('X', 'Z').to_matrix().to_4x4())
+            m.box((0, 0, 0), (0.42, 1.0, 0.06), smooth=False)
+            m.pop()
+        for p in (a, b):                                 # anchor posts standing on the pillar tops
+            for dy in (-0.55, 0.55):
+                m.cyl(tuple(p + side * dy + V((0, 0, 0.5))), r=0.08, h=1.3, seg=6)
         m.mat("sk_rope")
-        for dy in (-0.5, 0.5):
-            m.tube([tuple(p + V((0, dy, 0.7))) for p in pts], r=0.025, seg=5)
+        for dy in (-0.55, 0.55):
+            m.tube([tuple(p + side * dy + V((0, 0, 0.75 + 0.35 * (1 - math.sin(math.pi * k / n))))) for k, p in enumerate(pts)],
+                   r=0.025, seg=5)
+            for p in pts[2:-2:2]:
+                m.cyl(tuple(p + side * dy + V((0, 0, 0.38))), r=0.01, h=0.75, seg=4)
         m.mat("sk_paper_red")
         for k in range(2, n - 1, 3):
-            m.box(tuple(pts[k] + V((0, 0.5, 0.45))), (0.03, 0.2, 0.32), smooth=False)
+            m.box(tuple(pts[k] + side * 0.6 + V((0, 0, 0.4))), (0.03, 0.2, 0.32), smooth=False)
     # valley floor: terrace bands and a stream
     m.mat("sk_terrace")
     m.box((0, L / 2, FLOOR - 0.2), (2 * GORGE + 8, L, 0.4), smooth=False)
@@ -416,6 +451,9 @@ def design_sky_gorge():
                                        (-8, 18, -9, 7), (7, 42, -10, 8), (0, 70, -11, 9), (-9, 110, 6, 6))):
         c = cloud("cloud_%d" % k, seed=k + 2, size=sz)
         c.location = (x, y, z)
+    cab = chime_cable("gorge_cable", span=2 * GORGE + 6, pylon=8.0 - FLOOR)
+    cab.location = (0, 60, 8.0)
+    outl.append(cab)
     bo, wo = crow()
     bo.location = (1.5, 22, 6.0)
     wo.location = (1.6, 22, 6.02)
@@ -454,7 +492,7 @@ def design_sky():
     sl = sky_lantern()
     sl.location = (2.0, 0, 1.4)
     sl.scale = (2, 2, 2)
-    cc = chime_cable(span=10)
+    cc = chime_cable(span=10, pylon=4.5)
     cc.location = (0.5, 2.5, 3.6)
     sp = spire(h=6.0)
     sp.location = (5.5, 4.0, -3.0)

@@ -17,14 +17,14 @@ public final class RideSfx {
             ORE_BELL = BASE + 13, FORK_BELL = BASE + 14, CART_CRASH = BASE + 15, BUFFER_CRASH = BASE + 16,
             BOAT_LAND = BASE + 17, PADDLE_R = BASE + 18, PADDLE_L = BASE + 19, RUDDER = BASE + 20, BOAT_BUMP = BASE + 21,
             CROC_SURFACE = BASE + 22, CROC_SNAP = BASE + 23, LOG_KNOCK = BASE + 24, WHIRL = BASE + 25, BOAT_CRASH = BASE + 26,
-            WATERFALL = BASE + 27, CANOPY_OPEN = BASE + 28, CAW = BASE + 29, FLOCK = BASE + 30, KITE_FLAP = BASE + 31,
+            WATERFALL = BASE + 27, CANOPY_OPEN = BASE + 28, CAW = BASE + 29, FLOCK = BASE + 30, STORM_RUMBLE = BASE + 31,
             CHIMES = BASE + 32, GUST = BASE + 33, THERMAL = BASE + 34, GLIDER_CRASH = BASE + 35, TOUCHDOWN = BASE + 36,
             HOP_OFF = BASE + 37;
     public static final int COUNT = 38;
     public static final String[] NAMES = {"stow", "board_back", "board_cart", "cart_land", "cart_land_soft", "cart_bump",
             "track_switch", "rail_clack", "crouch", "duck_whoosh", "bats", "rock_rumble", "rockfall", "ore_bell", "fork_bell",
             "cart_crash", "buffer_crash", "boat_land", "paddle_r", "paddle_l", "rudder", "boat_bump", "croc_surface",
-            "croc_snap", "log_knock", "whirl", "boat_crash", "waterfall", "canopy_open", "caw", "flock", "kite_flap",
+            "croc_snap", "log_knock", "whirl", "boat_crash", "waterfall", "canopy_open", "caw", "flock", "storm_rumble",
             "chimes", "gust", "thermal", "glider_crash", "touchdown", "hop_off"};
 
     public static final int LOOP_CART = 0, LOOP_RIVER = 1, LOOP_WIND = 2, LOOP_CANOPY = 3, LOOP_COUNT = 4;
@@ -254,11 +254,12 @@ public final class RideSfx {
                     tone(b, st, 0.2f, f, f * 0.8f, 0.18f, 2, 2);
                 }
                 return pcm(b, 0.6f);
-            case KITE_FLAP:     // a kite's paper sail snapping in the wind and its tail rattling
-                b = buf(0.9f);
-                for (int k = 0; k < 5; k++) band(b, k * 0.16f, 0.06f, 1800, 900, 0.6f, 0.6f, 0.002f, 6);
-                band(b, 0, 0.9f, 3000, 2600, 2f, 0.1f, 0.1f, 1);
-                return pcm(b, 0.55f);
+            case STORM_RUMBLE:  // a small thundercloud: a soft crackle, then a low rolling rumble
+                b = buf(2.0f);
+                for (int k = 0; k < 4; k++) band(b, k * 0.05f, 0.05f, 2600, 1800, 0.8f, 0.5f, 0.002f, 6);
+                band(b, 0.12f, 1.8f, 90, 60, 0.7f, 0.9f, 0.25f, 2);
+                band(b, 0.3f, 1.4f, 160, 80, 0.8f, 0.5f, 0.3f, 2);
+                return pcm(b, 0.65f);
             case CHIMES:        // wind chimes strung on the cable ring as she nears it
                 b = buf(1.8f);
                 float[] notes = {1568, 1760, 2093, 2349, 2637};

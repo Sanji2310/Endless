@@ -20,7 +20,7 @@ import erlib as E
 
 V = Vector
 RIVER_HALF = 4.6                # = Ride.RIVER_HALF (the kits are built at game size, Ride.K = 1)
-JAW_HINGE = V((0.0, 0.62, 0.16))
+JAW_HINGE = V((0.0, 0.62, 0.06))        # after the croc is sunk SINK into the water
 
 
 def mats():
@@ -249,8 +249,9 @@ def river_sides(m, L, rnd, sd):
         SC.house(m, P, at(rnd.uniform(9, 13), rnd.uniform(4, L - 4)), rnd, rot=math.radians(90 if sd > 0 else -90))
     elif r < 0.7:
         y = rnd.uniform(4, L - 4)
-        SC.water_wheel(m, P, (sd * (e + 0.35), y, 0.6), rot=0.0)
-        SC.house(m, P, at(1.8, y), rnd, rot=math.radians(90 if sd > 0 else -90), w=2.2, d=1.8, h=1.3)
+        # the wheel stands in the shallows, its axle running into the mill on the bank
+        SC.water_wheel(m, P, (sd * (e - 0.55), y, 0.5), rot=0.0 if sd > 0 else math.pi, axle=2.4)
+        SC.house(m, P, at(1.6, y), rnd, rot=math.radians(90 if sd > 0 else -90), w=2.2, d=1.8, h=1.3)
     else:
         SC.dock(m, P, (sd * (e - 0.2), rnd.uniform(4, L - 4), 0.0), rot=0.0)
 
@@ -405,9 +406,24 @@ def croc(name="croc"):
         for sx in (-1, 1):
             jaw.cyl((sx * 0.16, 0.12 + k * 0.12, 0.0), r=0.022, h=0.06, seg=5, r2=0.0, )
     jo = jaw.obj(name + "_jaw", smooth_angle=50)
-    # face the croc toward -Y (at the canoe coming up +Y): rotate both 180 deg about Z
+    # waterline: foam collar round the back and a V of ripples off the snout (the part under z=0 is hidden by water)
+    wl = E.Mesher(name + "_wake")
+    wl.mat("rv_foam")
+    for k in range(17):
+        y = L0 + 0.1 + (L1 - L0 - 0.1) * k / 16
+        w, h = sec(y)
+        for sx in (-1, 1):
+            wl.box((sx * (w + 0.02), y, 0.1), (0.05, 0.14, 0.012), smooth=False)
+    for sx in (-1, 1):
+        wl.push(Matrix.Translation((0, L1 + 0.75, 0.0)) @ Matrix.Rotation(math.radians(sx * 28), 4, 'Z'))
+        for k in range(3):
+            wl.box((0, -0.5 - k * 0.5, 0.1), (0.04, 0.34, 0.012), smooth=False)
+        wl.pop()
+    wo = wl.obj(name + "_wake", smooth_angle=50)
+    bo = E.join([bo, wo], name + "_body")
+    # sink it 0.1 m so only the back, the scutes, the eyes and the snout ride above the water, and face -Y
     for o in (bo, jo):
-        o.data.transform(Matrix.Rotation(math.pi, 4, 'Z'))
+        o.data.transform(Matrix.Rotation(math.pi, 4, 'Z') @ Matrix.Translation((0, 0, -0.1)))
     return bo, jo
 
 
@@ -415,21 +431,28 @@ def drift_log(name="drift_log", seed=2, L=3.2):
     mats()
     rnd = random.Random(seed)
     m = E.Mesher(name)
+    # floats a little over half sunk: axis 0.06 m under the water, so 0.22 of its 0.56 m shows
+    zc = -0.06
     m.mat("rv_log")
-    m.cyl((0, 0, 0.05), r=0.28, h=L, seg=14, axis='X')
+    m.cyl((0, 0, zc), r=0.28, h=L, seg=14, axis='X')
     m.mat("rv_log_end")
     for sx in (-1, 1):
-        m.cyl((sx * L / 2, 0, 0.05), r=0.24, h=0.02, seg=14, axis='X')
+        m.cyl((sx * L / 2, 0, zc), r=0.24, h=0.02, seg=14, axis='X')
+        m.mat("rv_log_end")
     m.mat("rv_log")
-    m.push(Matrix.Translation((0.5, 0, 0.2)) @ Matrix.Rotation(math.radians(-35), 4, 'Y'))
+    m.push(Matrix.Translation((0.5, 0, zc + 0.24)) @ Matrix.Rotation(math.radians(-35), 4, 'Y'))
     m.cyl((0, 0, 0.3), r=0.07, h=0.6, seg=8, r2=0.03)
     m.pop()
     m.mat("rv_moss")
-    m.ico((-0.6, 0, 0.27), 0.25, 1, s=(1.4, 1, 0.3))
+    m.ico((-0.6, 0, zc + 0.22), 0.25, 1, s=(1.4, 1, 0.3))
     m.mat("rv_leaf")
-    m.poly([(-0.2, 0.2, 0.3), (0.0, 0.4, 0.3), (0.1, 0.2, 0.32)])
+    m.poly([(-0.2, 0.12, zc + 0.27), (0.0, 0.3, zc + 0.26), (0.1, 0.12, zc + 0.28)])
     m.mat("rv_foam")
-    m.torus((0, 0, -0.01), R=0.5, r=0.04, seg=20, sides=4)
+    for sy in (-1, 1):                  # waterline foam along both sides, heavier on the upstream (+Y) side
+        m.box((0, sy * 0.27, 0.0), (L - 0.1, 0.06 if sy < 0 else 0.1, 0.012), smooth=False)
+    for k in range(5):
+        x = -L / 2 + 0.3 + k * (L - 0.6) / 4
+        m.box((x, 0.45, 0.0), (0.3, 0.04, 0.012), smooth=False)
     ob = m.obj(name, smooth_angle=40)
     ob.data.transform(Matrix.Diagonal((1, 1, 1, 1)))
     return ob

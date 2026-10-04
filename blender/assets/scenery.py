@@ -100,7 +100,7 @@ def house(m, P, c, rnd, rot=0.0, w=2.6, d=2.0, h=1.5):
     """Small minka: cream plaster walls with timber frame, deep hip roof, veranda, a glowing paper window."""
     m.push(Matrix.Translation(c) @ Matrix.Rotation(rot, 4, 'Z'))
     m.mat(P["stone2"])
-    m.box((0, 0, 0.12), (w + 0.3, d + 0.3, 0.24), smooth=False)
+    m.box((0, 0, -0.3), (w + 0.3, d + 0.3, 1.08), smooth=False)     # plinth reaches into the slope (no gap downhill)
     m.mat(P["wall"])
     m.box((0, 0, 0.24 + h / 2), (w, d, h), smooth=False)
     m.mat(P["timber"])
@@ -118,7 +118,9 @@ def house(m, P, c, rnd, rot=0.0, w=2.6, d=2.0, h=1.5):
     m.pop()
 
 
-def water_wheel(m, P, c, rot=0.0, r=1.1):
+def water_wheel(m, P, c, rot=0.0, r=1.1, axle=0.7):
+    """Mill wheel turning in the water: two rims, spokes, paddles; the axle runs `axle` m along +X (rotated) into
+    the mill wall, with a timber bearing post at the water's edge."""
     m.push(Matrix.Translation(c) @ Matrix.Rotation(rot, 4, 'Z'))
     m.mat(P["timber"])
     for sx in (-0.22, 0.22):
@@ -129,7 +131,8 @@ def water_wheel(m, P, c, rot=0.0, r=1.1):
         m.box((0, 0, r * 0.5), (0.05, 0.05, r), smooth=False)
         m.box((0, 0, r + 0.05), (0.5, 0.06, 0.25), smooth=False)
         m.pop()
-    m.cyl((0, 0, 0), r=0.12, h=0.7, seg=10, axis='X')
+    m.cyl((axle / 2 - 0.35, 0, 0), r=0.12, h=axle, seg=10, axis='X')
+    m.box((0.45, 0, -0.6), (0.22, 0.22, 1.2), smooth=False)          # bearing post down into the river bed
     m.pop()
 
 
@@ -186,15 +189,30 @@ def mountains(m, P, c, rnd, n=6, w=80.0, h=(10, 22), depth=6.0):
                 m.cyl((x, y0 + dy, z0 + hh * 0.86), r=r * 0.26, h=hh * 0.28, seg=9, r2=r * 0.1)
 
 
-def waterfall(m, P, top, drop=8.0, w=1.2):
-    """Thin ribbon falls with a foam pool (flat, reads as animated by the water shader's scroll)."""
-    t = V(top)
+def waterfall(m, P, top, drop=8.0, w=1.2, out=(0.0, -1.0, 0.0)):
+    """Falls pouring off a lip: a curved sheet that leaves the edge and bends down (out = direction away from
+    the cliff), lighter streaks down its face, and a foam/mist cloud where it lands."""
+    t, o = V(top), V(out).normalized()
+    side = o.cross(V((0, 0, 1))).normalized()
+    n = 12
+    path = []
+    for k in range(n + 1):
+        u = k / n
+        path.append(t + o * (0.9 * math.sqrt(u) * min(1.0, drop / 6.0)) + V((0, 0, -drop * u)))
+    rings = [[tuple(p - side * (w / 2) * (1 + 0.5 * k / n)), tuple(p + side * (w / 2) * (1 + 0.5 * k / n))]
+             for k, p in enumerate(path)]
     m.mat(P["water"])
-    m.poly([tuple(t + V((-w / 2, 0, 0))), tuple(t + V((w / 2, 0, 0))), tuple(t + V((w * 0.7, -0.4, -drop))),
-            tuple(t + V((-w * 0.7, -0.4, -drop)))])
+    m.quad_strip(rings, closed=False, smooth=True)
     m.mat(P["foam"])
-    for k in range(5):
-        m.ico(tuple(t + V((rnd_off(k, w), -0.5, -drop + 0.1))), 0.35 + 0.08 * k, 1, s=(1, 1, 0.5))
+    for j in (-0.3, 0.05, 0.32):                       # streaks just in front of the sheet
+        pts = [p + side * (w * j) + o * 0.03 for p in path[1:]]
+        m.tube([tuple(p) for p in pts], r=0.04 * w, seg=4)
+    m.ico(tuple(t + o * 0.05 + V((0, 0, 0.02))), w * 0.3, 1, s=(1.6, 0.6, 0.4))     # lip foam
+    end = path[-1]
+    for k in range(6):
+        a = 2 * math.pi * k / 6
+        m.ico(tuple(end + side * math.cos(a) * w * 0.7 + o * (0.4 + math.sin(a) * 0.5) + V((0, 0, 0.2))),
+              0.45 * w + 0.1 * (k % 3), 1, s=(1, 1, 0.6))
 
 
 def rnd_off(k, w):

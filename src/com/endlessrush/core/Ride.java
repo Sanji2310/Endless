@@ -34,7 +34,7 @@ public final class Ride {
     // hazards
     public static final int H_BEAM = 0, H_LOG = 1, H_BATS = 2, H_BOULDER = 3, H_ROCKFALL = 4, H_ORE_TRAIN = 5, H_PILLAR = 6,
             H_STONE = 10, H_CROC = 11, H_DRIFTLOG = 12, H_WHIRL = 13, H_ISLAND = 14,
-            H_CROW = 20, H_FLOCK = 21, H_KITE = 22, H_LANTERN = 23, H_CABLE = 24, H_SPIRE = 25, H_GUST = 26, H_THERMAL = 27;
+            H_CROW = 20, H_FLOCK = 21, H_ISLET = 22, H_STORM = 23, H_CABLE = 24, H_SPIRE = 25, H_GUST = 26, H_THERMAL = 27;
 
     /** Blender metres to game metres for the vehicles and the river/sky kits. 1: they are built at game size, like
      *  the cave kit (its 2.4 m lanes, 1.067 m gauge, 1.25 m beams); Pongo herself is drawn at HERO_SCALE 1.2
@@ -586,26 +586,30 @@ public final class Ride {
                     }
                     break;
                 case H_CROW:
-                    // flies in from the side, then dives at her altitude
-                    h.x += h.vx * dt;
-                    h.y += (alt + 1.3f - h.y) * Math.min(1f, dt * (d < 30f ? 1.6f : 0.3f));
+                    // flies straight at her down the gorge: lines up on her while far, then commits (dodgeable)
+                    if (d > 22f) {
+                        float k = Math.min(1f, dt * 0.9f);
+                        h.x += (x - h.x) * k * 0.6f;
+                        h.y += (alt + 1.2f - h.y) * k * 0.6f;
+                    }
                     h.s += h.vs * dt;
-                    if (!h.warned && d < 40f) { h.warned = true; sfx(RideSfx.CAW); }
+                    h.phase += dt * 9f;     // wingbeat
+                    if (!h.warned && d < 45f) { h.warned = true; sfx(RideSfx.CAW); }
                     break;
                 case H_FLOCK:
-                    h.x += h.vx * dt;
                     h.s += h.vs * dt;
+                    h.phase += dt * 8f;
                     if (!h.warned && d < 55f) { h.warned = true; sfx(RideSfx.FLOCK); }
                     break;
-                case H_KITE:
+                case H_ISLET:       // a floating rock islet bobbing on the updraft, its little fall trickling
                     h.phase += dt;
-                    h.x = h.x0 + 0.9f * (float) Math.sin(h.phase * 1.3f + h.seed);
-                    h.y = h.y0 + 0.5f * (float) Math.sin(h.phase * 0.9f + h.seed * 2);
-                    if (!h.warned && d < 30f) { h.warned = true; sfx(RideSfx.KITE_FLAP); }
+                    h.y = h.y0 + 0.35f * (float) Math.sin(h.phase * 0.7f + h.seed);
+                    if (!h.warned && d < 35f) { h.warned = true; sfx(RideSfx.WATERFALL); }
                     break;
-                case H_LANTERN:
-                    h.y += 0.7f * dt;
-                    h.x += 0.25f * (float) Math.sin(h.t * 0.8f + h.seed) * dt;
+                case H_STORM:       // a small thundercloud drifting across, rumbling
+                    h.x += h.vx * dt;
+                    if (h.x < -SKY_HALF || h.x > SKY_HALF) h.vx = -h.vx;
+                    if (!h.warned && d < 40f) { h.warned = true; sfx(RideSfx.STORM_RUMBLE); }
                     break;
                 case H_CABLE:
                     if (!h.warned && d < 35f) { h.warned = true; sfx(RideSfx.CHIMES); }
@@ -673,10 +677,6 @@ public final class Ride {
                         return alt + 3.3f > h.y && alt + 0.2f < h.y;
                     case H_SPIRE:   // rock pillar from the valley floor up to h.y
                         return dx < h.w + 1.6f && alt < h.y;
-                    case H_KITE:    // the kite and its string down to the ground at x0 - 2
-                        if (dx < h.w + 0.9f && Math.abs(cy - h.y) < h.h + 0.9f) return true;
-                        float sx = h.x - 2f + (alt + 1f) / Math.max(0.5f, h.y) * 2f;
-                        return alt + 1f < h.y && Math.abs(x - sx) < 0.5f;
                     default:
                         dy = Math.abs(cy - h.y);
                         float rx = h.w + 0.8f, ry = h.h + 1.1f;
@@ -878,30 +878,31 @@ public final class Ride {
         float lx = (rng.nextFloat() * 2 - 1) * (SKY_HALF - 1.5f);
         float la = ALT_MIN + 1f + rng.nextFloat() * (ALT_MAX - ALT_MIN - 2.5f);
         if (r < 0.2f) {
-            // a crow crossing and diving at her height, coins on the other side
-            Hazard c = add(H_CROW, lx > 0 ? SKY_HALF + 2f : -SKY_HALF - 2f, la + 1f, at + 20f, 0.8f, 0.55f, 0.35f);
-            c.vx = (lx > 0 ? -1 : 1) * (2.5f + d * 2f);
-            c.vs = -3f;
+            // a crow flying head-on down the gorge at her; coins beside its line
+            Hazard c = add(H_CROW, lx, la + 1f, at + 70f, 0.8f, 0.55f, 0.35f);
+            c.vs = -(5f + d * 4f);
             coinRun(-lx * 0.7f, -lx * 0.7f, la, la, at, 7, 3f);
         } else if (r < 0.34f) {
-            // a flock of crows sweeping across in a V
-            float dir = rng.nextBoolean() ? 1 : -1;
-            for (int i = 0; i < 5 + (int) (d * 3); i++) {
-                Hazard c = add(H_FLOCK, -dir * (SKY_HALF + 3f + Math.abs(i - 2) * 1.1f), la + Math.abs(i - 2) * 0.35f,
-                        at + 30f + i * 1.3f, 0.8f, 0.45f, 0.3f);
-                c.vx = dir * (3.4f + d);
-                c.vs = -1.5f;
+            // a flock of crows coming head-on in a V: slip past the wings, above or below
+            int n = 5 + (int) (d * 2);
+            for (int i = 0; i < n; i++) {
+                int k = i - n / 2;
+                Hazard c = add(H_FLOCK, lx * 0.3f + k * 1.3f, la + 1f + Math.abs(k) * 0.45f, at + 70f + Math.abs(k) * 1.6f,
+                        0.8f, 0.45f, 0.3f);
+                c.vs = -(4f + d * 3f);
+                c.seed = i;
             }
             float ca = la > (ALT_MIN + ALT_MAX) * 0.5f ? la - 3.5f : la + 3.5f;
             coinRun(0, 0, ca, ca, at + 20f, 7, 3f);
         } else if (r < 0.5f) {
-            // kites on long strings; go over them or around
-            int n = 1 + (rng.nextFloat() < d ? 1 : 0);
+            // floating rock islets with their own trees and trickling falls; weave between them
+            int n = 1 + (rng.nextFloat() < 0.4f + d * 0.4f ? 1 : 0);
             for (int i = 0; i < n; i++) {
-                float kx = (rng.nextFloat() * 2 - 1) * (SKY_HALF - 1f);
-                add(H_KITE, kx, la + 0.5f, at + 10f + i * 14f, 1.0f, 0.9f, 0.9f);
+                float ix = i == 0 ? lx : (lx > 0 ? lx - 6f : lx + 6f);
+                Hazard h = add(H_ISLET, ix, la + 0.5f, at + 10f + i * 16f, 4f, 2.2f, 1.6f);
+                h.seed = rng.nextInt(1000);
             }
-            coinRun(-lx * 0.5f, lx * 0.2f, la + 3f, la + 3f, at + 4f, 8, 3f);
+            coinRun(lx > 0 ? lx - 3.2f : lx + 3.2f, 0, la + 1f, la + 1f, at + 4f, 8, 3f);
         } else if (r < 0.62f) {
             // a wind-chime cable strung across the valley: climb over or dive under
             float ca = ALT_MIN + 2.6f + rng.nextFloat() * (ALT_MAX - ALT_MIN - 4.5f);
@@ -917,10 +918,12 @@ public final class Ride {
                 add(H_SPIRE, sx > 0 ? sx - 5.2f : sx + 5.2f, ALT_MIN + 2f + rng.nextFloat() * 3f, at + 26f, 4f, 1.2f, 0f);
             coinRun(sx > 0 ? sx - 2.6f : sx + 2.6f, 0, la, la, at + 8f, 8, 3f);
         } else if (r < 0.84f) {
-            // sky lanterns drifting up; a gust shoves her sideways
-            for (int i = 0; i < 3; i++)
-                add(H_LANTERN, (rng.nextFloat() * 2 - 1) * (SKY_HALF - 1f), la - 2f + rng.nextFloat() * 3f, at + 8f + i * 7f,
-                        0.6f, 0.45f, 0.55f);
+            // little thunderclouds drifting across the way; then a gust shoves her sideways
+            for (int i = 0; i < 2; i++) {
+                Hazard h = add(H_STORM, (rng.nextFloat() * 2 - 1) * (SKY_HALF - 1.5f), la - 1f + rng.nextFloat() * 2.5f,
+                        at + 8f + i * 10f, 2.4f, 1.6f, 0.9f);
+                h.vx = (rng.nextBoolean() ? 1 : -1) * (0.8f + d);
+            }
             Hazard gu = add(H_GUST, 0, la + 1f, at + 30f, 6f, SKY_HALF, 3f);
             gu.vx = (rng.nextBoolean() ? 1 : -1) * (3f + d * 2f);
             coinRun(0, 0, la + 1.5f, la + 1.5f, at + 12f, 6, 3f);
