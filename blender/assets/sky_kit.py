@@ -39,8 +39,8 @@ def mats():
     M("sk_glow_core", 0xFFF2C0, emis=2.0, rim=0.0, soft=0.05, outline=0.0)
     M("sk_cable", 0x3A3E4E, rim=0.1, soft=0.1, outline=0.0)
     M("sk_glass", 0xBFEAFF, spec=1.0, rim=0.5, soft=0.04, flags=E.F_GLASS, outline=0.5)
-    M("sk_rock", 0xC6B8C8, rim=0.3, soft=0.12, shadow=0x8D86B8)
-    M("sk_rock_dark", 0x9A8EA8, rim=0.25, soft=0.12, shadow=0x6E6A98)
+    M("sk_rock", 0xF0DCC4, rim=0.3, soft=0.14, shadow=0xB4A4D0)
+    M("sk_rock_dark", 0xDDC2AE, rim=0.25, soft=0.14, shadow=0xA594C4)
     M("sk_pine", 0x5E9A6A, rim=0.25, soft=0.2, flags=E.F_FOLIAGE, sway=0.2, shadow=0x5A6A9A)
     M("sk_bark", 0x6E4A3A, rim=0.2, soft=0.12)
     M("sk_red", 0xE8473C, rim=0.3, soft=0.1)
@@ -289,7 +289,7 @@ PAL = {"trunk": "sk_bark", "leaf": "sk_tree", "leaf2": "sk_tree2", "leaf3": "sk_
        "flower2": "sk_flower2", "wall": "sk_wall", "timber": "sk_timber", "roof": "sk_roof", "stone": "sk_rock",
        "stone2": "sk_rock_dark", "moss": "sk_moss", "far": "sk_far", "far2": "sk_far2", "snow": "sk_snow",
        "water": "sk_water", "foam": "sk_foam", "rope": "sk_rope", "red": "sk_red", "glow": "sk_glow", "culm": "sk_stick"}
-GORGE = 9.0         # cliff faces start this far either side of the glide line (Ride.SKY_HALF is 6 game m = 5 here)
+GORGE = 10.5        # cliff faces start this far either side of the glide line (Ride.SKY_HALF is 6 game m = 5 here)
 FLOOR = -14.0       # valley floor below the glide line
 
 
@@ -319,7 +319,7 @@ def sky_gorge(name="sky_gorge", L=40.0, seed=3):
         while y < L:
             r = rnd.uniform(2.0, 3.4)
             x = sd * (GORGE + r + rnd.uniform(0.0, 2.5))
-            top_z = rnd.uniform(-2.0, 12.0)
+            top_z = rnd.uniform(-6.0, 9.0)
             top, rt = _cliff_column(m, rnd, x, y + r, FLOOR, top_z, r)
             # grassy cap with dressing
             m.mat("sk_grass")
@@ -339,6 +339,11 @@ def sky_gorge(name="sky_gorge", L=40.0, seed=3):
                                   rnd, h=rnd.uniform(2.0, 3.2), r=rnd.uniform(0.8, 1.2))
             SC.grass_tufts(m, P, tuple(top + V((0, 0, 0.25))), rnd, n=5, spread=rt * 0.6, h=0.4)
             # ledge pines and moss clinging to the cliff face on the gorge side
+            m.mat("sk_moss")
+            for j in range(4):                      # moss and ivy patches down the face
+                zz = rnd.uniform(FLOOR + 2, top_z - 0.5)
+                p = V((x - sd * r * 0.9, y + r + rnd.uniform(-r, r) * 0.7, zz))
+                m.ico(tuple(p), rnd.uniform(0.5, 1.0), 1, s=(0.5, 1.2, 1.6))
             for j in range(2):
                 zz = rnd.uniform(FLOOR + 4, top_z - 1)
                 p = V((x - sd * r * 0.95, y + r + rnd.uniform(-r, r) * 0.6, zz))
@@ -346,7 +351,7 @@ def sky_gorge(name="sky_gorge", L=40.0, seed=3):
                 if rnd.random() < 0.5:
                     SC.pine(m, P, tuple(p + V((-sd * 0.2, 0, 0.3))), rnd, h=1.8)
             if rnd.random() < 0.2:
-                SC.waterfall(m, P, (x - sd * r * 0.98, y + r, top_z - 0.5), drop=top_z - FLOOR - 1, w=1.0)
+                SC.waterfall(m, P, (x - sd * r * 0.98, y + r, top_z - 0.5), drop=top_z - FLOOR - 1, w=1.8)
             y += 2 * r + rnd.uniform(-0.5, 0.8)
         # second rank behind: taller, simpler
         y = rnd.uniform(-4, 0)
@@ -407,7 +412,8 @@ def design_sky_gorge():
         g.location = (0, k * 40.0, 0)
         outl.append(g)
     sky_backdrop()
-    for k, (x, y, z, sz) in enumerate(((-4, 30, -6, 6), (5, 55, -5, 7), (-6, 80, 4, 5), (3, 18, 13, 4), (8, 100, -3, 8))):
+    for k, (x, y, z, sz) in enumerate(((-4, 30, -6, 6), (5, 55, -5, 7), (-7, 80, 3, 5), (4, 12, 13, 4), (8, 100, -3, 8),
+                                       (-8, 18, -9, 7), (7, 42, -10, 8), (0, 70, -11, 9), (-9, 110, 6, 6))):
         c = cloud("cloud_%d" % k, seed=k + 2, size=sz)
         c.location = (x, y, z)
     bo, wo = crow()
