@@ -193,7 +193,7 @@ def cave_track(lod=0, seg=SEG, seed=5, lanes=LANES, name="cave_track"):
     rnd = random.Random(seed)
     m = E.Mesher(name)
     m.mat("c_floor", uvscale=3.0)
-    m.poly([(-4.6, 0, FLOOR), (4.6, 0, FLOOR), (4.6, seg, FLOOR), (-4.6, seg, FLOOR)])
+    m.poly([(-6.4, 0, FLOOR), (6.4, 0, FLOOR), (6.4, seg, FLOOR), (-6.4, seg, FLOOR)])   # runs in under the vault foot
     for lx in lanes:
         # low gravel bed under each track
         m.mat("c_floor", uvscale=1.2, tint=0xC9BDB0)

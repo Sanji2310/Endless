@@ -22,7 +22,7 @@ FPS = 24
 OUT = os.path.join(E.OUT_RENDERS, "anim")
 SPEED = 16.0            # m/s, the cart's cruising speed in the cave
 CAM_BEHIND = 4.5        # the follow camera sits this far behind Pongo
-ZONE_LEN = 1400.0       # Zones.ZONE_LEN: the clip runs into the first zone boundary
+ZONE_LEN = 1440.0       # Zones.ZONE_LEN: the clip runs into the first zone boundary
 
 
 def _look(cam, loc, target):
@@ -132,8 +132,8 @@ def transition_clip(seconds="6.5", step="all"):
     if step in ("all", "render"):
         E.reset()
         studio.stage(res=(1280, 720), floor=False)
-        tunnel.transition_scene(cave_segments=3)
-        tunnel.transition_lights(3)
+        tunnel.transition_scene(cave_segments=7)       # the camera ends 40 m into the cavern and sees 44 m on
+        tunnel.transition_lights(7)
         studio.aim_sun(0)
         cam = E.camera((0, TRANSITION_Y0, 2.5), (0, TRANSITION_Y0 + 10, 1.4), lens=26)
         cart = [o for o in bpy.data.objects if o.name.startswith("ore_cart")][0]

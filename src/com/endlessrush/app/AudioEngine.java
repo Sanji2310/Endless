@@ -5,11 +5,13 @@ import android.media.AudioManager;
 import android.media.AudioTrack;
 
 import com.endlessrush.core.Game;
+import com.pongo.core.CaveSounds;
 
 import java.util.ArrayList;
 import java.util.Random;
 
-/** Software mixer: procedurally synthesised sound effects plus a looping soundtrack. */
+/** Software mixer: procedurally synthesised sound effects plus a looping soundtrack, and the zone sounds
+ *  (com.pongo.core.CaveSounds: one-shots as Game.SND_ZONE + id, and the cave ambience loop at `ambience`). */
 public final class AudioEngine implements Runnable {
     private static final int RATE = 22050;
     private static final int BUF = 1024;
@@ -17,6 +19,12 @@ public final class AudioEngine implements Runnable {
     private final short[][] sfx = new short[Game.SOUND_COUNT][];
     private short[] music;
     private int musicPos;
+    private short[][] zone;
+    private short[] enterTunnel, caveLoop;
+    private int caveLoopPos;
+    private float ambGain;
+    /** Cave ambience volume 0..1 (Game.caveAmbience(), set every frame); the music dips under it. */
+    public volatile float ambience;
     private final ArrayList<int[]> voices = new ArrayList<int[]>(); // {sound, pos}
     private volatile boolean running, paused;
     public volatile boolean soundOn = true, musicOn = true;
@@ -42,7 +50,7 @@ public final class AudioEngine implements Runnable {
     }
 
     public void play(int id) {
-        if (!soundOn || id < 0 || id >= sfx.length) return;
+        if (!soundOn || id < 0 || (id >= sfx.length && (id < Game.SND_ZONE || id > Game.SND_ENTER_TUNNEL))) return;
         synchronized (voices) {
             if (id == Game.SND_COIN) {
                 // don't stack too many coin chimes
@@ -79,16 +87,25 @@ public final class AudioEngine implements Runnable {
             }
             if (trackPaused) { track.play(); trackPaused = false; }
             for (int i = 0; i < BUF; i++) mix[i] = 0;
+            float a0 = ambGain, a1 = ambGain + (ambience - ambGain) * 0.08f;   // eased per buffer, no clicks
+            ambGain = a1;
             if (musicOn && music != null) {
                 for (int i = 0; i < BUF; i++) {
-                    mix[i] += music[musicPos] * 0.55f;
+                    float a = a0 + (a1 - a0) * i / BUF;
+                    mix[i] += music[musicPos] * 0.55f * (1f - 0.55f * a);
                     if (++musicPos >= music.length) musicPos = 0;
+                }
+            }
+            if (soundOn && caveLoop != null && (a0 > 0.001f || a1 > 0.001f)) {
+                for (int i = 0; i < BUF; i++) {
+                    mix[i] += caveLoop[caveLoopPos] * 0.6f * (a0 + (a1 - a0) * i / BUF);
+                    if (++caveLoopPos >= caveLoop.length) caveLoopPos = 0;
                 }
             }
             synchronized (voices) {
                 for (int v = voices.size() - 1; v >= 0; v--) {
                     int[] vc = voices.get(v);
-                    short[] s = sfx[vc[0]];
+                    short[] s = sound(vc[0]);
                     int n = Math.min(BUF, s.length - vc[1]);
                     for (int i = 0; i < n; i++) mix[i] += s[vc[1] + i];
                     vc[1] += n;
@@ -103,6 +120,11 @@ public final class AudioEngine implements Runnable {
             track.write(out, 0, BUF);
         }
         try { track.stop(); track.release(); } catch (Exception ignored) { }
+    }
+
+    private short[] sound(int id) {
+        if (id < Game.SND_ZONE) return sfx[id];
+        return id == Game.SND_ENTER_TUNNEL ? enterTunnel : zone[id - Game.SND_ZONE];
     }
 
     // ---------------------------------------------------------------- synthesis
@@ -188,6 +210,9 @@ public final class AudioEngine implements Runnable {
         tone(b, 0.6f, 0.4f, 349, 300, 0.3f, 1, 2);
         sfx[Game.SND_CAUGHT] = pcm(b, 0.6f);
         music = makeMusic();
+        zone = CaveSounds.buildAll();
+        enterTunnel = CaveSounds.enterTunnel(zone);
+        caveLoop = zone[CaveSounds.AMBIENCE];
     }
 
     /** 8-bar hip-hop-ish loop: kick, snare, hats, bass line and a plucked lead. */

@@ -59,11 +59,35 @@ public class ZoneSim {
         check(Math.abs(z.blend - 1f) < 1e-4f, "full cave palette inside");
         float cardDur = cardEnd - portalT;
         check(cardDur > 2.8f && cardDur < 3.2f, "title card shows for " + cardDur + " s");
+        // the way out of the cavern: the same set piece turned round, back onto the Sakura Line
+        float b2 = 2 * Zones.ZONE_LEN;
+        check(Zones.exitAt(b2) && !Zones.exitAt(b), "the second boundary leaves the cavern");
         Zones z2 = new Zones();
-        z2.update(b + 300f, dt);
-        z2.update(b + 300f + Zones.ZONE_LEN - Zones.LINED, dt);
-        z2.update(2 * Zones.ZONE_LEN + 1f, dt);
-        check(z2.blend < 1e-4f && z2.zone == Zones.RIVER, "cave palette fades out by the Bamboo River");
+        int seen2 = 0;
+        float leaveD = -1, cardD = -1;
+        boolean invul2 = true;
+        for (float d = b2 - 200f; d < b2 + 100f; d += speed * dt) {
+            int ev = z2.update(d, dt);
+            seen2 |= ev;
+            if ((ev & Zones.EV_LEAVE) != 0) leaveD = d;
+            if (cardD < 0 && z2.cardTime >= 0) cardD = d;
+            if (d > Zones.portalAt(b2) && d < b2 && !z2.invulnerable) invul2 = false;
+        }
+        check((seen2 & Zones.EV_BOARD) == 0, "no boarding on the way out");
+        check(Math.abs(leaveD - Zones.leaveAt(b2)) < 1f, "leave the cart in the lining (" + leaveD + ")");
+        check(Math.abs(cardD - b2) < 1f && z2.zone == Zones.SAKURA, "Sakura Line card coming out of the portal");
+        check(invul2, "invulnerable through the lining on the way out");
+        check(z2.blend < 1e-4f, "cave palette gone outside");
+        check(Zones.zoneAt(3 * Zones.ZONE_LEN + 1f) == Zones.CAVERN, "the cycle comes back to the cavern");
+        // the city world and track hand over to the set pieces at segment seams
+        check(Zones.cityWorldAt(b - 73f) && !Zones.cityWorldAt(b - 72f), "city scenery stops at the approach");
+        check(Zones.cityTrackAt(b - 25f) && !Zones.cityTrackAt(b - 24f), "city track stops at the portal");
+        check(!Zones.cityTrackAt(b2 - 1f) && Zones.cityTrackAt(b2), "city track resumes at the portal out");
+        check(!Zones.cityWorldAt(b2 + 47f) && Zones.cityWorldAt(b2 + 48f), "city scenery resumes after the cutting");
+        check(Zones.cityWorldAt(10f), "the run starts on the Sakura Line");
+        check(Zones.ZONE_LEN % Zones.SEG == 0, "zones are whole segments");
+        check(Zones.skipSafe(b - 90f) == b - 90f && Zones.skipSafe(b - 50f) == Zones.safeTo(b)
+                && Zones.skipSafe(b2 + 10f) == Zones.safeTo(b2), "no obstacle patterns start in the set pieces");
         int[] kit = new int[3];
         Zones.caveKit(0, kit);
         check(kit[0] == 1, "first cave segment uses shell 1 (matches the tunnel mouth seam)");

@@ -47,6 +47,18 @@ public final class CaveSounds {
         return s;
     }
 
+    /** Going into the tunnel: TUNNEL_WHOOSH, the STING 0.15 s later and LAMP_ON at 0.4 s, mixed into one sound (the
+     *  way tools/preview/ZoneSim.java "track" lays them out). all = buildAll(). */
+    public static short[] enterTunnel(short[][] all) {
+        short[] w = all[TUNNEL_WHOOSH], st = all[STING], l = all[LAMP_ON];
+        int o1 = (int) (0.15f * RATE), o2 = (int) (0.4f * RATE);
+        float[] b = new float[Math.max(w.length, Math.max(o1 + st.length, o2 + l.length))];
+        for (int i = 0; i < w.length; i++) b[i] += w[i] / 32768f * 0.9f;
+        for (int i = 0; i < st.length; i++) b[o1 + i] += st[i] / 32768f * 0.6f;
+        for (int i = 0; i < l.length; i++) b[o2 + i] += l[i] / 32768f * 0.5f;
+        return pcm(b, 0.95f);
+    }
+
     public static short[] build(int id) {
         Random r = new Random(1000 + id);
         switch (id) {

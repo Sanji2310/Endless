@@ -3,16 +3,21 @@ package com.pongo.core;
 /**
  * The zone cycle along a run (docs/PONGO_DESIGN.md §4) and the set-piece transitions between zones.
  *
- * Distances are metres along the run (Blender +Y in the asset scripts, game -Z). Each zone lasts ZONE_LEN; the
- * transition into the next zone is laid out so its "mouth" (where the new zone's kit starts) sits exactly on the
- * zone boundary. For Sakura Line -> Crystal Cavern that layout is blender/assets/tunnel.py:
+ * Distances are metres along the run (Blender +Y in the asset scripts, game -Z). Each zone lasts ZONE_LEN (a whole
+ * number of 12 m track segments, so every set-piece edge falls on a segment seam). The transition into a zone is laid
+ * out so its "mouth" (where the new zone's kit starts) sits exactly on the zone boundary b. For Sakura Line -> Crystal
+ * Cavern that layout is blender/assets/tunnel.py:
  *
- *   boundary - 72  approach   cutting with retaining walls, hill rises         (tunnel_hill, cutting_l/r)
- *   boundary - 24  portal     tunnel mouth: title card, sting, whoosh          (tunnel_portal)
- *   boundary - 24  lined A    concrete-lined tunnel, Sakura Line track         (tunnel_lined_0 + track)
- *   boundary - 12  lined B    track turns into mine track at boundary - 6      (tunnel_lined_1 + track_change)
- *   boundary - 4   board      Pongo boards the ore cart waiting on the centre track
- *   boundary       mouth      lining ends, the cavern opens out                (tunnel_mouth, cave_* segments)
+ *   b - 72  approach   cutting with retaining walls, hill rises         (tunnel_hill, cutting_l/r)
+ *   b - 24  portal     tunnel mouth: title card, sting, whoosh          (tunnel_portal)
+ *   b - 24  lined A    concrete-lined tunnel, Sakura Line track         (tunnel_lined_0 + city_track)
+ *   b - 12  lined B    track turns into mine track at b - 6             (tunnel_lined_1 + track_change)
+ *   b - 4   board      Pongo boards the ore cart waiting on the centre track
+ *   b       mouth      lining ends, the cavern opens out                (tunnel_mouth, cave_* segments)
+ *
+ * Leaving the cavern uses the same pieces turned round (exitAt): the cavern narrows into the lining at b - 24, she
+ * leaves the cart at b - 20, the mine track turns back into Sakura Line track, and she runs out of the portal at b
+ * into the cutting (b .. b + 48), where the next zone starts.
  *
  * Nothing can hurt Pongo from the portal to the mouth. The lighting crossfades from whatever the time of day set to
  * the zone's palette between portal - 6 m and the mouth, and the Hotaru Lamp switches on as the light fades.
@@ -28,7 +33,11 @@ public final class Zones {
     /** Title card tiles painted by tunnel.title_cards() (null: not painted yet). */
     public static final String[] CARD = {"ui_zone_sakura", "ui_zone_cavern", null, null, null};
 
-    public static final float ZONE_LEN = 1400f;
+    /** About 1,400 m per zone (design §4), rounded to 120 track segments of 12 m. */
+    public static final float ZONE_LEN = 1440f, SEG = 12f;
+    /** The zones that have a kit, in run order; the run cycles through these. Bamboo River, Sky Glide and Express
+     *  Rooftops join the cycle (in that order, after the cavern) when their kits and transitions exist. */
+    public static final int[] CYCLE = {SAKURA, CAVERN};
     // Sakura Line -> Crystal Cavern set piece (tunnel.py: APPROACH, LINED)
     public static final float APPROACH = 48f, LINED = 24f, TRACK_CHANGE = 6f, BOARD = 4f;
     public static final float BLEND_LEAD = 6f;
@@ -36,10 +45,11 @@ public final class Zones {
 
     // events (bit flags returned by update)
     public static final int EV_APPROACH = 1;   // the set piece comes into view: start the tunnel ambience crossfade
-    public static final int EV_PORTAL = 2;     // entering the tunnel: whoosh, sting, title card, lamp on
-    public static final int EV_BOARD = 4;      // vehicle zones: hand Pongo to the vehicle (ore cart in the cave)
+    public static final int EV_PORTAL = 2;     // entering the tunnel lining: whoosh, sting, title card, lamp on
+    public static final int EV_BOARD = 4;      // into a vehicle zone: hand Pongo to the vehicle (ore cart in the cave)
     public static final int EV_MOUTH = 8;      // the new zone starts: its ambience loop and controls take over
     public static final int EV_ZONE_END = 16;  // the next transition's approach is about to begin
+    public static final int EV_LEAVE = 32;     // out of a vehicle zone: Pongo leaves the vehicle and runs on foot
 
     /** Lighting for one zone; values replace the time-of-day ones by blend weight. null fields keep time of day. */
     public static final class Palette {
@@ -85,10 +95,10 @@ public final class Zones {
     public int cardZone = -1;
     private float lastDist = -1f;
 
-    /** Zone of a distance (the cycle repeats every COUNT zones). */
+    /** Zone of a distance (the run repeats CYCLE). */
     public static int zoneAt(float d) {
-        int k = (int) Math.floor(d / ZONE_LEN);
-        return ((k % COUNT) + COUNT) % COUNT;
+        int k = (int) Math.floor(d / ZONE_LEN), n = CYCLE.length;
+        return CYCLE[((k % n) + n) % n];
     }
 
     /** Distance of the next zone boundary at or after d. */
@@ -96,25 +106,67 @@ public final class Zones {
         return (float) (Math.floor(d / ZONE_LEN) + 1) * ZONE_LEN;
     }
 
-    /** Where (in metres along the run) the transition into the zone starting at `boundary` puts its pieces. */
+    /** True when the transition at `boundary` leaves the cavern (the set piece turned round: lining before the
+     *  boundary, portal on it, cutting after it). */
+    public static boolean exitAt(float boundary) { return boundary > 0f && zoneAt(boundary - 1f) == CAVERN; }
+
+    /** Where (in metres along the run) the transition at `boundary` puts its pieces. */
     public static float portalAt(float boundary) { return boundary - LINED; }
     public static float approachAt(float boundary) { return boundary - LINED - APPROACH; }
     public static float boardAt(float boundary) { return boundary - BOARD; }
+    public static float leaveAt(float boundary) { return boundary - LINED + BOARD; }
+
+    /** The stretch around the transition at `boundary` where the level generator starts no obstacle pattern (the
+     *  lining, the mouth and a run-out either side, so nothing reaches into the set piece). */
+    public static float safeFrom(float boundary) { return boundary - LINED - 60f; }
+    public static float safeTo(float boundary) { return boundary + 30f; }
+
+    /** If d falls in a set piece's safe stretch, the distance where it ends; otherwise d. */
+    public static float skipSafe(float d) {
+        float b = nextBoundary(d - 30f);
+        return d >= safeFrom(b) && d < safeTo(b) ? safeTo(b) : d;
+    }
+
+    /** False where the Sakura Line world (buildings, lamps, trees, bridges) gives way to a set piece or the cavern. */
+    public static boolean cityWorldAt(float d) {
+        if (zoneAt(d) == CAVERN) return false;
+        float b = nextBoundary(d), pb = b - ZONE_LEN;
+        if (zoneAt(b) == CAVERN && d >= approachAt(b)) return false;          // cutting and hill into the tunnel
+        return !(exitAt(pb) && d < pb + APPROACH);                             // cutting after the way out
+    }
+
+    /** False where the Sakura Line track gives way to the set piece's own track (the lined tunnel) or mine track. */
+    public static boolean cityTrackAt(float d) {
+        if (zoneAt(d) == CAVERN) return false;
+        float b = nextBoundary(d);
+        return !(zoneAt(b) == CAVERN && d >= portalAt(b));
+    }
+
+    /** Back to the start of a run (the first zone, nothing blended, no card). */
+    public void reset() {
+        zone = prevZone = CYCLE[0];
+        paletteZone = -1;
+        blend = 0f;
+        invulnerable = inTransition = false;
+        cardTime = -1f;
+        cardZone = -1;
+        lastDist = -1f;
+    }
 
     /** Advances to distance d; returns the EV_* events crossed since the last call. */
     public int update(float d, float dt) {
         int ev = 0;
         float b = nextBoundary(d), pb = b - ZONE_LEN;
-        int next = zoneAt(b);
+        int next = zoneAt(b), cur = zoneAt(d);
         if (lastDist >= 0f) {
             ev |= crossed(lastDist, d, approachAt(b)) ? EV_APPROACH : 0;
             ev |= crossed(lastDist, d, portalAt(b)) ? EV_PORTAL : 0;
             ev |= crossed(lastDist, d, boardAt(b)) && isVehicleZone(next) ? EV_BOARD : 0;
+            ev |= crossed(lastDist, d, leaveAt(b)) && isVehicleZone(cur) && !isVehicleZone(next) ? EV_LEAVE : 0;
             ev |= crossed(lastDist, d, pb) ? EV_MOUTH : 0;
             ev |= crossed(lastDist, d, approachAt(b) - 60f) ? EV_ZONE_END : 0;
         }
         lastDist = d;
-        int cur = zoneAt(d);
         if (cur != zone) { prevZone = zone; zone = cur; }
         // blend: ramps up over the tunnel into a palette zone, ramps down over the tunnel out of it
         float in = smooth(portalAt(b) - BLEND_LEAD, b, d);       // toward the next zone
@@ -123,7 +175,9 @@ public final class Zones {
         blend = wCur + (wNext - wCur) * in;
         inTransition = d >= approachAt(b);
         invulnerable = d >= portalAt(b) - 1f && d < b + 1f;
-        if ((ev & EV_PORTAL) != 0 && CARD[next] != null) { cardTime = 0f; cardZone = next; }
+        // the title card shows on the way into the tunnel, or coming out of the portal when leaving the cavern
+        int cardFor = (ev & EV_PORTAL) != 0 && !exitAt(b) ? next : (ev & EV_MOUTH) != 0 && exitAt(pb) ? cur : -1;
+        if (cardFor >= 0 && CARD[cardFor] != null) { cardTime = 0f; cardZone = cardFor; }
         else if (cardTime >= 0f) {
             cardTime += dt;
             if (cardTime > CARD_IN + CARD_HOLD + CARD_OUT) { cardTime = -1f; cardZone = -1; }

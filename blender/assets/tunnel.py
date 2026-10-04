@@ -601,7 +601,8 @@ def design_transition(only=""):
 
 
 def export_transition():
-    """build/models/*.erm for the transition pieces (LOD0 + LOD1) and the zone title cards."""
+    """build/models/*.erm for the transition pieces (LOD0 + LOD1) and the zone title cards. The game places them
+    from the portal (src/com/endlessrush/core/ZoneWorld.java), turned round for the way out of the cavern."""
     for lod in (0, 1):
         sfx = "" if lod == 0 else "@1"
         E.reset(); city.city_mats(); cave.mats(); mats()
@@ -614,6 +615,7 @@ def export_transition():
         E.export_erm(tunnel_lined(lod, 1), "tunnel_lined_1" + sfx)
         E.export_erm(tunnel_mouth(lod), "tunnel_mouth" + sfx)
         E.export_erm(track_change(lod), "track_change" + sfx)
+        E.export_erm(city.track(lod), "city_track" + sfx)        # the Sakura Line track in the first lined part
     E.reset(); city.city_mats(); mats()
     sg = E.Mesher("tunnel_signal"); block_signal(sg, (0, 0, 0))
     E.export_erm(sg.obj(), "tunnel_signal")
