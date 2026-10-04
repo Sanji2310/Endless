@@ -36,13 +36,17 @@ public final class Ride {
             H_STONE = 10, H_CROC = 11, H_DRIFTLOG = 12, H_WHIRL = 13, H_ISLAND = 14,
             H_CROW = 20, H_FLOCK = 21, H_KITE = 22, H_LANTERN = 23, H_CABLE = 24, H_SPIRE = 25, H_GUST = 26, H_THERMAL = 27;
 
-    /** World scale: Pongo and her vehicles are modelled in metres and drawn 1.2x (PongoScene.HERO_SCALE). */
-    public static final float K = 1.2f;
+    /** Blender metres to game metres for the vehicles and the river/sky kits. 1: they are built at game size, like
+     *  the cave kit (its 2.4 m lanes, 1.067 m gauge, 1.25 m beams); Pongo herself is drawn at HERO_SCALE 1.2
+     *  (1.86 m), which is also how big she is modelled on the vehicles (vehicles.py PONGO_SCALE). */
+    public static final float K = 1f;
     public static final float TRACK_W = Game.LANE_W;
-    // Pongo rides at 1.2x her model (vehicles.py PONGO_SCALE): head top 1.96 standing, 1.14 ducked (+ hair)
-    public static final float PONGO_SCALE = 1.2f;
+    // her head top in the cart: 1.96 standing, 1.14 ducked (+ hair); the cart rim is at 1.12
+
     public static final float CART_FLOOR = 0.45f * K, CART_TOP_STAND = 2.0f * K, CART_TOP_CROUCH = 1.19f * K;
     public static final float SWITCH_TIME = 0.3f, CROUCH_HOLD = 0.85f;
+    /** Cave parting (cave.py cave_fork): the centre track splits to +-FORK_OFF over 6 m, runs parallel, rejoins. */
+    public static final float FORK_LEN = 24f, FORK_OFF = 1.2f;
     public static final float RIVER_HALF = 4.6f, BOAT_HALF = 0.62f, BOAT_LAT = 8.5f;
     public static final float GL_LAT = 9f, GL_VERT = 5.5f, GL_SINK = 0.5f, ALT_MIN = 3f, ALT_MAX = 12f, ALT_START = 7f;
     public static final float SKY_HALF = 6.0f;
@@ -85,9 +89,27 @@ public final class Ride {
         }
     }
 
+    /** The run's zone cycle (com.pongo.core.Zones): cavern = ore cart, river = canoe, sky = glider. She boards
+     *  Zones.BOARD m before the mouth and steps off at Zones.leaveAt on the way out, both inside the tunnel lining. */
+    public static final class GameZones implements Zones {
+        public int vehicleAt(float s) {
+            int z = com.pongo.core.Zones.zoneAt(s);
+            if (!com.pongo.core.Zones.isVehicleZone(z)) return NONE;
+            float b = com.pongo.core.Zones.nextBoundary(s);
+            boolean last = !com.pongo.core.Zones.isVehicleZone(com.pongo.core.Zones.zoneAt(b));
+            if (last && s >= com.pongo.core.Zones.leaveAt(b) + LOOKAHEAD) return NONE;
+            return z == com.pongo.core.Zones.CAVERN ? CART : z == com.pongo.core.Zones.RIVER ? BOAT : GLIDER;
+        }
+
+        public float nextZoneStart(float s) { return com.pongo.core.Zones.nextBoundary(s); }
+    }
+
+    /** How far ahead step() looks for the next zone's vehicle: she boards this far before the mouth. */
+    static final float LOOKAHEAD = com.pongo.core.Zones.BOARD;
+
     private final Game g;
     private final Random rng = new Random();
-    public Zones zones = new Schedule();
+    public Zones zones = new GameZones();
 
     public final ArrayList<Hazard> hazards = new ArrayList<Hazard>();
     public final ArrayList<Fork> forks = new ArrayList<Fork>();
@@ -208,7 +230,7 @@ public final class Ride {
 
     /** Called by Game.step after s has advanced. Returns true while the ride controls the player. */
     boolean step(float dt) {
-        int want = zones.vehicleAt(g.s + 2f);
+        int want = zones.vehicleAt(g.s + LOOKAHEAD);
         if (want != vehicle && transition == TR_NONE) {
             if (canBegin()) begin(want);
             else prepare();
@@ -386,24 +408,28 @@ public final class Ride {
         Fork f = nextFork(60f);
         if (f != null) {
             if (!f.announced && f.s0 - g.s < 55f) { f.announced = true; sfx(RideSfx.FORK_BELL); }
-            if (track == 0 && !f.resolved && f.s0 - g.s < 5f) {
+            if (track == 0 && !f.resolved && f.s0 - g.s < 1f) {
                 f.resolved = true;
-                int d = Math.abs(tiltX) > 0.15f ? (tiltX < 0 ? -1 : 1) : f.calm;
-                f.choice = d;
-                trackFrom = 0;
-                track = d;
-                switchT = 0;
+                f.choice = Math.abs(tiltX) > 0.15f ? (tiltX < 0 ? -1 : 1) : f.calm;
                 sfx(RideSfx.TRACK_SWITCH);
+            }
+        }
+        float branch = 0f;         // on the centre track through a parting: out along the chosen branch and back
+        for (int i = 0; i < forks.size(); i++) {
+            Fork k = forks.get(i);
+            if (k.choice != 0 && track == 0 && g.s >= k.s0 && g.s <= k.s1) {
+                float d = g.s - k.s0;
+                branch = k.choice * FORK_OFF * (smooth(d / 6f) - smooth((d - (FORK_LEN - 6f)) / 6f));
             }
         }
         if (switchT < 1f) {
             switchT = Math.min(1f, switchT + dt / SWITCH_TIME);
             float u = smooth(switchT);
-            x = (trackFrom + (track - trackFrom) * u) * TRACK_W;
+            x = (trackFrom + (track - trackFrom) * u) * TRACK_W + branch;
             hop = 0.32f * (float) Math.sin(Math.PI * switchT);
             if (switchT >= 1f) sfx(RideSfx.CART_LAND_SOFT);
         } else {
-            x = track * TRACK_W;
+            x = track * TRACK_W + branch;
             hop = 0;
         }
         roll = (track - trackFrom) * 10f * (float) Math.sin(Math.PI * Math.min(1f, switchT)) + tiltX * 4f;
@@ -689,9 +715,11 @@ public final class Ride {
     private void generate() {
         if (vehicle == NONE) return;
         float zoneEnd = zones.nextZoneStart(g.s);
-        float limit = Math.min(g.s + 240f, zoneEnd - 40f);
+        // stop before the exit lining (the set piece back to running is hazard-free)
+        float limit = Math.min(g.s + 240f, zoneEnd - com.pongo.core.Zones.LINED - 40f);
         while (genS < limit) {
-            if (genS >= nextForkS && genS + 120f < zoneEnd) {
+            if (vehicle == CART && caveFork(genS, zoneEnd)) continue;
+            if (vehicle != CART && genS >= nextForkS && genS + 120f < zoneEnd) {
                 patternFork();
                 nextForkS = genS + 260f + rng.nextFloat() * 200f;
             } else if (genS >= nextPowerS) {
@@ -902,6 +930,32 @@ public final class Ride {
             for (int i = 0; i < 6; i++) coin(lx, coinY(la + i * 0.7f), at + 8f + i * 2.4f);
         }
         genS = at + gap() * 1.1f;
+    }
+
+    /** The cavern's partings sit where the kit puts them (Zones.caveKit, 24 m from a segment seam). If one starts
+     *  within the next stretch, fills up to it and lays it out; returns true when it did. */
+    private boolean caveFork(float at, float zoneEnd) {
+        float mouth = zoneEnd - com.pongo.core.Zones.ZONE_LEN, seg = com.pongo.core.Zones.SEG;
+        int[] kit = new int[3];
+        for (int i = (int) Math.ceil((at - mouth) / seg); mouth + i * seg < at + gap() + 30f; i++) {
+            com.pongo.core.Zones.caveKit(i, kit);
+            if (kit[2] != 1) continue;
+            float s0 = mouth + i * seg;
+            if (s0 + FORK_LEN + 10f > zoneEnd - com.pongo.core.Zones.LINED) return false;
+            for (int k = 0; k < forks.size(); k++) if (forks.get(k).s0 == s0) return false;
+            Fork f = new Fork();
+            f.s0 = s0;
+            f.s1 = s0 + FORK_LEN;
+            f.half = 0.62f;
+            f.calm = rng.nextBoolean() ? -1 : 1;
+            forks.add(f);
+            add(H_PILLAR, 0, 0, f.s0 + FORK_LEN * 0.5f - 1f, 2f, f.half, 8.6f);
+            coinRun(f.calm * FORK_OFF, f.calm * FORK_OFF, 0, 0, f.s0 + 7f, 4, 3f);
+            add(H_BEAM, -f.calm * FORK_OFF, 1.25f, f.s0 + 10f, 0.5f, 0.7f, 0.4f);
+            genS = f.s1 + gap() * 0.6f;
+            return true;
+        }
+        return false;
     }
 
     /** Y fork: river island or the cavern's crystal pillar, with a calm branch (coins) and a busy one. */

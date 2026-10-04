@@ -19,7 +19,7 @@ from mathutils import Vector, Matrix
 import erlib as E
 
 V = Vector
-RIVER_HALF = 4.6 / 1.2          # Ride.RIVER_HALF is in game units (x1.2)
+RIVER_HALF = 4.6                # = Ride.RIVER_HALF (the kits are built at game size, Ride.K = 1)
 JAW_HINGE = V((0.0, 0.62, 0.16))
 
 
@@ -295,7 +295,7 @@ def river_seg(name="river_seg", L=20.0, seed=3, details=True):
     return ob
 
 
-def fork_island(name="fork_island", L=50.0, half=1.4 / 1.2, seed=5):
+def fork_island(name="fork_island", L=50.0, half=1.4, seed=5):
     """Island for a Y fork: pointed rocky nose upstream (y=0), grassy body with bamboo, a small torii."""
     mats()
     rnd = random.Random(seed)

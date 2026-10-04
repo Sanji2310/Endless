@@ -11,6 +11,9 @@ public final class Scene {
      * scene: the body of hero 0 and the coins are then left out here (her blob shadow, board and gear stay).
      */
     public boolean toonHero, toonCoins;
+    /** Set when ZoneWorld draws the set pieces and the cavern: city segments are then left out where it owns the
+     *  world (com.pongo.core.Zones.cityWorldAt / cityTrackAt). */
+    public boolean toonWorld;
 
     /** Character shown on the menu / shop (overrides profile selection when >= 0). */
     public void setPreviewCharacter(int idx) { menuChar = idx; }
@@ -76,8 +79,10 @@ public final class Scene {
         int k0 = (int) Math.floor((ps - (menu ? 160 : 14)) / segLen), k1 = (int) Math.floor((ps + 185) / segLen);
         for (int k = k0; k <= k1; k++) {
             float z = -k * segLen;
+            if (toonWorld && !com.pongo.core.Zones.cityTrackAt(k * segLen)) continue;
             m = dl.add(Models.track);
             Mat4.translate(m, 0, 0, z);
+            if (toonWorld && !com.pongo.core.Zones.cityWorldAt(k * segLen)) continue;
             int h = hash(k);
             float bx = Models.LANE_W * 1.5f + 6.2f;
             m = dl.add(Models.buildings[h % Models.buildings.length]);
