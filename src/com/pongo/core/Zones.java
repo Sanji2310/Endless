@@ -98,6 +98,7 @@ public final class Zones {
 
     /** Zone of a distance (the run repeats CYCLE). */
     public static int zoneAt(float d) {
+        if (d < 0f) return CYCLE[0];      // behind the start (the menu camera looks back): still the first zone
         int k = (int) Math.floor(d / ZONE_LEN), n = CYCLE.length;
         return CYCLE[((k % n) + n) % n];
     }
