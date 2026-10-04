@@ -15,7 +15,7 @@ public class ShaderExport {
             sb.append('[').append(q(p[0])).append(',').append(q(p[1])).append(',').append(q(p[2])).append(',').append(q(p[3])).append(']');
         }
         sb.append("],\"sources\":{");
-        String[] keys = {"MAIN_VS", "MAIN_FS", "OUTLINE_VS", "OUTLINE_FS", "SHADOW_VS", "SHADOW_FS", "SKY_VS", "SKY_FS", "PART_VS", "PART_FS", "SCREEN_VS", "SCREEN_FS"};
+        String[] keys = Shaders.KEYS;
         for (int i = 0; i < keys.length; i++) {
             if (i > 0) sb.append(',');
             sb.append(q(keys[i])).append(':').append(q(Shaders.source(keys[i])));

@@ -259,6 +259,8 @@ F_METAL = 128     # sharp metallic highlight, deeper shadows
 F_FOLIAGE = 256   # wind sway + soft translucency
 F_NIGHT = 512     # emissive only after dusk (windows, lamps)
 F_DECAL = 1024    # alpha-blended decal drawn over opaque surfaces (eyes, mouths, signs)
+F_CRYSTAL = 2048  # mineral crystal: muted cel body with a faint soft inner glow (game shader)
+F_CLOUD = 4096    # painted cloud: wide wrap light in three tones, silver lining against the sun (game shader)
 
 _MATS = {}
 TOON_GROUP = "PongoToon"

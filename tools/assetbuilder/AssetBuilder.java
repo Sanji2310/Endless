@@ -17,7 +17,8 @@ import java.util.*;
  * Vertex format (28 bytes, 36 when skinned):
  *   0 aPos    short4 norm  xyz = position (dequantised by per-mesh scale/offset), w = wind sway
  *   8 aNrm    byte4  norm  xyz = normal, w = outline width
- *  12 aOut    byte4  norm  xyz = smoothed outline normal, w = shading type / 7
+ *  12 aOut    byte4  norm  xyz = smoothed outline normal, w = shading type (packType: 0..7 as type / 7, 8 and up
+ *                           as -(type - 7) / 7, so older files decode the same)
  *  16 aUV     ushort2 norm atlas uv
  *  20 aCol    ubyte4 norm  rgb albedo tint (sRGB), a = ambient occlusion
  *  24 aMat    ubyte4 norm  specular, rim, emissive, softness
@@ -27,9 +28,10 @@ import java.util.*;
 public class AssetBuilder {
     // material flags (mirror blender/lib/erlib.py)
     static final int F_DOUBLE = 1, F_UNLIT = 2, F_WATER = 4, F_NOCAST = 8, F_HAIR = 16, F_ALPHA = 32, F_GLASS = 64,
-            F_METAL = 128, F_FOLIAGE = 256, F_NIGHT = 512, F_DECAL = 1024;
+            F_METAL = 128, F_FOLIAGE = 256, F_NIGHT = 512, F_DECAL = 1024, F_CRYSTAL = 2048, F_CLOUD = 4096;
     // shading types (mirror core/Shaders.java)
-    static final int T_STD = 0, T_SKIN = 1, T_GLASS = 2, T_HAIR = 3, T_METAL = 4, T_FOLIAGE = 5, T_NIGHT = 6, T_UNLIT = 7;
+    static final int T_STD = 0, T_SKIN = 1, T_GLASS = 2, T_HAIR = 3, T_METAL = 4, T_FOLIAGE = 5, T_NIGHT = 6, T_UNLIT = 7,
+            T_CRYSTAL = 8, T_CLOUD = 9;
     // part classes
     static final int C_OPAQUE = 0, C_DOUBLE = 1, C_CUTOUT = 2, C_WATER = 3, C_DECAL = 4;
 
@@ -46,6 +48,8 @@ public class AssetBuilder {
         int type() {
             if ((flags & F_UNLIT) != 0) return T_UNLIT;
             if (skin > 0.5f) return T_SKIN;
+            if ((flags & F_CRYSTAL) != 0) return T_CRYSTAL;
+            if ((flags & F_CLOUD) != 0) return T_CLOUD;
             if ((flags & F_GLASS) != 0) return T_GLASS;
             if ((flags & F_HAIR) != 0) return T_HAIR;
             if ((flags & F_METAL) != 0) return T_METAL;
@@ -352,6 +356,62 @@ public class AssetBuilder {
         int verts, tris;
     }
 
+    /** Sway weight per corner. Small swaying islands (grass tufts, reeds, flowers: under SMALL_SWAY metres tall,
+     *  islands joined by shared positions) bend from a fixed root: 0 at their lowest point, 1 at the tip. Larger ones
+     *  (tree canopies) keep moving as a whole, as before. */
+    static final float SMALL_SWAY = 1.2f;
+
+    static float[] swayWeights(Erm e) {
+        int nc = e.nTri * 3;
+        float[] w = new float[nc];
+        java.util.Arrays.fill(w, 1f);
+        Map<Long, Integer> id = new HashMap<>();
+        int[] parent = new int[nc];
+        for (int k = 0; k < nc; k++) parent[k] = k;
+        for (int t = 0; t < e.nTri; t++) {
+            Mat m = e.mats.get(Math.max(0, Math.min(e.mats.size() - 1, e.MI[t])));
+            if (m.sway <= 0) continue;
+            for (int j = 0; j < 3; j++) {
+                int k = t * 3 + j;
+                union(parent, k, t * 3);
+                Integer o = id.putIfAbsent(posKey(e.P[k * 3], e.P[k * 3 + 1], e.P[k * 3 + 2]), k);
+                if (o != null) union(parent, k, o);
+            }
+        }
+        Map<Integer, float[]> range = new HashMap<>();
+        for (int t = 0; t < e.nTri; t++) {
+            Mat m = e.mats.get(Math.max(0, Math.min(e.mats.size() - 1, e.MI[t])));
+            if (m.sway <= 0) continue;
+            for (int j = 0; j < 3; j++) {
+                int k = t * 3 + j;
+                float y = e.P[k * 3 + 1];
+                float[] r = range.computeIfAbsent(find(parent, k), kk -> new float[]{Float.MAX_VALUE, -Float.MAX_VALUE});
+                r[0] = Math.min(r[0], y); r[1] = Math.max(r[1], y);
+            }
+        }
+        for (int t = 0; t < e.nTri; t++) {
+            Mat m = e.mats.get(Math.max(0, Math.min(e.mats.size() - 1, e.MI[t])));
+            if (m.sway <= 0) continue;
+            for (int j = 0; j < 3; j++) {
+                int k = t * 3 + j;
+                float[] r = range.get(find(parent, k));
+                float h = r[1] - r[0];
+                if (h < SMALL_SWAY) w[k] = (e.P[k * 3 + 1] - r[0]) / Math.max(h, 0.05f);
+            }
+        }
+        return w;
+    }
+
+    static int find(int[] p, int k) {
+        while (p[k] != k) { p[k] = p[p[k]]; k = p[k]; }
+        return k;
+    }
+
+    static void union(int[] p, int a, int b) {
+        a = find(p, a); b = find(p, b);
+        if (a != b) p[a] = b;
+    }
+
     static OutMesh buildMesh(Erm e, Path texDir) throws IOException {
         // smoothed outline normals: average by position
         Map<Long, float[]> avg = new HashMap<>();
@@ -361,6 +421,7 @@ public class AssetBuilder {
             float[] a = avg.computeIfAbsent(key, kk -> new float[3]);
             a[0] += e.N[k * 3]; a[1] += e.N[k * 3 + 1]; a[2] += e.N[k * 3 + 2];
         }
+        float[] swayW = swayWeights(e);
         Map<Integer, Part> parts = new TreeMap<>();
         for (int t = 0; t < e.nTri; t++) {
             Mat m = e.mats.get(Math.max(0, Math.min(e.mats.size() - 1, e.MI[t])));
@@ -380,7 +441,7 @@ public class AssetBuilder {
                 if (al < 1e-6f) { v.ox = v.nx; v.oy = v.ny; v.oz = v.nz; } else { v.ox = a[0] / al; v.oy = a[1] / al; v.oz = a[2] / al; }
                 v.u = e.UV[k * 2]; v.v = e.UV[k * 2 + 1];
                 v.r = m.r * e.COL[k * 4]; v.g = m.g * e.COL[k * 4 + 1]; v.b = m.b * e.COL[k * 4 + 2]; v.ao = e.COL[k * 4 + 3];
-                v.spec = m.spec; v.rim = m.rim; v.emis = m.emis; v.soft = m.soft; v.outline = m.outline; v.sway = m.sway;
+                v.spec = m.spec; v.rim = m.rim; v.emis = m.emis; v.soft = m.soft; v.outline = m.outline; v.sway = m.sway * swayW[k];
                 v.type = m.type();
                 if (e.skinned) {
                     for (int q = 0; q < 4; q++) { v.bi[q] = e.BI[k * 4 + q] & 255; v.bw[q] = e.BW[k * 4 + q]; }
@@ -582,7 +643,7 @@ public class AssetBuilder {
         b.put(qb(v.nx / nl)); b.put(qb(v.ny / nl)); b.put(qb(v.nz / nl)); b.put(qb(Math.min(1f, v.outline)));
         float ol = (float) Math.sqrt(v.ox * v.ox + v.oy * v.oy + v.oz * v.oz);
         if (ol < 1e-8f) ol = 1;
-        b.put(qb(v.ox / ol)); b.put(qb(v.oy / ol)); b.put(qb(v.oz / ol)); b.put(qb(v.type / 7f));
+        b.put(qb(v.ox / ol)); b.put(qb(v.oy / ol)); b.put(qb(v.oz / ol)); b.put(qb(packType(v.type)));
         b.putShort(qus(v.u)); b.putShort(qus(v.v));
         b.put(qub(v.r)); b.put(qub(v.g)); b.put(qub(v.b)); b.put(qub(v.ao));
         b.put(qub(v.spec)); b.put(qub(v.rim)); b.put(qub(v.emis)); b.put(qub(v.soft));
@@ -599,6 +660,9 @@ public class AssetBuilder {
     }
 
     static short qs(float f) { return (short) Math.round(Math.max(-1f, Math.min(1f, f)) * 32767f); }
+    /** Shading type in aOut.w: 0..7 as type / 7 (the original packing), 8 and up below zero (see Shaders.shadingType). */
+    static float packType(int type) { return type <= 7 ? type / 7f : -(type - 7) / 7f; }
+
     static byte qb(float f) { return (byte) Math.round(Math.max(-1f, Math.min(1f, f)) * 127f); }
     static byte qub(float f) { return (byte) Math.round(Math.max(0f, Math.min(1f, f)) * 255f); }
     static short qus(float f) { return (short) Math.round(Math.max(0f, Math.min(1f, f)) * 65535f); }

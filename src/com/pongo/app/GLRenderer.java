@@ -13,7 +13,7 @@ import java.nio.IntBuffer;
 import java.nio.ShortBuffer;
 
 /**
- * OpenGL ES 2.0 executor for RenderFrames: shadow map, painted sky, cel-shaded meshes, inverted-hull ink
+ * OpenGL ES 2.0 executor for RenderFrames: shadow map, cel-shaded meshes, toon water, painted sky, inverted-hull ink
  * outlines, decals, blended draws, particles and screen overlays. Pass for pass the same as the WebGL
  * preview harness (tools/web/render.js), with the GLSL sources from com.pongo.core.Shaders.
  *
@@ -31,14 +31,14 @@ public final class GLRenderer {
         int uVP, uModel, uPosScale, uPosOffset, uWind, uShadowVP, uCamPos, uSunDir, uLightCol, uShadeCol, uSkinShade,
                 uRimCol, uSkyTop, uSkyHor, uSkyLow, uSunCol, uMoonDir, uFogCol, uFog, uShadowP, uNight, uTime, uLamp,
                 uLampCol, uTint, uEmis, uInk, uScreen, uOutline, uAtlas, uShadow, uBones, uInvVP, uAdd, uSpeed, uFlash,
-                uVignette;
+                uVignette, uHaze, uCloud, uCloudLit, uCloudShade, uWater;
 
         Prog(String name, boolean skin) { this.name = name; this.skin = skin; }
     }
 
     private final PongoAssets a;
     private final Prog[] progs = new Prog[Shaders.PROGRAMS.length];
-    private Prog main, mainSkin, mainDouble, mainCutout, mainDecal, mainDecalSkin, outline, outlineSkin,
+    private Prog main, mainSkin, mainDouble, mainCutout, mainDecal, mainDecalSkin, water, outline, outlineSkin,
             shadowP, shadowSkin, shadowCutout, sky, part, screen;
     private int atlasTex, fsTri, quadIdx, partVbo;
     private int shadowTex, shadowFbo, shadowRb, shadowSize;
@@ -62,7 +62,7 @@ public final class GLRenderer {
             progs[i] = pr;
         }
         main = prog("main"); mainSkin = prog("main_skin"); mainDouble = prog("main_double"); mainCutout = prog("main_cutout");
-        mainDecal = prog("main_decal"); mainDecalSkin = prog("main_decal_skin"); outline = prog("outline");
+        mainDecal = prog("main_decal"); mainDecalSkin = prog("main_decal_skin"); water = prog("water"); outline = prog("outline");
         outlineSkin = prog("outline_skin"); shadowP = prog("shadow"); shadowSkin = prog("shadow_skin");
         shadowCutout = prog("shadow_cutout"); sky = prog("sky"); part = prog("part"); screen = prog("screen");
 
@@ -160,17 +160,6 @@ public final class GLRenderer {
             GLES20.glClearColor(f.fogCol[0], f.fogCol[1], f.fogCol[2], 1);
             GLES20.glDepthMask(true);
             GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);
-            GLES20.glDisable(GLES20.GL_DEPTH_TEST);
-            GLES20.glDepthMask(false);
-            GLES20.glDisable(GLES20.GL_CULL_FACE);
-            use(sky);
-            attribs(1);
-            GLES20.glUniformMatrix4fv(sky.uInvVP, 1, false, f.invViewProj, 0);
-            u3(sky.uSkyTop, f.skyTop); u3(sky.uSkyHor, f.skyHor); u3(sky.uSkyLow, f.skyLow); u3(sky.uSunDir, f.sunDir);
-            u3(sky.uSunCol, f.sunCol); u3(sky.uMoonDir, f.moonDir);
-            GLES20.glUniform1f(sky.uNight, f.night);
-            GLES20.glUniform1f(sky.uTime, f.time);
-            fullScreen();
         }
         GLES20.glEnable(GLES20.GL_DEPTH_TEST);
         GLES20.glDepthFunc(GLES20.GL_LEQUAL);
@@ -184,12 +173,14 @@ public final class GLRenderer {
                 if ((f.flags[d] & RenderFrame.D_BLEND) != 0) continue;
                 PongoAssets.Mesh me = a.meshes[f.mesh[d]];
                 if (!hasClass(me, cls)) continue;
-                Prog pr = me.skinned() ? mainSkin : cls == 1 ? mainDouble : cls == 2 ? mainCutout : main;
+                Prog pr = me.skinned() ? mainSkin : cls == 1 ? mainDouble : cls == 2 ? mainCutout : cls == 3 ? water : main;
                 if (cls == 1 || cls == 2 || (f.flags[d] & RenderFrame.D_NO_CULL) != 0) GLES20.glDisable(GLES20.GL_CULL_FACE);
                 else GLES20.glEnable(GLES20.GL_CULL_FACE);
                 drawMesh(begin(pr, f, f.viewProj), me, f, d, cls);
             }
         }
+        // ---- painted sky, after the opaque surfaces so only the pixels that still show sky are shaded
+        if (!overlay || f.skyOverlay) sky(f);
         // ---- ink outlines (inverted hull)
         GLES20.glEnable(GLES20.GL_CULL_FACE);
         GLES20.glCullFace(GLES20.GL_FRONT);
@@ -243,6 +234,23 @@ public final class GLRenderer {
         GLES20.glBindBuffer(GLES20.GL_ELEMENT_ARRAY_BUFFER, 0);
         GLES20.glUseProgram(0);
         cur = null;
+    }
+
+    /** Full-screen sky at the far plane: depth-tested against what is drawn, never writing depth. */
+    private void sky(RenderFrame f) {
+        GLES20.glDisable(GLES20.GL_CULL_FACE);
+        GLES20.glDepthMask(false);
+        GLES20.glDepthFunc(GLES20.GL_LEQUAL);
+        use(sky);
+        attribs(1);
+        GLES20.glUniformMatrix4fv(sky.uInvVP, 1, false, f.invViewProj, 0);
+        u3(sky.uSkyTop, f.skyTop); u3(sky.uSkyHor, f.skyHor); u3(sky.uSkyLow, f.skyLow); u3(sky.uSunDir, f.sunDir);
+        u3(sky.uSunCol, f.sunCol); u3(sky.uMoonDir, f.moonDir);
+        u3(sky.uCloudLit, f.cloudLit); u3(sky.uCloudShade, f.cloudShade); u4(sky.uCloud, f.cloud);
+        GLES20.glUniform1f(sky.uNight, f.night);
+        GLES20.glUniform1f(sky.uTime, f.time);
+        fullScreen();
+        GLES20.glDepthMask(true);
     }
 
     // part filters for drawMesh besides a class index 0..4
@@ -357,7 +365,8 @@ public final class GLRenderer {
         if (pr.uShadowVP >= 0) GLES20.glUniformMatrix4fv(pr.uShadowVP, 1, false, f.shadowVP, 0);
         u3(pr.uCamPos, f.camPos); u3(pr.uSunDir, f.sunDir); u3(pr.uLightCol, f.lightCol); u3(pr.uShadeCol, f.shadeCol);
         u3(pr.uSkinShade, f.skinShade); u3(pr.uRimCol, f.rimCol); u3(pr.uSkyTop, f.skyTop); u3(pr.uSkyHor, f.skyHor);
-        u3(pr.uFogCol, f.fogCol);
+        u3(pr.uFogCol, f.fogCol); u3(pr.uSunCol, f.sunCol); u4(pr.uHaze, f.haze); u4(pr.uWater, f.water);
+        if (pr.uTime >= 0) GLES20.glUniform1f(pr.uTime, f.time);
         if (pr.uFog >= 0) GLES20.glUniform4f(pr.uFog, f.fogStart, f.fogEnd, f.fogMax, f.heightFog);
         if (pr.uNight >= 0) GLES20.glUniform1f(pr.uNight, f.night);
         u4(pr.uLamp, f.lamp); u3(pr.uLampCol, f.lampCol); u3(pr.uInk, f.ink);
@@ -461,6 +470,11 @@ public final class GLRenderer {
         p.uSpeed = GLES20.glGetUniformLocation(id, "uSpeed");
         p.uFlash = GLES20.glGetUniformLocation(id, "uFlash");
         p.uVignette = GLES20.glGetUniformLocation(id, "uVignette");
+        p.uHaze = GLES20.glGetUniformLocation(id, "uHaze");
+        p.uCloud = GLES20.glGetUniformLocation(id, "uCloud");
+        p.uCloudLit = GLES20.glGetUniformLocation(id, "uCloudLit");
+        p.uCloudShade = GLES20.glGetUniformLocation(id, "uCloudShade");
+        p.uWater = GLES20.glGetUniformLocation(id, "uWater");
     }
 
     private static int compile(int type, String src) {

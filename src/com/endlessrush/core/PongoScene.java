@@ -1,6 +1,7 @@
 package com.endlessrush.core;
 
 import com.pongo.core.Animator;
+import com.pongo.core.Lighting;
 import com.pongo.core.PongoAssets;
 import com.pongo.core.RenderFrame;
 
@@ -13,6 +14,9 @@ import com.pongo.core.RenderFrame;
 public final class PongoScene {
     /** Pongo is modelled at 1.55 m; the runner world is built around a ~1.9 m hero. */
     public static final float HERO_SCALE = 1.2f, COIN_SCALE = 0.95f;
+    /** Sun shadow box around her (metres from the centre to an edge) and the shadow map size. */
+    static final float SHADOW_RADIUS = 16f;
+    static final int SHADOW_MAP = 1024;
     /** The hero slot she replaces (the free starter). */
     public static final int HERO_SLOT = 0;
 
@@ -52,12 +56,12 @@ public final class PongoScene {
         f.clear();
         boolean paused = g.state == Game.PAUSED;
         if (!paused) time += dt;
-        camera(dl, f, w, h);
+        camera(g, dl, f, w, h);
         if (scene.heroIndex(g) == HERO_SLOT) hero(g, f, paused ? 0 : dt);
         coins(g, f);
     }
 
-    private void camera(DrawList dl, RenderFrame f, int w, int h) {
+    private void camera(Game g, DrawList dl, RenderFrame f, int w, int h) {
         f.screenW = Math.max(1, w);
         f.screenH = Math.max(1, h);
         System.arraycopy(dl.view, 0, f.view, 0, 16);
@@ -65,25 +69,36 @@ public final class PongoScene {
         System.arraycopy(dl.viewProj, 0, f.viewProj, 0, 16);
         com.pongo.core.Mat4.invert(f.invViewProj, f.viewProj);
         System.arraycopy(dl.camPos, 0, f.camPos, 0, 3);
-        float lx = dl.lightDir[0], ly = dl.lightDir[1], lz = dl.lightDir[2];
-        float ll = (float) Math.sqrt(lx * lx + ly * ly + lz * lz);
-        f.sunDir[0] = lx / ll; f.sunDir[1] = ly / ll; f.sunDir[2] = lz / ll;
-        System.arraycopy(dl.fogColor, 0, f.fogCol, 0, 3);
-        f.fogStart = dl.fogStart;
-        f.fogEnd = dl.fogEnd;
-        f.fogMax = 1;
-        f.heightFog = 0;
-        f.night = 0;
+        // time of day (the run starts in the day of the design renders); Zones.apply blends a zone palette over it
+        Lighting.apply(f, Lighting.phaseAt(g.state == Game.MENU ? 0 : g.s));
         f.time = time;
         f.wind[3] = time;
-        // the world layer has no shadow receivers yet; her blob shadow comes from Scene
-        f.shadowOn = false;
+        // the painted sky replaces the old one wherever no world geometry was drawn
+        f.skyOverlay = true;
+        // sun shadows over the stretch around and ahead of her (texel-snapped, so the edges don't crawl)
+        Lighting.fitShadow(f, g.x, 0, -g.s - 7f, SHADOW_RADIUS, SHADOW_MAP);
         // screen overlays belong to the world layer
         f.vignette[3] = 0;
         f.speed[0] = 0;
         f.flash[3] = 0;
         // ink width tuned at 760 px tall, kept readable on small and large screens
         f.outlinePx = Math.max(1.4f, Math.min(3.2f, 2.2f * f.screenH / 900f));
+        shareLight(f, dl);
+    }
+
+    /** The old world (still drawn by Scene) follows the same sun, fog and light colour, so it changes with the hour. */
+    private static void shareLight(RenderFrame f, DrawList dl) {
+        System.arraycopy(f.sunDir, 0, dl.lightDir, 0, 3);
+        System.arraycopy(f.fogCol, 0, dl.fogColor, 0, 3);
+        dl.fogStart = f.fogStart;
+        dl.fogEnd = f.fogEnd;
+        float r = f.lightCol[0], gg = f.lightCol[1], b = f.lightCol[2];
+        for (int i = 0; i < dl.count; i++) {
+            if ((dl.flags[i] & DrawList.F_NODEPTH) != 0) continue;
+            dl.tint[i * 4] *= r;
+            dl.tint[i * 4 + 1] *= gg;
+            dl.tint[i * 4 + 2] *= b;
+        }
     }
 
     private void hero(Game g, RenderFrame f, float dt) {

@@ -92,9 +92,15 @@ function step() {
     case OP.PRESENT: { const name = str(); gl.finish(); frames.push([name, canvas.toDataURL('image/png')]); break; }
     default: throw new Error('bad opcode ' + op + ' at ' + (pos - 4));
   }
-  const e = gl.getError();
-  if (e) throw new Error('GL error 0x' + e.toString(16) + ' after opcode ' + op + ' at ' + pos);
+  // getError is a full GPU round trip: checking every call made long recordings take many minutes, so it is
+  // checked every few thousand calls and on every presented frame
+  if (op === OP.PRESENT || ++sinceCheck >= 4096) {
+    sinceCheck = 0;
+    const e = gl.getError();
+    if (e) throw new Error('GL error 0x' + e.toString(16) + ' near opcode ' + op + ' at ' + pos);
+  }
 }
+let sinceCheck = 0;
 
 async function main() {
   const q = new URLSearchParams(location.search);

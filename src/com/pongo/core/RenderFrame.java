@@ -37,6 +37,17 @@ public final class RenderFrame {
     public final float[] lamp = new float[4];
     public final float[] lampCol = {1f, 0.8f, 0.5f};
     public float outlinePx = 2.2f;
+    /** Sun haze in the fog (looking toward the sun), sky bounce in up-facing shadows, crystal glow pulse rate, aerial haze. */
+    public final float[] haze = {0.18f, 0.35f, 1.7f, 0.32f};
+    /** Painted sky clouds: coverage 0..1, scale, drift speed, sea of clouds below the horizon 0..1 (Sky Glide). */
+    public final float[] cloud = {0.5f, 1.1f, 0.03f, 0f};
+    public final float[] cloudLit = {1f, 1f, 1f};
+    public final float[] cloudShade = {0.79f, 0.77f, 0.92f};
+    /** Toon water: flow in m/s along game x and z, ripple scale (1/m), flow streak amount 0..1. */
+    public final float[] water = {0f, -1.2f, 0.55f, 1f};
+    /** Draw the painted sky even when rendering as an overlay: it fills only the pixels nothing has been drawn on
+     *  yet (depth still at the clear value), so it replaces another renderer's sky that left the depth alone. */
+    public boolean skyOverlay;
 
     // shadow
     public boolean shadowOn;
