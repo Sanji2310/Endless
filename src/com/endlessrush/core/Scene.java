@@ -6,8 +6,17 @@ public final class Scene {
     private int menuChar = -1;
     private float charSpin;
 
+    /**
+     * Set by the renderer when the toon layer (PongoScene) draws the heroine and the Mon coins on top of this
+     * scene: the body of hero 0 and the coins are then left out here (her blob shadow, board and gear stay).
+     */
+    public boolean toonHero, toonCoins;
+
     /** Character shown on the menu / shop (overrides profile selection when >= 0). */
     public void setPreviewCharacter(int idx) { menuChar = idx; }
+
+    /** Hero currently on screen. */
+    public int heroIndex(Game g) { return menuChar >= 0 ? menuChar : g.profile.selected; }
 
     public void build(Game g, DrawList dl, float aspect, float dt) {
         dl.clear();
@@ -135,6 +144,7 @@ public final class Scene {
         for (int i = 0; i < g.pickups.size(); i++) {
             Game.Pickup p = g.pickups.get(i);
             if (p.taken || p.s > ps + 170 || p.s < ps - 10) continue;
+            if (toonCoins && p.type == Game.COIN) continue;
             float spin = (menuT * 180 + p.s * 7) % 360;
             float bob = p.type == Game.COIN ? 0 : (float) Math.sin(menuT * 3 + p.s) * 0.15f;
             Mesh mesh;
@@ -175,8 +185,9 @@ public final class Scene {
     }
 
     private void drawPlayer(Game g, DrawList dl, float pz, boolean menu) {
-        int ci = menuChar >= 0 ? menuChar : g.profile.selected;
+        int ci = heroIndex(g);
         Mesh[] parts = Models.runner[ci];
+        boolean toon = toonHero && ci == 0;
         float t = g.animPhase;
         boolean blink = g.invulnT > 0 && ((int) (g.invulnT * 12)) % 2 == 0;
         float alpha = 1;
@@ -266,24 +277,26 @@ public final class Scene {
             torsoPitch = -40; headPitch = -20;
         }
         float hipY = 0.95f;
-        // legs
-        part(dl, parts[Models.P_LEG], body, -0.13f, hipY, 0, legL, 0, alpha, emis);
-        part(dl, parts[Models.P_LEG], body, 0.13f, hipY, 0, legR, 0, alpha, emis);
-        // torso
         float[] torso = body.clone();
         Mat4.translate(torso, 0, hipY, 0);
         Mat4.rotX(torso, torsoPitch);
-        float[] tm = dl.add(parts[Models.P_TORSO], 1, 1, 1, alpha, emis, 0);
-        Mat4.copy(tm, torso);
-        // head
-        float[] hm = dl.add(parts[Models.P_HEAD], 1, 1, 1, alpha, emis, 0);
-        Mat4.copy(hm, torso);
-        Mat4.translate(hm, 0, 0.6f, 0);
-        Mat4.rotX(hm, headPitch);
-        if (menu) Mat4.rotY(hm, (float) Math.sin(t * 0.7f) * 12);
-        // arms
-        part(dl, parts[Models.P_ARM], torso, -0.34f, 0.52f, 0, armL, armSpreadL, alpha, emis);
-        part(dl, parts[Models.P_ARM], torso, 0.34f, 0.52f, 0, armR, armSpreadR, alpha, emis);
+        if (!toon) {
+            // legs
+            part(dl, parts[Models.P_LEG], body, -0.13f, hipY, 0, legL, 0, alpha, emis);
+            part(dl, parts[Models.P_LEG], body, 0.13f, hipY, 0, legR, 0, alpha, emis);
+            // torso
+            float[] tm = dl.add(parts[Models.P_TORSO], 1, 1, 1, alpha, emis, 0);
+            Mat4.copy(tm, torso);
+            // head
+            float[] hm = dl.add(parts[Models.P_HEAD], 1, 1, 1, alpha, emis, 0);
+            Mat4.copy(hm, torso);
+            Mat4.translate(hm, 0, 0.6f, 0);
+            Mat4.rotX(hm, headPitch);
+            if (menu) Mat4.rotY(hm, (float) Math.sin(t * 0.7f) * 12);
+            // arms
+            part(dl, parts[Models.P_ARM], torso, -0.34f, 0.52f, 0, armL, armSpreadL, alpha, emis);
+            part(dl, parts[Models.P_ARM], torso, 0.34f, 0.52f, 0, armR, armSpreadR, alpha, emis);
+        }
         // jetpack
         if (g.jetT > 0 && !menu) {
             float[] jm = dl.add(Models.jetBack, 1, 1, 1, 1, 0.1f, 0);

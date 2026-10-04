@@ -22,7 +22,8 @@ A 3D endless runner for Android in the style of subway-runner games. Everything 
 - **Mystery boxes** on the track and in the shop.
 - **Missions.** Three missions are active at a time (coins, jumps, rolls, score, dodging trains and more). Finishing a set raises your permanent **score multiplier**, up to x30.
 - **Shop.** Six upgrade levels for each power-up, plus hoverboards, keys and mystery boxes.
-- **Heroes.** Five original characters to unlock: Jax, Nova, Rook, Mika and Bolt-9.
+- **Heroes.** Five original characters: Pongo (free), Nova, Rook, Mika and Bolt-9.
+- **Pongo toon layer.** The starter hero is Pongo, the cel-shaded heroine from the [PONGO rework](docs/PONGO_DESIGN.md): a skinned, animated Blender model with ink outlines, spring-physics twin tails, and toon-shaded Mon coins, drawn over the Sakura Line world by the `com.pongo` renderer.
 - The game speeds up the longer you run, and the level generator makes sure there is always a way through.
 - Pause with a 3-2-1 resume countdown, a high score, and progress saved on the device.
 - Synthesized music and sound effects, each of which can be turned on or off.
@@ -32,8 +33,14 @@ A 3D endless runner for Android in the style of subway-runner games. Everything 
 ```
 src/com/endlessrush/core/   pure Java: game logic, level generator, 3D models, scene/camera (no Android deps)
 src/com/endlessrush/app/    Android: GLES 2.0 renderer, audio mixer/synth, UI screens, touch input
+src/com/pongo/core/         toon renderer data: pongo.bin loader, skeletal animator, GLSL, RenderFrame
+src/com/pongo/app/          Android GLES 2.0 executor for RenderFrames (shadow map, cel shading, outlines, decals)
+assets/pongo.bin            Pongo + coin meshes, skeleton, clips and atlas, built from blender/ by tools/build_assets.sh
 tools/Preview.java          desktop software rasteriser that renders the same scenes to PNG/GIF + bot simulations
+tools/preview/, tools/web/  GLES recorder + WebGL replayer: runs the real Android renderers headless (preview.sh pongo)
 ```
+
+![Pongo on the Sakura Line](preview/pongo_02_run.png)
 
 ## Build
 
@@ -44,6 +51,8 @@ sudo apt-get install aapt apksigner zipalign dalvik-exchange android-sdk-platfor
 ./preview.sh gif      # animated gameplay -> preview/gameplay.gif
 ./preview.sh sim 20   # 20 headless autopilot runs to sanity-check level generation
 ./preview.sh icon     # regenerate launcher icons
+./preview.sh pongo    # the real Android renderers replayed in headless Chromium -> preview/pongo_*.png
+tools/build_assets.sh # rebuild assets/pongo.bin from the Blender scripts (Blender 4.0 + numpy)
 ```
 
 `build.sh` creates a debug signing key in `keystore/` the first time it runs; this folder is git-ignored. Keep the same key if you want new builds to install as updates over old ones.

@@ -1,14 +1,23 @@
 package com.endlessrush.app;
 
+import android.content.res.AssetManager;
 import android.opengl.GLES20;
 import android.opengl.GLSurfaceView;
 import android.os.SystemClock;
+import android.util.Log;
 
 import com.endlessrush.core.DrawList;
 import com.endlessrush.core.Game;
 import com.endlessrush.core.Mesh;
 import com.endlessrush.core.Models;
+import com.endlessrush.core.PongoScene;
 import com.endlessrush.core.Scene;
+import com.pongo.app.GLRenderer;
+import com.pongo.core.PongoAssets;
+import com.pongo.core.RenderFrame;
+
+import java.io.BufferedInputStream;
+import java.io.InputStream;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -19,7 +28,11 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
 
-/** OpenGL ES 2.0 renderer; also drives the simulation on the GL thread. */
+/**
+ * OpenGL ES 2.0 renderer; also drives the simulation on the GL thread.
+ * The world is drawn from Scene's draw list; Pongo and the Mon coins are drawn on top by the toon renderer
+ * (com.pongo) from assets/pongo.bin, sharing the depth buffer. Without that asset the old hero is drawn instead.
+ */
 public final class GameRenderer implements GLSurfaceView.Renderer {
     private static final String VS =
             "uniform mat4 uVP; uniform mat4 uModel; uniform vec3 uLight; uniform vec3 uCam;\n" +
@@ -56,15 +69,22 @@ public final class GameRenderer implements GLSurfaceView.Renderer {
     private final ConcurrentLinkedQueue<Runnable> queue = new ConcurrentLinkedQueue<Runnable>();
     private final ArrayList<Mesh> uploaded = new ArrayList<Mesh>();
     private final Hud hud;
+    private final AssetManager assetManager;
+    private PongoAssets pongoAssets;
+    private boolean pongoTried;
+    private PongoScene pongo;
+    private GLRenderer toon;
+    private final RenderFrame frame = new RenderFrame();
     private int prog, uVP, uModel, uLight, uCam, uTint, uEmis, uFogColor, uFog, uUnlit, aPos, aNrm, aCol;
     private int width = 1, height = 1;
     private long last;
     private final float[] light = new float[3];
 
-    public GameRenderer(Game game, Scene scene, Hud hud) {
+    public GameRenderer(Game game, Scene scene, Hud hud, AssetManager assets) {
         this.game = game;
         this.scene = scene;
         this.hud = hud;
+        this.assetManager = assets;
     }
 
     /** Runs r on the GL thread before the next frame (all game mutations go through here). */
@@ -90,7 +110,37 @@ public final class GameRenderer implements GLSurfaceView.Renderer {
         aCol = GLES20.glGetAttribLocation(prog, "aCol");
         GLES20.glClearColor(0.73f, 0.87f, 0.98f, 1);
         GLES20.glDisable(GLES20.GL_CULL_FACE);
+        setupToon();
         last = SystemClock.elapsedRealtime();
+    }
+
+    /** Loads assets/pongo.bin once and (re)builds the toon renderer's GL objects for this context. */
+    private void setupToon() {
+        if (!pongoTried) {
+            pongoTried = true;
+            InputStream in = null;
+            try {
+                in = new BufferedInputStream(assetManager.open("pongo.bin"), 1 << 16);
+                pongoAssets = PongoAssets.load(in, true);
+                pongo = new PongoScene(pongoAssets);
+            } catch (Exception e) {
+                Log.w("EndlessRush", "toon renderer off: " + e);
+                pongoAssets = null;
+                pongo = null;
+            } finally {
+                if (in != null) try { in.close(); } catch (Exception ignored) { }
+            }
+        }
+        if (pongo == null) return;
+        try {
+            toon = new GLRenderer(pongoAssets);
+            toon.onSurfaceCreated();
+            pongo.attach(scene);
+        } catch (RuntimeException e) {
+            Log.w("EndlessRush", "toon renderer off: " + e);
+            toon = null;
+            scene.toonHero = scene.toonCoins = false;
+        }
     }
 
     @Override
@@ -111,23 +161,24 @@ public final class GameRenderer implements GLSurfaceView.Renderer {
         // fixed sub-steps keep collisions stable on slow frames
         int steps = dt > 0.02f ? 2 : 1;
         for (int i = 0; i < steps; i++) game.update(dt / steps);
+        drawFrame(dt);
+    }
+
+    /** Builds the draw lists for the current game state and renders them (the desktop preview calls this too). */
+    public void drawFrame(float dt) {
         scene.build(game, dl, width / (float) height, dt);
+        if (toon != null) pongo.build(game, scene, dl, frame, width, height, dt);
         if (hud != null) hud.onFrame(game);
 
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);
-        GLES20.glUseProgram(prog);
-        GLES20.glUniformMatrix4fv(uVP, 1, false, dl.viewProj, 0);
-        float lx = dl.lightDir[0], ly = dl.lightDir[1], lz = dl.lightDir[2];
-        float ll = (float) Math.sqrt(lx * lx + ly * ly + lz * lz);
-        light[0] = lx / ll; light[1] = ly / ll; light[2] = lz / ll;
-        GLES20.glUniform3fv(uLight, 1, light, 0);
-        GLES20.glUniform3fv(uCam, 1, dl.camPos, 0);
-        GLES20.glUniform3fv(uFogColor, 1, dl.fogColor, 0);
-        GLES20.glEnableVertexAttribArray(aPos);
-        GLES20.glEnableVertexAttribArray(aNrm);
-        GLES20.glEnableVertexAttribArray(aCol);
-
+        beginWorld();
         for (int pass = 0; pass < 3; pass++) {
+            if (pass == 2 && toon != null) {
+                // the heroine and coins go in after the opaque world and before its blended layer (blob shadows,
+                // glows, speed lines), so those still blend over the ground around her
+                toon.render(frame, true);
+                beginWorld();
+            }
             if (pass == 0) {
                 GLES20.glDisable(GLES20.GL_DEPTH_TEST);
                 GLES20.glDepthMask(false);
@@ -137,6 +188,8 @@ public final class GameRenderer implements GLSurfaceView.Renderer {
                 GLES20.glDepthFunc(GLES20.GL_LEQUAL);
                 GLES20.glDepthMask(true);
             } else {
+                GLES20.glEnable(GLES20.GL_DEPTH_TEST);
+                GLES20.glDepthFunc(GLES20.GL_LEQUAL);
                 GLES20.glDepthMask(false);
                 GLES20.glEnable(GLES20.GL_BLEND);
                 GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA);
@@ -150,6 +203,22 @@ public final class GameRenderer implements GLSurfaceView.Renderer {
         }
         GLES20.glDepthMask(true);
         GLES20.glDisable(GLES20.GL_BLEND);
+    }
+
+    /** Program, frame uniforms and attribute arrays for the world draw list. */
+    private void beginWorld() {
+        GLES20.glUseProgram(prog);
+        GLES20.glDisable(GLES20.GL_CULL_FACE);
+        GLES20.glUniformMatrix4fv(uVP, 1, false, dl.viewProj, 0);
+        float lx = dl.lightDir[0], ly = dl.lightDir[1], lz = dl.lightDir[2];
+        float ll = (float) Math.sqrt(lx * lx + ly * ly + lz * lz);
+        light[0] = lx / ll; light[1] = ly / ll; light[2] = lz / ll;
+        GLES20.glUniform3fv(uLight, 1, light, 0);
+        GLES20.glUniform3fv(uCam, 1, dl.camPos, 0);
+        GLES20.glUniform3fv(uFogColor, 1, dl.fogColor, 0);
+        GLES20.glEnableVertexAttribArray(aPos);
+        GLES20.glEnableVertexAttribArray(aNrm);
+        GLES20.glEnableVertexAttribArray(aCol);
     }
 
     private void draw(int i, int flags) {
