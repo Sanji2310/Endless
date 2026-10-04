@@ -239,13 +239,14 @@ public final class FxLayer {
                     float side = fx.rnd() < 0.5f ? -1 : 1;
                     fx.drifter(Fx.PETAL, side * fx.rnd(2.5f, 10f), fx.rnd(2f, 8f), -(ps + fx.rnd(menu ? -4 : 6, 70)), 0.15f, Fx.WARM_WHITE);
                 }
+                airFill(g, dt, menu, Fx.WARM_WHITE, 1f);
                 if (night > 0.35f) fireflies(g, dt, 4f);
                 break;
             }
             case Zones.CAVERN: {
                 // a trickle of grit from the vault now and then, and a crystal chime somewhere ahead
                 if (fx.rnd() < dt * 0.7f) fx.rockfall(fx.rnd(-4.5f, 4.5f), fx.rnd(4.2f, 5.5f), -(ps + fx.rnd(14, 50)), fx.rnd(0.4f, 0.8f));
-                if (fx.rnd() < dt * 0.5f) {
+                if (fx.rnd() < dt * 0.2f) {
                     float side = fx.rnd() < 0.5f ? -1 : 1;
                     fx.crystalChime(side * fx.rnd(4.4f, 5.4f), fx.rnd(0.8f, 3.5f), -(ps + fx.rnd(10, 40)),
                             fx.rnd() < 0.5f ? Fx.CYAN : Fx.VIOLET);
@@ -260,6 +261,7 @@ public final class FxLayer {
                 if (fx.rnd() < dt * 2.2f) fx.wisp(fx.rnd(-8f, 8f), fx.rnd(0.15f, 0.6f), -(ps + fx.rnd(20, 70)), fx.rnd(1.2f, 2.2f), 0.45f, 0);
                 if (fx.rnd() < dt * 0.25f) fx.koiLeap(fx.rnd(-4f, 4f), 0f, -(ps + fx.rnd(18, 40)), 0);
                 if (fx.rnd() < dt * 3f) fx.ripple(fx.rnd(-4f, 4f), 0f, -(ps + fx.rnd(4, 40)), fx.rnd(0.6f, 1.2f), 0);
+                airFill(g, dt, menu, Fx.MINT, 0.8f);
                 if (night > 0.2f) fireflies(g, dt, 8f);
                 break;
             }
@@ -285,6 +287,18 @@ public final class FxLayer {
             default:
                 break;
         }
+    }
+
+    /** Pollen motes and the odd dandelion seed hanging in the air on both sides: fills the open space the way
+     *  Genshin's scenery does, without drawing the eye. */
+    private void airFill(Game g, float dt, boolean menu, float[] c, float k) {
+        float ps = g.s;
+        for (int n = 0; n < count(dt * 30 * k); n++) {
+            float side = fx.rnd() < 0.5f ? -1 : 1;
+            fx.pollen(side * fx.rnd(1.5f, 9f), fx.rnd(0.4f, 4.5f), -(ps + fx.rnd(menu ? -2 : 3, 45)), c);
+        }
+        for (int n = 0; n < count(dt * 2.5f * k); n++)
+            fx.seed(fx.rnd(-7f, 7f), fx.rnd(1f, 4f), -(ps + fx.rnd(8, 45)));
     }
 
     private void fireflies(Game g, float dt, float rate) {

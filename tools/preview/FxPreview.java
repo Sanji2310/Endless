@@ -43,6 +43,22 @@ public class FxPreview {
         if (list.equals("all")) list = "run,coins,magnet,fever,boots,rocket,board,crash,cave,river,sky,rooftops";
         for (String s : list.split(",")) {
             reset();
+            suffix = "";
+            renderer.cameraHook = null;
+            if (s.endsWith("_side")) {
+                // a three-quarter view from beside and a little ahead of her, close in
+                s = s.substring(0, s.length() - 5);
+                suffix = "_side";
+                final float aspect = w / (float) h;
+                renderer.cameraHook = (dl, g) -> {
+                    float tx = g.x, ty = g.y + 1.0f, tz = -g.s - 0.6f;
+                    float ex = tx + 3.8f, ey = ty + 0.9f, ez = tz - 3.2f;
+                    com.endlessrush.core.Mat4.lookAt(dl.view, ex, ey, ez, tx, ty, tz + 0.8f, 0, 1, 0);
+                    com.endlessrush.core.Mat4.perspective(dl.proj, 50f, aspect, 0.1f, 300f);
+                    com.endlessrush.core.Mat4.mul(dl.viewProj, dl.proj, dl.view);
+                    dl.camPos[0] = ex; dl.camPos[1] = ey; dl.camPos[2] = ez;
+                };
+            }
             switch (s) {
                 case "run": run(); break;
                 case "coins": coins(); break;
@@ -90,7 +106,9 @@ public class FxPreview {
     /** The chaser starts on her heels and closes in on a crash; these clips are about the effects. */
     static void noChaser() { game.chaseT = 0; game.guardGap = 30; }
 
-    static void clip(String name, int n, Runnable each) { frame = 0; step(n, name, each); }
+    static String suffix = "";
+
+    static void clip(String name, int n, Runnable each) { frame = 0; step(n, name + suffix, each); }
 
     static void warm(int n) { step(n, null, null); }
 
@@ -198,7 +216,7 @@ public class FxPreview {
             boolean rec = i % 2 == 0;
             GLES20.drawing = rec;
             renderer.drawFrame(DT);
-            if (rec) GLES20.present(String.format("crash_%03d", frame++));
+            if (rec) GLES20.present(String.format("crash%s_%03d", suffix, frame++));
         }
     }
 

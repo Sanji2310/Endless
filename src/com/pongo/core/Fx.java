@@ -3,7 +3,7 @@ package com.pongo.core;
 /**
  * The effects system: pooled sprite particles and ribbon trails, written into a RenderFrame as particle quads.
  *
- * Sprites are the fx_* tiles painted by blender/assets/tex_fx.py (and the cave ones from tex_cave.py) in the Sakura
+ * Sprites are the vfx_* tiles painted by blender/assets/tex_fx.py (and the cave ones from tex_cave.py) in the Sakura
  * Line look: cel puffs, petals and leaves, water, sparks, glows. Solid sprites carry their own colours and are drawn
  * alpha blended (back to front); light sprites are white and drawn additively, tinted by the particle colour.
  *
@@ -31,10 +31,10 @@ public final class Fx {
             RING = 8, BURST = 9, SPARK = 10, STREAK = 11, TRAIL = 12, DROPLET = 13, CROWN = 14, FOAM = 15, RIPPLE = 16,
             FLAME = 17, SWIRL = 18, WINDRING = 19, CHIP = 20, FEATHER = 21, CONFETTI = 22, SHARD = 23, WISP = 24,
             MOTE = 25, DRIP = 26, SPLASH = 27, SPARKLE = 28, ROCKDUST = 29, SPRITES = 30;
-    public static final String[] SPRITE_NAMES = {"fx_puff", "fx_puff2", "fx_puff3", "fx_petal", "fx_leaf_bamboo",
-            "fx_leaf_maple", "fx_star", "fx_glow", "fx_ring", "fx_burst", "fx_spark", "fx_streak", "fx_trail", "fx_droplet",
-            "fx_crown", "fx_foam", "fx_ripple", "fx_flame", "fx_swirl", "fx_windring", "fx_chip", "fx_feather",
-            "fx_confetti", "fx_shard", "fx_wisp", "fx_mote", "fx_drip", "fx_splash", "fx_sparkle", "fx_rockdust"};
+    public static final String[] SPRITE_NAMES = {"vfx_puff", "vfx_puff2", "vfx_puff3", "vfx_petal", "vfx_leaf_bamboo",
+            "vfx_leaf_maple", "vfx_star", "vfx_glow", "vfx_ring", "vfx_burst", "vfx_spark", "vfx_streak", "vfx_trail", "vfx_droplet",
+            "vfx_crown", "vfx_foam", "vfx_ripple", "vfx_flame", "vfx_swirl", "vfx_windring", "vfx_chip", "vfx_feather",
+            "vfx_confetti", "vfx_shard", "vfx_wisp", "fx_mote", "fx_drip", "fx_splash", "fx_sparkle", "fx_rockdust"};
 
     public static final int BILL = 0, TUMBLE = 1, VEL = 2, FLAT = 3;
 
@@ -89,7 +89,7 @@ public final class Fx {
     }
 
     /** True when pongo.bin carries the fx sprites (older builds don't: then every preset is a no-op). */
-    public static boolean available(PongoAssets a) { return a.tiles.get("fx_puff") != null && a.tiles.get("fx_star") != null; }
+    public static boolean available(PongoAssets a) { return a.tiles.get("vfx_puff") != null && a.tiles.get("vfx_star") != null; }
 
     public boolean hasSprite(int s) { return has[s]; }
 
@@ -670,6 +670,23 @@ public final class Fx {
         fade(i, 0.12f);
     }
 
+    /** Pollen / light motes hanging in sunlit air (the Genshin-style ambient fill): soft, dim, slowly drifting
+     *  and twinkling, never bright points. */
+    public void pollen(float px, float py, float pz, float[] c) {
+        int i = spawn(MOTE, BILL, px, py, pz, rnd(-0.25f, 0.25f), rnd(-0.08f, 0.12f), rnd(-0.25f, 0.25f), rnd(3f, 5f),
+                rnd(0.035f, 0.07f), 1.1f, c[0], c[1], c[2], rnd(0.25f, 0.45f));
+        phys(i, 0, 0.4f, 0.6f).tumble(i, 0, 0.25f);
+        fade(i, 0.3f);
+    }
+
+    /** A dandelion seed floating across the way. */
+    public void seed(float px, float py, float pz) {
+        int i = spawn(STAR, TUMBLE, px, py, pz, rnd(-0.3f, 0.3f), rnd(-0.15f, 0.05f), rnd(-0.3f, 0.3f), rnd(4f, 6f),
+                rnd(0.06f, 0.09f), 1f, 1f, 1f, 0.95f, 0.5f);
+        phys(i, 0, 0.5f, 1f).tumble(i, rnd(0.6f, 1.2f), 0.5f).spin(i, rnd() * 6.28f, rnd(-0.6f, 0.6f));
+        fade(i, 0.2f);
+    }
+
     /** A firefly: a small warm-green glow that wanders and pulses. */
     public void firefly(float px, float py, float pz) {
         int i = spawn(GLOW, BILL, px, py, pz, rnd(-0.4f, 0.4f), rnd(-0.15f, 0.25f), rnd(-0.4f, 0.4f), rnd(2.5f, 4f), rnd(0.06f, 0.09f), 1f,
@@ -798,14 +815,26 @@ public final class Fx {
         }
     }
 
-    /** Passing through a cloud: a burst of cel puffs rushing past on every side. */
+    /** The glider bursting through a cloud: the cloud wall parts in big cel puffs thrown out radially, a soft ring
+     *  of white opens around her, and wisps stream past on every side. */
     public void cloudBurst(float px, float py, float pz, float vzRel) {
-        for (int k = 0; k < count(18); k++) {
-            float ang = rnd() * 6.2832f, r = rnd(0.8f, 2.4f);
-            int i = spawn(PUFF + k % 3, BILL, px + (float) Math.cos(ang) * r, py + (float) Math.sin(ang) * r, pz - rnd(0f, 4f),
-                    (float) Math.cos(ang) * 1.5f, (float) Math.sin(ang) * 1.5f, vzRel, rnd(0.6f, 0.9f), rnd(0.5f, 0.9f), 1.6f, 1, 1, 1, 0.9f);
-            phys(i, 0, 0.8f, 0).pop(i);
+        int i = spawn(RING, BILL, px, py, pz - 1.5f, 0, 0, vzRel * 0.5f, 0.45f, 0.8f, 4.5f, 1f, 1f, 1f, 0.7f);
+        fade(i, 0);
+        for (int k = 0; k < count(26); k++) {
+            float ang = rnd() * 6.2832f, r = rnd(0.6f, 2f);
+            float c = (float) Math.cos(ang), s = (float) Math.sin(ang);
+            i = spawn(PUFF + k % 3, BILL, px + c * r, py + s * r * 0.8f, pz - rnd(0.5f, 4f),
+                    c * rnd(3f, 6f), s * rnd(2.5f, 5f), vzRel * 0.4f, rnd(0.6f, 1.0f), rnd(0.6f, 1.1f), 1.7f, 1, 1, 1, 0.95f);
+            phys(i, 0, 1.6f, 0).pop(i).spin(i, rnd() * 6.28f, rnd(-1f, 1f));
         }
+        for (int k = 0; k < count(10); k++) {
+            float ang = rnd() * 6.2832f, r = rnd(1.5f, 3.5f);
+            i = spawn(WISP, BILL, px + (float) Math.cos(ang) * r, py + (float) Math.sin(ang) * r * 0.7f, pz - rnd(2f, 10f),
+                    (float) Math.cos(ang) * 1.5f, (float) Math.sin(ang), vzRel + 10f, rnd(0.6f, 0.9f), rnd(1.2f, 2f), 1.3f, 1, 1, 1, 0.8f);
+            shape(i, 0.45f, 0).fade(i, 0.1f).spin(i, ang + 1.5708f, 0);
+        }
+        for (int k = 0; k < count(12); k++)
+            windStreak(px + rnd(-2.5f, 2.5f), py + rnd(-2f, 2f), pz - rnd(1f, 8f), vzRel - 16f, 0.7f);
     }
 
     /** Pantograph / catenary sparks on the Express Rooftops: a blue-white crackle at height py. */
@@ -831,12 +860,11 @@ public final class Fx {
 
     /** Crystal chime: a cave crystal struck (cart graze, bat swarm passing) sheds shards and violet sparkles. */
     public void crystalChime(float px, float py, float pz, float[] c) {
-        int i = spawn(GLOW, BILL, px, py, pz, 0, 0, 0, 0.4f, 0.5f, 1.5f, c[0], c[1], c[2], 0.9f);
-        fade(i, 0);
-        for (int k = 0; k < count(8); k++) {
+        int i;
+        for (int k = 0; k < count(4); k++) {
             float ang = rnd() * 6.2832f;
             i = spawn(SPARKLE, BILL, px, py, pz, (float) Math.cos(ang) * rnd(1f, 2.5f), rnd(0.5f, 2.5f), (float) Math.sin(ang) * rnd(1f, 2.5f),
-                    rnd(0.4f, 0.7f), rnd(0.08f, 0.13f), 0.4f, c[0], c[1], c[2], 1f);
+                    rnd(0.4f, 0.7f), rnd(0.06f, 0.09f), 0.4f, c[0], c[1], c[2], 0.55f);
             phys(i, 3f, 2f, 0);
         }
         for (int k = 0; k < count(4); k++) {

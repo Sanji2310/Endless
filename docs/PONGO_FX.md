@@ -4,7 +4,7 @@ The effects system for every zone, the vehicles, the pickups and the power-ups.
 
 | Piece | File | What it does |
 |---|---|---|
-| Sprites | `blender/assets/tex_fx.py` | 25 effect sprites painted in the Sakura Line look (flat cel fill, violet shade away from the light, thin ink on solid things). Packed into `pongo.bin` by `tools/build_assets.sh`. The cave sprites (`fx_mote`, `fx_drip`, `fx_splash`, `fx_sparkle`, `fx_rockdust`) come from `tex_cave.py` and are reused. |
+| Sprites | `blender/assets/tex_fx.py` | 25 effect sprites (`vfx_*`) painted in the Sakura Line look (flat cel fill, violet shade away from the light, thin ink on solid things). Packed into `pongo.bin` by `tools/build_assets.sh`. The cave sprites (`fx_mote`, `fx_drip`, `fx_splash`, `fx_sparkle`, `fx_rockdust`) come from `tex_cave.py` and are reused. |
 | Engine | `src/com/pongo/core/Fx.java` | Pooled particles (camera-facing, tumbling, velocity-stretched, flat on the ground or water), ribbon trails, one-frame sprites, and one preset method per effect. |
 | Game driver | `src/com/endlessrush/core/FxLayer.java` | Watches `Game` from frame to frame and fires the effects. No hooks in the simulation are needed. It also owns the zone ambience and the toon screen overlay (speed lines, impact flash). |
 | Preview | `tools/fx_clips.sh`, `tools/preview/FxPreview.java` | Short showcase clips through the real Android renderers: `tools/fx_clips.sh [scenes] [pongo.bin dir]` writes `preview/fx/<scene>.mp4`, a GIF and a still. |
@@ -33,7 +33,7 @@ The effects system for every zone, the vehicles, the pickups and the power-ups.
 | Glider wingtips | two `Fx.Trail`s: `push(x, y, z, fx.time)` each frame, then `fx.draw(frame, trail)` |
 | Gust hazard | `gust(x, y, z, dir -1/+1, size)` |
 | Thermal ring (each frame nearby) | `thermal(x, y, z, dt)` |
-| Flying through a cloud | `cloudBurst(x, y, z, vzRel)` |
+| Glider bursts through a cloud (`ride.bursts` went up) | `cloudBurst(ride.burstX, ride.burstY, -ride.burstS, vzRel)` |
 | Crow or crow flock dodged | `feathers(x, y, z, count)` |
 | Steam from a train or vent | `steam(x, y, z, riseSpeed, size)` |
 

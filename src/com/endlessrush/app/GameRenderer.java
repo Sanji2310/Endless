@@ -179,9 +179,14 @@ public final class GameRenderer implements GLSurfaceView.Renderer {
         drawFrame(dt);
     }
 
+    /** Replaces the game camera after the scene is built (previews: side and close views). */
+    public interface CameraHook { void camera(DrawList dl, Game game); }
+    public CameraHook cameraHook;
+
     /** Builds the draw lists for the current game state and renders them (the desktop preview calls this too). */
     public void drawFrame(float dt) {
         scene.build(game, dl, width / (float) height, dt);
+        if (cameraHook != null) cameraHook.camera(dl, game);
         if (toon != null) {
             pongo.build(game, scene, dl, frame, width, height, dt);
             if (zoneWorld != null) zoneWorld.build(game, dl, frame, dt);

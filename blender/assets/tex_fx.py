@@ -7,7 +7,7 @@ for light (glows, stars, sparks, streaks). Solid sprites are painted in their re
 white so the particle colour tints them. Every sprite is listed in build/tex/_extra.txt so the AssetBuilder packs
 it into the atlas by name.
 
-  blender -b -P blender/run.py -- tex_fx build_all     -> build/tex/fx_*.png
+  blender -b -P blender/run.py -- tex_fx build_all     -> build/tex/vfx_*.png
   blender -b -P blender/run.py -- tex_fx preview       -> renders/design/tex_fx_sheet.png
 """
 import os
@@ -46,6 +46,8 @@ def ellipse(u, v, cx, cy, rx, ry, rot=0.0):
 
 
 def save(name, rgb, a):
+    # "vfx_" so these never collide with other threads' fx_* tiles in the shared atlas
+    name = "v" + name
     img = np.zeros(rgb.shape[:2] + (4,))
     img[..., :3] = np.clip(rgb, 0, 1)
     img[..., 3] = np.clip(a, 0, 1)
@@ -349,7 +351,7 @@ def build_all():
 def preview():
     """Contact sheet of every fx sprite over a light and a dark backdrop -> renders/design/tex_fx_sheet.png."""
     import zlib
-    names = sorted(nm for nm in os.listdir(E.OUT_TEX) if nm.startswith("fx_") and nm.endswith(".png"))
+    names = sorted(nm for nm in os.listdir(E.OUT_TEX) if nm.startswith("vfx_") and nm.endswith(".png"))
     cell, cols = 160, 8
     rows = (len(names) + cols - 1) // cols
     sheet = np.ones((rows * cell * 2, cols * cell, 3))

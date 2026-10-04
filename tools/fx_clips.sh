@@ -12,11 +12,12 @@ javac -nowarn -d build/preview-fx $(find src/com/endlessrush/core src/com/pongo/
     src/com/endlessrush/app/GameRenderer.java src/com/pongo/app/GLRenderer.java \
     $(find tools/preview/stubs -name '*.java') tools/Preview.java tools/preview/FxPreview.java
 [ "$SCENES" = all ] && SCENES=run,coins,magnet,fever,boots,rocket,board,crash,cave,river,sky,rooftops
-# one recording per scene: a long stream of frames is too much for one headless page
-for s in ${SCENES//,/ }; do
-  java -Dpongo.assets="$ASSETS" -cp build/preview-fx FxPreview build/preview-fx/gles.bin "$W" "$H" "$s"
-  node tools/web/replay.mjs build/preview-fx/gles.bin build/preview-fx/frames "$W" "$H" > /dev/null
-done
+# one recording per scene (a long stream of frames is too much for one headless page), JOBS at a time
+export ASSETS W H
+echo "${SCENES//,/ }" | tr ' ' '\n' | xargs -P "${JOBS:-3}" -I{} sh -c '
+  java -Dpongo.assets="$ASSETS" -cp build/preview-fx FxPreview build/preview-fx/{}.bin "$W" "$H" {} > /dev/null &&
+  node tools/web/replay.mjs build/preview-fx/{}.bin build/preview-fx/frames "$W" "$H" > /dev/null &&
+  rm -f build/preview-fx/{}.bin && echo "rendered {}"'
 for first in build/preview-fx/frames/*_000.png; do
   name="$(basename "$first" _000.png)"
   ffmpeg -loglevel error -y -framerate 30 -i "build/preview-fx/frames/${name}_%03d.png" \
