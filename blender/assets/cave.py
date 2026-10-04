@@ -46,6 +46,11 @@ SHADOW = 0x6E62AE          # tinted shadow band inside the cave (the Sakura Line
 SHADOW_WARM = 0x8A6A8A
 CRYSTALS = (0x45D6F2, 0x9C7CFF, 0xFF74C4)
 
+# Crouch clearances, from the rider's height in the cart (the vehicle side owns Pongo's size). The crouch obstacles
+# are built relative to these, so a new rider height is one edit here plus the same numbers in the game.
+BEAM_UNDERSIDE = 1.25      # underside of ob_timber_beam and ob_fallen_log (obstacles.py: "beam HIGH ... at 1.25 m")
+SWARM_BAND = (1.2, 1.9)    # height band ob_bat_swarm flies in
+
 
 def mats():
     M = E.mat
@@ -91,6 +96,10 @@ def mats():
     M("c_loco_trim", 0xF2C230, spec=0.3, rim=0.3, soft=0.08, shadow=SHADOW_WARM)
     M("c_glass", 0x9FD8F0, spec=1.0, rim=0.5, soft=0.05, emis=0.25, flags=E.F_GLASS)
     M("c_strap", 0x3A2E2A, rim=0.25, soft=0.1, shadow=SHADOW_WARM)
+    M("c_canvas", 0xF2D98A, rim=0.3, soft=0.12, outline=0.6, shadow=SHADOW_WARM)          # ventilation duct
+    M("c_canvas_ring", 0xC99A48, rim=0.2, soft=0.1, outline=0.4, shadow=SHADOW_WARM)
+    M("c_cable_orange", 0xE58A4A, rim=0.25, soft=0.1, outline=0.0, shadow=SHADOW_WARM)
+    M("c_void", 0x16122A, emis=1.0, rim=0.0, soft=0.0, outline=0, flags=E.F_NOCAST)       # a side gallery's dark
 
 
 # ----------------------------------------------------------------------------- helpers
@@ -287,27 +296,87 @@ def cave_shell(lod=0, seed=1, seg=SEG):
     return m.obj("cave_shell_%d" % seed + ("" if lod == 0 else "@1"), smooth_angle=18)
 
 
+_PROF0 = {}
+
+
+def _shell_mesh_at(i, t, y, seed):
+    """Point on the LOD0 cave_shell mesh itself: between profile vertices i and i+1 (t 0..1) and between the 1 m
+    rows around y. Placing deco on the facets, not on the smooth field, keeps it from floating or sinking where
+    the mesh cuts across the strata steps."""
+    if not _PROF0:
+        _PROF0["p"] = vault_profile(15)
+    prof, arc = _PROF0["p"]
+    ya = math.floor(y)
+    u = y - ya
+
+    def P(k, yy):
+        x, z, nx, nz = prof[k]
+        return shell_point(x, z, nx, nz, arc[k], yy, seed)
+    a = P(i, ya).lerp(P(i + 1, ya), t)
+    b = P(i, ya + 1.0).lerp(P(i + 1, ya + 1.0), t)
+    n = V(prof[i][2:]).lerp(V(prof[i + 1][2:]), t)
+    return a.lerp(b, u), V((n.x, 0, n.y)).normalized()
+
+
 def _surface_at(px, pz_hint, y, seed, side):
-    """Point and inward normal on the displaced shell near height pz_hint on one side (+1 right, -1 left)."""
-    prof, arc = vault_profile(60)
-    best = None
-    for i, (x, z, nx, nz) in enumerate(prof):
-        if (x > 0) != (side > 0):
+    """Point and inward normal on the shell mesh at height pz_hint on one side (+1 right, -1 left)."""
+    if not _PROF0:
+        _PROF0["p"] = vault_profile(15)
+    prof = _PROF0["p"][0]
+    for i in range(len(prof) - 1):
+        (x0, z0), (x1, z1) = prof[i][:2], prof[i + 1][:2]
+        if (x0 + x1 > 0) != (side > 0) or z0 == z1:
             continue
-        dz = abs(z - pz_hint)
-        if best is None or dz < best[0]:
-            best = (dz, i)
-    i = best[1]
-    x, z, nx, nz = prof[i]
-    p = shell_point(x, z, nx, nz, arc[i], y, seed)
-    return p, V((nx, 0, nz))
+        t = (pz_hint - z0) / (z1 - z0)
+        if 0.0 <= t <= 1.0:
+            return _shell_mesh_at(i, t, y, seed)
+    raise ValueError("no wall at z=%.2f" % pz_hint)
 
 
 def _ceiling_at(x_hint, y, seed):
-    prof, arc = vault_profile(60)
-    i = min(range(len(prof)), key=lambda k: abs(prof[k][0] - x_hint) + (0 if prof[k][1] > 5 else 100))
-    x, z, nx, nz = prof[i]
-    return shell_point(x, z, nx, nz, arc[i], y, seed), V((nx, 0, nz))
+    if not _PROF0:
+        _PROF0["p"] = vault_profile(15)
+    prof = _PROF0["p"][0]
+    for i in range(len(prof) - 1):
+        (x0, z0), (x1, z1) = prof[i][:2], prof[i + 1][:2]
+        if min(z0, z1) > 4.5 and x0 != x1:
+            t = (x_hint - x0) / (x1 - x0)
+            if 0.0 <= t <= 1.0:
+                return _shell_mesh_at(i, t, y, seed)
+    return _surface_at(0, 5.0, y, seed, 1 if x_hint > 0 else -1)
+
+
+def _ledge(m, side, y, z, L, seed, rnd, palette, lod=0):
+    """A rock shelf jutting from the wall at height z, L long: flat top with a jagged front lip, its back buried in
+    the rock, crystals and glowing mushrooms on it and glowing moss hanging over the edge."""
+    ws = [abs(_surface_at(0, z, yy, seed, side)[0].x) for yy in (y - L / 2, y, y + L / 2)]
+    back = max(ws) + 0.35
+    front = min(ws) - rnd.uniform(0.55, 0.85)
+    n = 6
+    lip = []
+    for j in range(n + 1):
+        t = j / n
+        taper = math.sin(math.pi * t) ** 0.6           # the ends tuck back into the wall
+        xa = front + (1 - taper) * (back - 0.3 - front) + rnd.uniform(-0.1, 0.1) * taper
+        lip.append((side * xa, y - L / 2 + L * t))
+    outline = lip + [(side * back, y + L / 2), (side * back, y - L / 2)]
+    th = rnd.uniform(0.22, 0.32)
+    m.mat("c_rock", uvscale=1.5)
+    m.extrude(outline, th, c=(0, 0, z), bevel=(0.03, 1) if lod == 0 else None)
+    top = z + th / 2
+    xm = side * (front + 0.35)
+    crystal_cluster(m, (xm, y + rnd.uniform(-L / 4, L / 4), top), (-side * 0.25, rnd.uniform(-0.3, 0.3), 1.0),
+                    size=rnd.uniform(0.45, 0.8), rnd=rnd, mats=palette, n=4 if lod == 0 else 2, lod=lod)
+    if lod == 0:
+        _mushrooms(m, xm + side * 0.15, y + rnd.uniform(-L / 3, L / 3), top, rnd, n=rnd.randint(3, 5), spread=0.12)
+        m.mat("c_moss")
+        for j in range(1, n):
+            if rnd.random() < 0.55:
+                x0, yy = lip[j]
+                h = rnd.uniform(0.25, 0.8)
+                m.tube([(x0 + side * 0.03, yy, z - th / 2 + 0.02), (x0 - side * 0.02, yy + 0.03, z - th / 2 - h * 0.5),
+                        (x0 - side * 0.04, yy, z - th / 2 - h)], r=0.035, seg=5, taper=0.4)
+        m.ico((xm + side * 0.2, y, top), 0.22, 1, s=(1.0, 2.0, 0.25))
 
 
 def cave_deco(lod=0, seed=1, seg=SEG):
@@ -328,9 +397,65 @@ def cave_deco(lod=0, seed=1, seg=SEG):
             y = rnd.uniform(1.5, seg - 1.5)
             crystal_cluster(m, (side * rnd.uniform(4.75, 5.2), y, FLOOR), (side * -0.45, rnd.uniform(-0.2, 0.2), 1.0),
                             size=rnd.uniform(0.9, 1.6), rnd=rnd, mats=palette, n=rnd.randint(6, 10), lod=lod)
-    # stalactites in groups from the vault
+    # upper walls (they were bare above the boards): rock ledges with crystals, mushrooms and hanging moss, more
+    # clusters up to the crown, and veins of small points running along cracks
+    for side in (-1, 1):
+        for k in range(rnd.randint(3, 4) if lod == 0 else 1):
+            _ledge(m, side, seg * (k + rnd.uniform(0.25, 0.75)) / 4, rnd.uniform(3.0, 5.4), rnd.uniform(1.6, 2.8), seed,
+                   rnd, palette, lod)
+        for k in range(rnd.randint(6, 9) if lod == 0 else 2):           # boulders standing out of the wall
+            p, nrm = _surface_at(0, rnd.uniform(2.8, 7.0), rnd.uniform(0.3, seg - 0.3), seed, side)
+            m.push(Matrix.Translation(p) @ _orient(nrm))
+            _rock(m, (0, 0, 0), rnd.uniform(0.25, 0.6), rnd, s=(1.0, rnd.uniform(0.7, 1.2), 0.75),
+                  mat=rnd.choice(("c_rock_dark", "c_rock_wet")))
+            m.pop()
+        if lod == 0:                                                   # rock bolts: plates and nuts in a loose grid
+            for yb in (1.6, 4.6, 7.6, 10.6):
+                for zb in (3.2, 4.6, 6.0):
+                    if rnd.random() < 0.75:
+                        p, nrm = _surface_at(0, zb + rnd.uniform(-0.3, 0.3), yb + rnd.uniform(-0.4, 0.4), seed, side)
+                        m.push(Matrix.Translation(p) @ _orient(nrm) @ _R(rnd.uniform(-20, 20), 'Z'))
+                        m.mat("c_iron_dark")
+                        m.box((0, 0, 0.0), (0.18, 0.18, 0.04), smooth=False)
+                        m.mat("c_rust")
+                        m.cyl((0, 0, 0.04), r=0.035, h=0.05, seg=6, smooth=False)
+                        m.pop()
+            # a survey mark painted on the rock: a red ring round a white dot, and an arrow out
+            p, nrm = _surface_at(0, rnd.uniform(3.0, 3.8), rnd.uniform(2.0, seg - 2.0), seed, side)
+            m.push(Matrix.Translation(p + nrm * 0.03) @ _orient(nrm))
+            m.mat("c_paint_red")
+            m.cyl((0, 0, 0), r=0.16, h=0.02, seg=16)
+            m.mat("c_paint_white")
+            m.cyl((0, 0, 0.012), r=0.08, h=0.02, seg=12)
+            m.mat("c_paint_white")
+            m.poly([(0.25, -0.05, 0.01), (0.55, -0.05, 0.01), (0.55, -0.12, 0.01), (0.7, 0.0, 0.01), (0.55, 0.12, 0.01),
+                    (0.55, 0.05, 0.01), (0.25, 0.05, 0.01)])
+            m.pop()
+        m.mat("c_moss")
+        for k in range(rnd.randint(2, 4) if lod == 0 else 0):           # glowing moss up the wall
+            p, nrm = _surface_at(0, rnd.uniform(2.8, 6.0), rnd.uniform(0.5, seg - 0.5), seed, side)
+            m.push(Matrix.Translation(p) @ _orient(nrm))
+            for j in range(3):
+                m.ico((rnd.uniform(-0.2, 0.2), rnd.uniform(-0.25, 0.25), 0), rnd.uniform(0.15, 0.28), 1,
+                      s=(1.0, 1.3, 0.25))
+            m.pop()
+        for k in range(rnd.randint(2, 3)):
+            p, nrm = _surface_at(0, rnd.uniform(4.6, 6.8), rnd.uniform(1.0, seg - 1.0), seed, side)
+            crystal_cluster(m, tuple(p - nrm * 0.1), (nrm + V((0, 0, -0.25))).normalized(), size=rnd.uniform(0.6, 1.2),
+                            rnd=rnd, mats=palette, n=rnd.randint(4, 7), lod=lod)
+        for k in range(rnd.randint(2, 3) if lod == 0 else 0):
+            y0, z0 = rnd.uniform(0.5, seg - 3.0), rnd.uniform(2.9, 6.0)
+            for j in range(rnd.randint(5, 8)):
+                p, nrm = _surface_at(0, z0 + j * 0.13 + rnd.uniform(-0.1, 0.1), y0 + j * 0.35, seed, side)
+                d = (nrm + V((rnd.uniform(-0.4, 0.4), rnd.uniform(-0.4, 0.4), 0.3))).normalized()
+                crystal(m, tuple(p - nrm * 0.05), d, rnd.uniform(0.15, 0.35), 0.045, rnd.choice(palette),
+                        twist=rnd.random())
+        for k in range(rnd.randint(4, 7) if lod == 0 else 2):          # rubble along the wall foot
+            _rock(m, (side * rnd.uniform(4.4, 5.3), rnd.uniform(0.3, seg - 0.3), FLOOR + 0.04),
+                  rnd.uniform(0.08, 0.22), rnd, s=(1.0, 1.0, 0.6), mat=rnd.choice(("c_rock", "c_rock_dark")))
+    # stalactites in groups from the vault, some tipped with a crystal
     m.mat("c_rock_wet", uvscale=1.0)
-    for g in range(rnd.randint(3, 5)):
+    for g in range(rnd.randint(5, 8) if lod == 0 else 3):
         xg = rnd.uniform(-5.0, 5.0)
         yg = rnd.uniform(0.5, seg - 0.5)
         for k in range(rnd.randint(2, 5) if lod == 0 else 2):
@@ -342,6 +467,10 @@ def cave_deco(lod=0, seed=1, seg=SEG):
             n = 7 if lod == 0 else 5
             m.cyl((0, 0, -L * 0.3), r=r, r2=r * 1.15, h=L * 0.6, seg=n)
             m.cyl((0, 0, -L * 0.8), r=0.0, r2=r, h=L * 0.4, seg=n, caps=False)
+            if lod == 0 and rnd.random() < 0.3:
+                crystal(m, (0, 0, -L * 0.75), (rnd.uniform(-0.2, 0.2), rnd.uniform(-0.2, 0.2), -1.0), L * 0.4, r * 0.5,
+                        rnd.choice(palette))
+            m.mat("c_rock_wet", uvscale=1.0)
             m.pop()
     # stalagmites at the wall foot
     for side in (-1, 1):
@@ -452,6 +581,13 @@ def cave_frame(lod=0):
             m.mat("c_cable")
             m.sweep(pts, [(0.018 * math.cos(a), 0.018 * math.sin(a)) for a in [2 * math.pi * i / 6 for i in range(6)]],
                     closed=True, cap=False, up=(0, 0, 1))
+            for i in range(1, 12):                 # a string of work lights on the cable
+                y = 6.0 * i / 12
+                zc = 3.0 - 0.18 * math.sin(math.pi * y / 6.0)
+                m.mat("c_iron_dark")
+                m.cyl((s * 5.12, y, zc - 0.05), r=0.022, h=0.06, seg=6)
+                m.mat("c_lamp")
+                m.sphere((s * 5.12, y, zc - 0.12), 0.05, 6, 4)
             m.mat("c_porcelain")
             m.cyl((s * 5.12, 0, 3.04), r=0.045, r2=0.03, h=0.09, seg=8)
             m.mat("c_iron_dark")
@@ -489,6 +625,29 @@ def cave_pipe(lod=0, seg=SEG):
         pts += E.catenary(a, b, sag=0.18, n=10 if lod == 0 else 4)[(0 if k == 0 else 1):]
     pts = [p for p in pts if p[1] <= seg + 0.01] + [(x - 0.02, seg, z + 0.52 - 0.0)]
     m.tube(pts, r=0.03, seg=6 if lod == 0 else 4, cap=False)
+    # a canvas ventilation duct hung high on the left wall, above the frames' cap beams, ribbed every 0.6 m
+    dx, dz, dr = -4.6, 6.1, 0.38
+    m.mat("c_canvas", uvscale=1.0)
+    m.cyl((dx, seg / 2, dz), r=dr, h=seg, seg=16 if lod == 0 else 8, axis='Y')
+    m.mat("c_canvas_ring")
+    for k in range(int(seg / 0.6)):
+        y = 0.3 + k * 0.6
+        if lod == 0 or k % 3 == 0:
+            m.torus((dx, y, dz), R=dr + 0.005, r=0.025, seg=16 if lod == 0 else 8, sides=4, axis='Y')
+    m.mat("c_iron_dark")
+    for k in range(int(seg / 1.2)):
+        y = 0.6 + k * 1.2
+        m.cyl((dx - 0.15, y, dz + dr + 0.45), r=0.01, h=0.9, seg=4)                     # hanger wires
+    # a cable tray on the right wall above the boards: three cables on brackets
+    tx, tz = 5.75, 4.3
+    m.mat("c_iron_dark")
+    m.box((tx, seg / 2, tz - 0.03), (0.42, seg, 0.025), smooth=False)
+    m.box((tx - 0.2, seg / 2, tz + 0.02), (0.02, seg, 0.1), smooth=False)
+    for k in range(int(seg / 1.5)):
+        m.box((tx + 0.25, 0.75 + k * 1.5, tz - 0.08), (0.6, 0.05, 0.05), smooth=False)
+    for j, mat in enumerate(("c_cable", "c_cable_orange", "c_iron") if lod == 0 else ("c_cable_orange",)):
+        m.mat(mat)
+        m.cyl((tx - 0.12 + j * 0.12, seg / 2, tz + 0.03), r=0.04, h=seg, seg=8 if lod == 0 else 5, axis='Y')
     return m.obj("cave_pipe" if lod == 0 else "cave_pipe@1", smooth_angle=40)
 
 
@@ -676,7 +835,6 @@ def rockpile(name="ob_rockpile", seed=3):
     return ob
 
 
-BEAM_UNDERSIDE = 1.25      # crouch height in the cart (obstacles.py: "beam HIGH timber beam at 1.25 m")
 
 
 def timber_beam(name="ob_timber_beam"):
@@ -693,7 +851,7 @@ def timber_beam(name="ob_timber_beam"):
             m.mat("c_paint_yellow" if k % 2 == 0 else "c_paint_black")
             m.box((0, 0, 0.2 + k * 0.14), (0.25, 0.25, 0.14), smooth=False)
         m.mat("c_iron_dark")
-        for z in (0.95, BEAM_UNDERSIDE - 0.08):
+        for z in (BEAM_UNDERSIDE - 0.3, BEAM_UNDERSIDE - 0.08):
             m.box((0, 0, z), (0.27, 0.27, 0.05), smooth=False)                          # iron strap
             for bx in (-0.06, 0.06):
                 m.cyl((bx, -0.14, z), r=0.017, h=0.02, seg=8, axis='Y')                # bolt heads
@@ -708,7 +866,7 @@ def timber_beam(name="ob_timber_beam"):
     m.mat("c_iron_dark")
     bx, by, bz = _chain(m, (-W / 2 - 0.2, -0.1, BEAM_UNDERSIDE), n=5)
     m.torus((bx, by, bz - 0.03), R=0.04, r=0.01, seg=10, sides=4, arc=270.0, axis='Y')
-    _hard_hat(m, (W / 2 - 0.02, -0.27, 1.06), yaw=8)
+    _hard_hat(m, (W / 2 - 0.02, -0.27, BEAM_UNDERSIDE - 0.19), yaw=8)
     m.mat("c_timber", uvscale=1.0)
     m.push(Matrix.Translation((0, 0, BEAM_UNDERSIDE + 0.14)) @ Matrix.Rotation(math.radians(2), 4, 'Y'))
     m.box((0, 0, 0), (W + 0.5, 0.28, 0.28), bevel=(0.015, 1), smooth=False)       # underside at the crouch line
@@ -722,18 +880,19 @@ def timber_beam(name="ob_timber_beam"):
     # hazard board on ropes: yellow/black stripes and 頭上注意
     m.mat("c_rope")
     for x in (-0.4, 0.4):
-        m.cyl((x, -0.16, 1.68), r=0.01, h=0.3, seg=5)
+        m.cyl((x, -0.16, BEAM_UNDERSIDE + 0.43), r=0.01, h=0.3, seg=5)
     m.mat("c_paint_yellow")
-    m.box((0, -0.16, 1.9), (1.15, 0.04, 0.34), smooth=False)
+    zb = BEAM_UNDERSIDE + 0.65
+    m.box((0, -0.16, zb), (1.15, 0.04, 0.34), smooth=False)
     m.mat("c_iron_dark")
     for k in range(6):
-        m.push(Matrix.Translation((-0.48 + k * 0.19, -0.185, 1.9)) @ Matrix.Rotation(math.radians(35), 4, 'Y'))
+        m.push(Matrix.Translation((-0.48 + k * 0.19, -0.185, zb)) @ Matrix.Rotation(math.radians(35), 4, 'Y'))
         m.box((0, 0, 0), (0.05, 0.01, 0.42), smooth=False)
         m.pop()
     m.mat("c_paint_white")
-    m.box((0, -0.19, 1.9), (0.66, 0.012, 0.22), smooth=False)
+    m.box((0, -0.19, zb), (0.66, 0.012, 0.22), smooth=False)
     m.mat("c_paint_red")
-    m.push(Matrix.Translation((0, -0.2, 1.9)) @ Matrix.Rotation(math.radians(90), 4, 'X'))
+    m.push(Matrix.Translation((0, -0.2, zb)) @ Matrix.Rotation(math.radians(90), 4, 'X'))
     m.text("頭上注意", size=0.14, depth=0.008, font=E.FONT_JP, c=(0, 0, 0))
     m.pop()
     lantern(m, (W / 2 + 0.2, 0, BEAM_UNDERSIDE + 0.28))
@@ -917,18 +1076,19 @@ def ore_train(name="ob_ore_train", wagons=3, seed=11, lod=0):
 
 def fallen_log(name="ob_fallen_log", seed=4):
     """CROUCH: a round log (an old prop gone over) jammed across the track, resting on rubble at both sides with
-    its underside at 1.25 m. Bark, broken branch stubs, a split end, crystals grown on top. Duck to pass."""
+    its underside at BEAM_UNDERSIDE. Bark, broken branch stubs, a split end, crystals grown on top. Duck to pass."""
     rnd = random.Random(seed)
     m = E.Mesher(name)
     W = 2.6
     r = 0.2
     zc = BEAM_UNDERSIDE + r
-    # rubble heaps at both sides that hold the log up
+    k = BEAM_UNDERSIDE / 1.25
+    # rubble heaps at both sides that hold the log up (scaled with the crouch line)
     for sx in (-1, 1):
         # a rubble cone: three big stones at the base, two above, one wedged under the log
         for (dx, dy, z, rr) in ((-0.3, -0.25, 0.3, 0.42), (0.3, -0.15, 0.3, 0.4), (0.0, 0.3, 0.3, 0.42),
                                 (-0.12, -0.05, 0.75, 0.34), (0.2, 0.12, 0.72, 0.3), (0.0, 0.0, 1.05, 0.26)):
-            _rock(m, (sx * (W / 2 - 0.1) + dx, dy, z), rr * rnd.uniform(0.9, 1.1), rnd, s=(1.0, 0.9, 0.75),
+            _rock(m, (sx * (W / 2 - 0.1) + dx, dy, z * k), rr * k * rnd.uniform(0.9, 1.1), rnd, s=(1.0, 0.9, 0.75),
                   mat=rnd.choice(("c_rock_dark", "c_rock")))
     # the log: slightly bent, tapering, with bark-coloured timber and a pale split end
     pts = [(-W / 2 - 0.35, 0.0, zc + 0.06), (-0.4, 0.03, zc - 0.02), (0.5, -0.02, zc - 0.01), (W / 2 + 0.3, 0.02, zc + 0.08)]
@@ -1000,9 +1160,6 @@ def fallen_log(name="ob_fallen_log", seed=4):
     m.pop()
     ob = m.obj(name, smooth_angle=45)
     return ob
-
-
-SWARM_BAND = (1.2, 1.9)
 
 
 def bat_swarm(frame=0, name=None, seed=13, n=9):
@@ -1146,6 +1303,33 @@ def rail_stack(m, c, n=4, L=3.0):
                 closed=True, cap=True)
 
 
+def side_gallery(m, side, y, lod=0, name="第三坑道"):
+    """A closed-off side gallery in the wall (|x| ~5.4), 1.3 m wide: a dark opening in front of the boards in a
+    timber set, a rail stub running in, a yellow and black bar across it, a name board and a lantern."""
+    xw = side * 5.47
+    m.mat("c_void")
+    pts = [(xw, y - 0.65, FLOOR), (xw, y + 0.65, FLOOR), (xw, y + 0.65, 2.25), (xw, y - 0.65, 2.25)]
+    m.poly(pts[::-1] if side > 0 else pts)            # faces the tunnel axis
+    m.mat("c_timber", uvscale=1.0)
+    for dy in (-0.75, 0.75):
+        m.box((side * 5.36, y + dy, (FLOOR + 2.35) / 2), (0.2, 0.2, 2.45 - FLOOR), smooth=False)
+    m.box((side * 5.36, y, 2.42), (0.24, 1.9, 0.22), smooth=False)
+    for k in range(5):                      # the bar across: closed
+        m.mat("c_paint_yellow" if k % 2 == 0 else "c_paint_black")
+        m.box((side * 5.3, y - 0.6 + k * 0.24 + 0.12, 0.95), (0.06, 0.24, 0.09), smooth=False)
+    m.mat("c_paint_white")
+    m.box((side * 5.22, y, 2.75), (0.03, 0.9, 0.28), smooth=False)
+    m.mat("c_iron_dark")
+    m.push(Matrix.Translation((side * 5.2, y, 2.75)) @ _R(-side * 90, 'Z') @ _R(90, 'X'))   # reads from the track
+    m.text(name, size=0.17, depth=0.006, font=E.FONT_JP, c=(0, 0, 0))
+    m.pop()
+    m.push(Matrix.Translation((side * 4.95, y, 0)) @ _R(90, 'Z'))
+    _rail(m, -GAUGE / 2, -0.5, 0.5)
+    _rail(m, GAUGE / 2, -0.5, 0.5)
+    m.pop()
+    lantern(m, (side * 5.15, y + 0.95, 2.3), lod)
+
+
 def cave_props(lod=0, seed=1, seg=SEG):
     """Small props outside the lanes (|x| 3.7 .. 5.2), one variant per seed."""
     rnd = random.Random(seed * 7 + 2)
@@ -1166,6 +1350,7 @@ def cave_props(lod=0, seed=1, seg=SEG):
         shovel(m, (-side * 4.0, 4.6, FLOOR), yaw=90, lean=side * 12)
         signboard(m, (-side * 4.4, 9.5, FLOOR), "落石注意", yaw=-side * 15, col="c_paint_white", ink="c_paint_red")
         barrel(m, (side * 4.4, 9.5, FLOOR), rnd, h=0.8)
+        side_gallery(m, side, 8.0, lod)
     else:
         # an old cart left on a stub of rail by the wall, with a lantern on a crate beside it
         _rail(m, side * 4.45 - 0.53, 2.0, 5.2)
@@ -1338,7 +1523,7 @@ def hotaru_beam(loc, target, power=1500.0, angle=50.0):
 
 def design_cave(only=""):
     """Crystal Cavern from Pongo's ore cart (Hotaru Lamp beam on), a high view down the gallery with the parting,
-    and a crystal close-up."""
+    a crystal close-up, and the left wall with its side gallery."""
     import vehicles as VH
     E.reset()
     studio.stage(res=(1280, 720), floor=False)
@@ -1354,8 +1539,9 @@ def design_cave(only=""):
     cave_tint()
     shots = {
         "cave_runner": dict(target=(0, 10, 1.3), dist=8.6, yaw=0, pitch=10, lens=24),
-        "cave_overview": dict(target=(0, 36, 0.8), dist=12, yaw=8, pitch=16, lens=24),
+        "cave_overview": dict(target=(0, 46, 0.8), dist=18.4, yaw=-10, pitch=12, lens=24),
         "cave_crystals": dict(target=(2.6, 4, 1.1), dist=4.6, yaw=-35, pitch=8, lens=30),
+        "cave_sides": dict(target=(-4.6, 31, 3.0), dist=8.5, yaw=62, pitch=6, lens=24),
     }
     for name, kw in shots.items():
         if only and only not in name:
