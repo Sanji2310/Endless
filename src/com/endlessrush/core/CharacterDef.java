@@ -16,7 +16,7 @@ public final class CharacterDef {
     }
 
     public static final CharacterDef[] ALL = {
-            new CharacterDef("Jax", "Street artist. Always late.", 0,
+            new CharacterDef("Pongo", "Freerunner of the Sakura Line.", 0,
                     0xE8B38A, 0x3A2415, 0x2F7DE1, 0xFFFFFF, 0x2B3A55, 0xE94B3C, 0xE94B3C, CAP),
             new CharacterDef("Nova", "Skater with a sonic boom.", 6000,
                     0xF2C9A0, 0x8E3FD6, 0xFFC928, 0x222222, 0x3B3B46, 0xFFFFFF, 0x8E3FD6, BUNS),

@@ -33,7 +33,8 @@ public class AssetBuilder {
     // part classes
     static final int C_OPAQUE = 0, C_DOUBLE = 1, C_CUTOUT = 2, C_WATER = 3, C_DECAL = 4;
 
-    static final int ATLAS_W = 2048, ATLAS_H = 2048;
+    // the atlas starts small and doubles until every tile fits (up to ATLAS_MAX)
+    static final int ATLAS_W = 256, ATLAS_H = 256, ATLAS_MAX = 4096;
 
     // ------------------------------------------------------------------ data
 
@@ -210,7 +211,7 @@ public class AssetBuilder {
     static void pack() {
         List<Tile> sorted = new ArrayList<>(tiles);
         sorted.sort((a, b) -> b.cellH != a.cellH ? b.cellH - a.cellH : b.cellW - a.cellW);
-        for (int attempt = 0; attempt < 3; attempt++) {
+        while (true) {
             int x = 0, y = 0, shelf = 0;
             boolean ok = true;
             for (Tile t : sorted) {
@@ -221,6 +222,7 @@ public class AssetBuilder {
                 shelf = Math.max(shelf, t.cellH);
             }
             if (ok) break;
+            if (atlasW >= ATLAS_MAX && atlasH >= ATLAS_MAX) throw new IllegalStateException("tiles do not fit a " + ATLAS_MAX + " atlas");
             if (atlasW <= atlasH) atlasW *= 2; else atlasH *= 2;
             System.out.println("atlas grows to " + atlasW + "x" + atlasH);
         }
