@@ -893,10 +893,20 @@ def haitsu_sign():
 
 def design_street():
     """A full Sakura Line block: tracks, both streets, houses, apartment, konbini, sakura, crossing."""
-    import studio, city
+    import studio
     E.reset()
-    haitsu_sign()
     studio.stage(res=(1600, 900), floor=False)
+    street_scene()
+    studio.aim_sun(200)
+    studio.shoot("street_overview", target=(0, 16, 1.5), dist=30, yaw=180 + 25, pitch=24, lens=30)
+    studio.shoot("street_runner", target=(0, 22, 1.6), dist=7.5, yaw=180, pitch=14, lens=24)
+    studio.shoot("street_konbini", target=(13, 6, 2.2), dist=14, yaw=180 + 70, pitch=10, lens=30)
+
+
+def street_scene(outlines=True):
+    """Builds the Sakura Line block (y -12..48 along the tracks) into the current scene."""
+    import city
+    haitsu_sign()
     city.city_mats()
     mats()
     for i in range(5):
@@ -950,9 +960,5 @@ def design_street():
         nm = ob.name
         if any(k in nm for k in ("house", "apartment", "konbini", "crossing", "gantry", "upole")):
             E.finish_hard(ob, width=0.012, segments=2, angle=35)
-        if not any(k in nm for k in ("canopy", "shadow", "lot", "wires", "side", "track")):
+        if outlines and not any(k in nm for k in ("canopy", "shadow", "lot", "wires", "side", "track")):
             E.add_outline(ob, 0.02)
-    studio.aim_sun(200)
-    studio.shoot("street_overview", target=(0, 16, 1.5), dist=30, yaw=180 + 25, pitch=24, lens=30)
-    studio.shoot("street_runner", target=(0, 22, 1.6), dist=7.5, yaw=180, pitch=14, lens=24)
-    studio.shoot("street_konbini", target=(13, 6, 2.2), dist=14, yaw=180 + 70, pitch=10, lens=30)
