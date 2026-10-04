@@ -145,8 +145,18 @@ def fx_sprites(n=64):
                 f.write(nm + "\n")
 
 
+def contact_sprite(n=64):
+    """s_contact: the cave obstacles' contact shadow (a decal under each one). A flat core that falls off over the
+    outer third, so it reads as a cel shadow with a soft edge rather than a fuzzy blob. White; the material tints it."""
+    ys, xs = np.mgrid[0:n, 0:n].astype(np.float64) + 0.5
+    r = np.sqrt(((xs - n / 2) / (n / 2)) ** 2 + ((ys - n / 2) / (n / 2)) ** 2)
+    img = np.ones((n, n, 4))
+    img[..., 3] = 0.62 * (1 - T.smooth(r, 0.62, 0.98))
+    T.write_png("s_contact", img)
+
+
 def build_all():
-    cave_rock(); cave_floor(); timber(); portal_stone(); fx_sprites()
+    cave_rock(); cave_floor(); timber(); portal_stone(); fx_sprites(); contact_sprite()
 
 
 def preview():
