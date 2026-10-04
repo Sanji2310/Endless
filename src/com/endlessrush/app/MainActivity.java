@@ -93,7 +93,7 @@ public final class MainActivity extends Activity implements Game.Listener, GameR
         audio.musicOn = profile.musicOn == 1;
         game = new Game(profile, this);
         scene = new Scene();
-        renderer = new GameRenderer(game, scene, this);
+        renderer = new GameRenderer(game, scene, this, getAssets());
 
         root = new FrameLayout(this);
         glView = new GLSurfaceView(this);

@@ -18,7 +18,10 @@ echo "==> Dexing"
 "$DX" --dex --min-sdk-version=21 --output="$OUT/classes.dex" "$OUT/classes"
 
 echo "==> Packaging resources"
-aapt package -f -M AndroidManifest.xml -S res -I "$ANDROID_JAR" -F "$OUT/unsigned.apk"
+# assets/pongo.bin (toon renderer data) is built by tools/build_assets.sh
+ASSETS=()
+if [ -f assets/pongo.bin ]; then ASSETS=(-A assets); else echo "warning: assets/pongo.bin missing, the toon renderer will be off"; fi
+aapt package -f -M AndroidManifest.xml -S res "${ASSETS[@]}" -I "$ANDROID_JAR" -F "$OUT/unsigned.apk"
 (cd "$OUT" && aapt add unsigned.apk classes.dex >/dev/null)
 
 echo "==> Aligning & signing"
