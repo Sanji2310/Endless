@@ -9,7 +9,11 @@ _SUN = []
 
 
 def stage(res=(900, 900), sky_top=0x7EC8F8, sky_hor=0xE8F6FF, floor=True, floor_col=0xF3EEE6):
-    E.setup_eevee(res=res, samples=48, bloom=True)
+    import os
+    quick = os.environ.get("PONGO_QUICK")
+    sc = E.setup_eevee(res=res, samples=16 if quick else 48, bloom=True)
+    if quick:
+        sc.render.resolution_percentage = 50
     E.world_sky(sky_top, sky_hor, 1.0)
     _SUN.clear()
     _SUN.append(E.sun(rot=(48, 12, 38), energy=4.0, color=0xFFF4E2))
@@ -36,6 +40,113 @@ def shoot(name, target=(0, 0, 0.5), dist=3.0, yaw=35.0, pitch=18.0, lens=50, lig
     y, p = math.radians(yaw), math.radians(pitch)
     loc = t + Vector((math.sin(y) * math.cos(p), -math.cos(y) * math.cos(p), math.sin(p))) * dist
     E.camera(loc, t, lens=lens)
+    import os
+    os.makedirs(os.path.join(E.OUT_RENDERS, "design"), exist_ok=True)
+    E.render(os.path.join(E.OUT_RENDERS, "design", name + ".png"))
+
+
+# ----------------------------------------------------------------------------- semi-real studio (PBR)
+
+def stage_pbr(res=(1200, 1600), backdrop=0xD9D3E3, floor_col=0xB9B2C6, world_top=0x7C8FB4, world_hor=0xC9C4D6,
+              world_strength=0.3, key=260.0, fill=70.0, rim=380.0, look='AgX - Medium High Contrast', samples=96):
+    """Three-point area lighting, curved cyclorama, AO, SSR, soft shadows, SSS, bloom, AgX colour.
+    PONGO_QUICK=1 in the environment renders previews (half size, few samples)."""
+    import os
+    quick = os.environ.get("PONGO_QUICK")
+    sc = E.setup_eevee(res=res, samples=16 if quick else samples, bloom=True)
+    if quick:
+        sc.render.resolution_percentage = 50
+    sc.view_settings.view_transform = 'AgX'
+    try:
+        sc.view_settings.look = look
+    except TypeError:
+        pass
+    ev = sc.eevee
+    ev.use_gtao = True
+    ev.gtao_distance = 0.25
+    ev.gtao_factor = 1.0
+    ev.use_gtao_bent_normals = True
+    ev.use_ssr = True
+    ev.use_ssr_halfres = False
+    ev.ssr_quality = 0.75
+    ev.ssr_max_roughness = 0.6
+    ev.use_soft_shadows = True
+    ev.shadow_cube_size = '2048'
+    ev.shadow_cascade_size = '4096'
+    ev.use_shadow_high_bitdepth = True
+    ev.sss_samples = 15
+    ev.bloom_threshold = 0.9
+    ev.bloom_intensity = 0.04
+    ev.bloom_radius = 5.5
+    # world: soft gradient that does light the scene (semi-real needs ambient light)
+    w = sc.world or bpy.data.worlds.new("world")
+    sc.world = w
+    w.use_nodes = True
+    nt = w.node_tree
+    nt.nodes.clear()
+    out = nt.nodes.new('ShaderNodeOutputWorld')
+    bg = nt.nodes.new('ShaderNodeBackground')
+    tc = nt.nodes.new('ShaderNodeTexCoord')
+    sep = nt.nodes.new('ShaderNodeSeparateXYZ')
+    nt.links.new(tc.outputs["Generated"], sep.inputs[0])
+    ramp = nt.nodes.new('ShaderNodeValToRGB')
+    ramp.color_ramp.elements[0].color = E.lin4(world_hor)
+    ramp.color_ramp.elements[1].color = E.lin4(world_top)
+    ramp.color_ramp.elements[0].position = 0.45
+    ramp.color_ramp.elements[1].position = 0.8
+    nt.links.new(sep.outputs["Z"], ramp.inputs[0])
+    nt.links.new(ramp.outputs[0], bg.inputs[0])
+    bg.inputs[1].default_value = world_strength
+    nt.links.new(bg.outputs[0], out.inputs[0])
+    # cyclorama: floor curving up into a back wall
+    E.pbr("cyclorama", floor_col, rough=0.85, spec=0.2, outline=0)
+    m = E.Mesher("cyclorama").mat("cyclorama")
+    # profile runs from the camera side (+Y) back to the wall (-Y): faces point up / towards the subject
+    rings = []
+    prof = [(0, 9.0, 0.0)] + [(0, -3.5 - 2.0 * math.sin(math.radians(90 * i / 12)),
+                                2.0 - 2.0 * math.cos(math.radians(90 * i / 12))) for i in range(13)] + [(0, -5.5, 8.0)]
+    for x in (-12.0, 12.0):
+        rings.append([(x, y, z) for (_, y, z) in prof])
+    m.quad_strip(rings, closed=False)
+    m.obj("cyclorama", smooth_angle=80)
+    _SUN.clear()
+    lights = []
+
+    def area(name, loc, target, power, size, color, shape='RECTANGLE', size_y=None):
+        ld = bpy.data.lights.new(name, 'AREA')
+        ld.energy = power
+        ld.shape = shape
+        ld.size = size
+        if size_y is not None:
+            ld.size_y = size_y
+        ld.color = E.hexrgb(color)
+        ld.use_contact_shadow = True
+        ob = bpy.data.objects.new(name, ld)
+        E.link(ob)
+        ob.location = Vector(loc)
+        d = Vector(target) - Vector(loc)
+        ob.rotation_euler = d.to_track_quat('-Z', 'Y').to_euler()
+        lights.append(ob)
+        return ob
+    # subject faces +Y: key and fill in front (camera-left = +X), rims behind
+    area("key", (2.2, 2.6, 3.0), (0, 0, 1.1), key, 1.6, 0xFFF1E4, 'DISK')
+    area("fill", (-2.8, 2.2, 1.6), (0, 0, 1.0), fill, 3.0, 0xDCE6FF)
+    area("rim_l", (2.0, -2.4, 2.4), (0, 0, 1.2), rim, 1.0, 0xFFE2C4, 'RECTANGLE', 2.0)
+    area("rim_r", (-2.2, -2.2, 2.0), (0, 0, 1.1), rim * 0.7, 1.0, 0xC8DCFF, 'RECTANGLE', 2.0)
+    area("top", (0.0, 0.4, 4.2), (0, 0, 1.0), key * 0.15, 2.5, 0xFFFFFF, 'DISK')
+    return lights
+
+
+def shoot_pbr(name, target=(0, 0, 1.0), dist=3.0, yaw=0.0, pitch=8.0, lens=50, dof=None):
+    """Camera only (lights stay fixed); yaw 0 = in front of a character facing +Y."""
+    t = Vector(target)
+    y, p = math.radians(yaw), math.radians(pitch)
+    loc = t + Vector((math.sin(y) * math.cos(p), math.cos(y) * math.cos(p), math.sin(p))) * dist
+    cam = E.camera(loc, t, lens=lens)
+    if dof:
+        cam.data.dof.use_dof = True
+        cam.data.dof.focus_distance = (loc - t).length
+        cam.data.dof.aperture_fstop = dof
     import os
     os.makedirs(os.path.join(E.OUT_RENDERS, "design"), exist_ok=True)
     E.render(os.path.join(E.OUT_RENDERS, "design", name + ".png"))

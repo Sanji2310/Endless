@@ -1375,3 +1375,229 @@ def set_light_tint(light=0xFFF6E8, shadow=0x6A5FA8, rimc=0xFFF1D8):
                 n.inputs["LightTint"].default_value = lin4(light)
                 n.inputs["ShadowTint"].default_value = lin4(shadow)
                 n.inputs["RimColor"].default_value = lin4(rimc)
+
+
+# ----------------------------------------------------------------------------- PBR materials (semi-real style)
+
+def _img(name, non_color=False):
+    img = bpy.data.images.get(name)
+    if img is None:
+        p = tex_path(name)
+        if not os.path.exists(p):
+            return None
+        img = bpy.data.images.load(p)
+        img.name = name
+    if non_color:
+        img.colorspace_settings.name = 'Non-Color'
+    return img
+
+
+def add_rest(obj):
+    """Store the rest-pose vertex positions as the 'rest' attribute: box-projected textures and procedural
+    detail read it, so they stick to the surface when the armature deforms the mesh."""
+    me = obj.data
+    if "rest" in me.attributes:
+        me.attributes.remove(me.attributes["rest"])
+    at = me.attributes.new("rest", 'FLOAT_VECTOR', 'POINT')
+    co = [0.0] * (3 * len(me.vertices))
+    me.vertices.foreach_get("co", co)
+    at.data.foreach_set("vector", co)
+
+
+def _rest_vec(N, L, scale=1.0):
+    at = N.new('ShaderNodeAttribute')
+    at.attribute_type = 'GEOMETRY'
+    at.attribute_name = "rest"
+    mp = N.new('ShaderNodeMapping')
+    mp.inputs["Scale"].default_value = (scale, scale, scale)
+    L.new(at.outputs["Vector"], mp.inputs["Vector"])
+    return mp.outputs[0]
+
+
+def _tex_node(N, L, img, vec, proj, blend=0.25):
+    ti = N.new('ShaderNodeTexImage')
+    ti.image = img
+    ti.interpolation = 'Linear'
+    if proj == 'BOX':
+        ti.projection = 'BOX'
+        ti.projection_blend = blend
+    L.new(vec, ti.inputs[0])
+    return ti
+
+
+def pbr(name, color=0xFFFFFF, tex="", nrm="", nrm_strength=1.0, rough=0.5, rough_var=0.0, metal=0.0, sheen=0.0,
+        sheen_rough=0.5, sss=0.0, sss_radius=(1.0, 0.35, 0.2), sss_scale=0.01, coat=0.0, coat_rough=0.1, emis=0.0,
+        spec=0.5, aniso=0.0, alpha_tex=False, flags=0, outline=0.6, game_spec=None, game_rim=0.25, shadow=0xB3ACDC,
+        skin=0.0, sway=0.0, mask_tex="", mask_color=None, mask_metal=None, mask_rough=None,
+        proj='UV', tex_scale=1.0, bump="", bump_strength=0.3, bump_dist=0.002, rough_scale=18.0, tex_mix=1.0,
+        col_var=0.0, col_var_scale=6.0):
+    """Semi-real material: Principled BSDF in Blender renders (texture * colour * vertex colour, tangent normal
+    map, roughness with optional procedural variation, sheen for fabric, SSS for skin, coat for lacquer).
+    Also registers the game material (colour/texture/flags) used by the exporter.
+    mask_tex: optional grayscale mask that switches to a second colour/metal/roughness (e.g. gold inlay).
+    proj='BOX': textures are box-projected from the rest-position attribute (add_rest) at tex_scale repeats
+    per metre; surface relief then comes from the `bump` height map (no tangents needed).
+    tex_mix: how strongly the colour texture modulates the base colour (1 = full multiply).
+    col_var: low-frequency colour/value variation (dye/wear unevenness)."""
+    if name in _MATS:
+        return _MATS[name]
+    gs = game_spec if game_spec is not None else (0.9 if metal > 0.5 else max(0.0, 0.6 - rough * 0.6))
+    gm = GameMat(name, color, tex, spec=gs, rim=game_rim, emis=emis, soft=0.1, outline=outline, skin=skin,
+                 sway=sway, flags=flags | (F_METAL if metal > 0.5 else 0), shadow=shadow)
+    gm.pbr = True
+    bm = bpy.data.materials.get(name) or bpy.data.materials.new(name)
+    bm["pongo"] = 1
+    bm["color"] = color
+    bm["tex"] = tex
+    for k in ("spec", "rim", "emis", "soft", "outline", "skin", "sway", "flags", "shadow"):
+        bm[k] = getattr(gm, k)
+    bm.use_nodes = True
+    nt = bm.node_tree
+    nt.nodes.clear()
+    N, L = nt.nodes, nt.links
+    out = N.new('ShaderNodeOutputMaterial')
+    bsdf = N.new('ShaderNodeBsdfPrincipled')
+    L.new(bsdf.outputs[0], out.inputs[0])
+    uv = N.new('ShaderNodeUVMap')
+    uv.uv_map = "UVMap"
+    if proj == 'BOX':
+        vec = _rest_vec(N, L, tex_scale)
+    elif tex_scale != 1.0:
+        mp = N.new('ShaderNodeMapping')
+        mp.inputs["Scale"].default_value = (tex_scale, tex_scale, tex_scale)
+        L.new(uv.outputs[0], mp.inputs["Vector"])
+        vec = mp.outputs[0]
+    else:
+        vec = uv.outputs[0]
+    # base colour = colour * texture * vertex colour
+    col = N.new('ShaderNodeMix'); col.data_type = 'RGBA'; col.blend_type = 'MULTIPLY'
+    col.inputs[0].default_value = tex_mix
+    col.inputs[6].default_value = lin4(color)
+    col.inputs[7].default_value = (1, 1, 1, 1)
+    img = _img(tex) if tex else None
+    ti = None
+    if img is not None:
+        ti = _tex_node(N, L, img, vec, proj)
+        L.new(ti.outputs["Color"], col.inputs[7])
+        if alpha_tex:
+            L.new(ti.outputs["Alpha"], bsdf.inputs["Alpha"])
+            bm.blend_method = 'CLIP'
+            bm.shadow_method = 'CLIP'
+    vc = N.new('ShaderNodeVertexColor'); vc.layer_name = "Col"
+    col2 = N.new('ShaderNodeMix'); col2.data_type = 'RGBA'; col2.blend_type = 'MULTIPLY'
+    col2.inputs[0].default_value = 1.0
+    L.new(col.outputs[2], col2.inputs[6]); L.new(vc.outputs["Color"], col2.inputs[7])
+    base_out = col2.outputs[2]
+    if col_var > 0:
+        # uneven dye / wear: low-frequency value variation in rest space
+        nz = N.new('ShaderNodeTexNoise')
+        nz.inputs["Scale"].default_value = col_var_scale
+        nz.inputs["Detail"].default_value = 3.0
+        L.new(_rest_vec(N, L, 1.0), nz.inputs["Vector"])
+        mr = N.new('ShaderNodeMapRange')
+        mr.inputs["From Min"].default_value = 0.3; mr.inputs["From Max"].default_value = 0.7
+        mr.inputs["To Min"].default_value = 1.0 - col_var; mr.inputs["To Max"].default_value = 1.0 + col_var * 0.6
+        L.new(nz.outputs["Fac"], mr.inputs["Value"])
+        cv = N.new('ShaderNodeMix'); cv.data_type = 'RGBA'; cv.blend_type = 'MULTIPLY'
+        cv.inputs[0].default_value = 1.0
+        L.new(base_out, cv.inputs[6])
+        cc = N.new('ShaderNodeCombineXYZ')
+        for k in range(3):
+            L.new(mr.outputs["Result"], cc.inputs[k])
+        L.new(cc.outputs[0], cv.inputs[7])
+        base_out = cv.outputs[2]
+    rough_out = None
+    metal_out = None
+    if mask_tex:
+        mimg = _img(mask_tex, True)
+        if mimg is not None:
+            mi = _tex_node(N, L, mimg, vec, proj)
+            mcol = N.new('ShaderNodeMix'); mcol.data_type = 'RGBA'
+            L.new(mi.outputs["Color"], mcol.inputs[0])
+            L.new(base_out, mcol.inputs[6])
+            mcol.inputs[7].default_value = lin4(mask_color if mask_color is not None else color)
+            base_out = mcol.outputs[2]
+            if mask_metal is not None:
+                mm = N.new('ShaderNodeMix'); mm.data_type = 'FLOAT'
+                L.new(mi.outputs["Color"], mm.inputs[0])
+                mm.inputs[2].default_value = metal
+                mm.inputs[3].default_value = mask_metal
+                metal_out = mm.outputs[0]
+            if mask_rough is not None:
+                mr = N.new('ShaderNodeMix'); mr.data_type = 'FLOAT'
+                L.new(mi.outputs["Color"], mr.inputs[0])
+                mr.inputs[2].default_value = rough
+                mr.inputs[3].default_value = mask_rough
+                rough_out = mr.outputs[0]
+    L.new(base_out, bsdf.inputs["Base Color"])
+    if metal_out is not None:
+        L.new(metal_out, bsdf.inputs["Metallic"])
+    else:
+        bsdf.inputs["Metallic"].default_value = metal
+    if rough_out is None and rough_var > 0:
+        # procedural roughness break-up (smudges / wear), object-space noise
+        nz = N.new('ShaderNodeTexNoise'); nz.inputs["Scale"].default_value = rough_scale; nz.inputs["Detail"].default_value = 6.0
+        L.new(_rest_vec(N, L, 1.0), nz.inputs["Vector"])
+        mr = N.new('ShaderNodeMapRange')
+        mr.inputs["From Min"].default_value = 0.3; mr.inputs["From Max"].default_value = 0.7
+        mr.inputs["To Min"].default_value = max(0.0, rough - rough_var); mr.inputs["To Max"].default_value = min(1.0, rough + rough_var)
+        L.new(nz.outputs["Fac"], mr.inputs["Value"])
+        rough_out = mr.outputs["Result"]
+    if rough_out is not None:
+        L.new(rough_out, bsdf.inputs["Roughness"])
+    else:
+        bsdf.inputs["Roughness"].default_value = rough
+    bsdf.inputs["Specular IOR Level"].default_value = spec
+    bsdf.inputs["Sheen Weight"].default_value = sheen
+    bsdf.inputs["Sheen Roughness"].default_value = sheen_rough
+    bsdf.inputs["Subsurface Weight"].default_value = sss
+    bsdf.inputs["Subsurface Radius"].default_value = sss_radius
+    bsdf.inputs["Subsurface Scale"].default_value = sss_scale
+    bsdf.inputs["Coat Weight"].default_value = coat
+    bsdf.inputs["Coat Roughness"].default_value = coat_rough
+    bsdf.inputs["Anisotropic"].default_value = aniso
+    if emis > 0:
+        L.new(base_out, bsdf.inputs["Emission Color"])
+        bsdf.inputs["Emission Strength"].default_value = emis * 3.0
+    if bump:
+        bimg = _img(bump, True)
+        if bimg is not None:
+            bi = _tex_node(N, L, bimg, vec, proj)
+            bp = N.new('ShaderNodeBump')
+            bp.inputs["Strength"].default_value = bump_strength
+            bp.inputs["Distance"].default_value = bump_dist
+            L.new(bi.outputs["Color"], bp.inputs["Height"])
+            L.new(bp.outputs["Normal"], bsdf.inputs["Normal"])
+            if coat > 0:
+                L.new(bp.outputs["Normal"], bsdf.inputs["Coat Normal"])
+    if nrm and not bump:
+        nimg = _img(nrm, True)
+        if nimg is not None:
+            ni = _tex_node(N, L, nimg, vec, 'UV')
+            nm = N.new('ShaderNodeNormalMap'); nm.uv_map = "UVMap"
+            nm.inputs["Strength"].default_value = nrm_strength
+            L.new(ni.outputs["Color"], nm.inputs["Color"])
+            L.new(nm.outputs["Normal"], bsdf.inputs["Normal"])
+            if coat > 0:
+                L.new(nm.outputs["Normal"], bsdf.inputs["Coat Normal"])
+    if flags & F_DOUBLE:
+        bm.use_backface_culling = False
+    if flags & F_NOCAST:
+        bm.shadow_method = 'NONE'
+    if flags & F_DECAL:
+        bm.blend_method = 'BLEND'
+        bm.shadow_method = 'NONE'
+        if img is not None:
+            ti_nodes = [n for n in N if n.type == 'TEX_IMAGE' and n.image == img]
+            if ti_nodes:
+                L.new(ti_nodes[0].outputs["Alpha"], bsdf.inputs["Alpha"])
+    gm.bmat = bm
+    _MATS[name] = gm
+    return gm
+
+
+def outline_color(rgb_hex):
+    m = outline_material()
+    for n in m.node_tree.nodes:
+        if n.type == 'EMISSION':
+            n.inputs[0].default_value = lin4(rgb_hex)

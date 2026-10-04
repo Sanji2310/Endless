@@ -114,3 +114,93 @@ def poster(x, levels, mix=0.6):
     """Partial posterisation for the painted look."""
     q = np.round(x * levels) / levels
     return x * (1 - mix) + q * mix
+
+
+# ----------------------------------------------------------------------------- vector painting (decals)
+
+def _grid(w, h):
+    ys, xs = np.mgrid[0:h, 0:w].astype(np.float32)
+    return xs + 0.5, ys + 0.5
+
+
+def _seg_dist(xs, ys, ax, ay, bx, by):
+    """Distance from every pixel to segment a-b, and the segment parameter t."""
+    dx, dy = bx - ax, by - ay
+    L2 = dx * dx + dy * dy
+    t = np.clip(((xs - ax) * dx + (ys - ay) * dy) / max(L2, 1e-12), 0.0, 1.0)
+    px, py = ax + t * dx - xs, ay + t * dy - ys
+    return np.sqrt(px * px + py * py), t
+
+
+def poly_cov(w, h, pts, soft=1.0):
+    """Anti-aliased coverage (0..1) of a closed polygon (pixel coords, y down). soft: edge width in px."""
+    xs, ys = _grid(w, h)
+    inside = np.zeros((h, w), bool)
+    dist = np.full((h, w), 1e9, np.float32)
+    n = len(pts)
+    for i in range(n):
+        ax, ay = pts[i]
+        bx, by = pts[(i + 1) % n]
+        if (ay > ys[:, :1]).any() or True:
+            cond = ((ay > ys) != (by > ys)) & (xs < (bx - ax) * (ys - ay) / ((by - ay) if by != ay else 1e-12) + ax)
+            inside ^= cond
+        d, _ = _seg_dist(xs, ys, ax, ay, bx, by)
+        dist = np.minimum(dist, d)
+    sd = np.where(inside, dist, -dist)
+    return np.clip(0.5 + sd / max(soft, 1e-6), 0.0, 1.0)
+
+
+def stroke_cov(w, h, pts, widths, soft=1.0):
+    """Coverage of a polyline with per-point half-widths (px), round joins."""
+    xs, ys = _grid(w, h)
+    best = np.full((h, w), -1e9, np.float32)
+    for i in range(len(pts) - 1):
+        (ax, ay), (bx, by) = pts[i], pts[i + 1]
+        d, t = _seg_dist(xs, ys, ax, ay, bx, by)
+        hw = widths[i] + (widths[i + 1] - widths[i]) * t
+        best = np.maximum(best, hw - d)
+    return np.clip(0.5 + best / max(soft, 1e-6), 0.0, 1.0)
+
+
+def ellipse_cov(w, h, cx, cy, rx, ry, rot=0.0, soft=1.0):
+    xs, ys = _grid(w, h)
+    c, s = np.cos(np.radians(rot)), np.sin(np.radians(rot))
+    u = ((xs - cx) * c + (ys - cy) * s) / rx
+    v = (-(xs - cx) * s + (ys - cy) * c) / ry
+    r = np.sqrt(u * u + v * v)
+    return np.clip(0.5 + (1.0 - r) * min(rx, ry) / max(soft, 1e-6), 0.0, 1.0)
+
+
+def over(img, alpha, color, a):
+    """Alpha-over a flat colour (hex or rgb array, or HxWx3 image) with coverage a into img/alpha (in place)."""
+    col = rgb(color) if isinstance(color, int) else np.asarray(color)
+    if col.ndim == 1:
+        col = col[None, None, :]
+    a3 = a[..., None]
+    img[:] = img * (1 - a3) + col * a3
+    alpha[:] = alpha + a * (1 - alpha)
+
+
+def bezier2d(p0, p1, p2, p3, n=48):
+    out = []
+    for i in range(n):
+        t = i / (n - 1)
+        mt = 1 - t
+        out.append((mt ** 3 * p0[0] + 3 * mt * mt * t * p1[0] + 3 * mt * t * t * p2[0] + t ** 3 * p3[0],
+                    mt ** 3 * p0[1] + 3 * mt * mt * t * p1[1] + 3 * mt * t * t * p2[1] + t ** 3 * p3[1]))
+    return out
+
+
+def normal_from_height(hgt, strength=2.0):
+    """Tangent-space (OpenGL, +Y up) normal map from a periodic height field (row 0 = top)."""
+    gx = (np.roll(hgt, -1, 1) - np.roll(hgt, 1, 1)) * 0.5
+    gy = (np.roll(hgt, 1, 0) - np.roll(hgt, -1, 0)) * 0.5      # +v is up (rows go down)
+    nx, ny = -gx * strength, -gy * strength
+    nz = np.ones_like(nx)
+    ln = np.sqrt(nx * nx + ny * ny + nz * nz)
+    return np.stack([nx / ln * 0.5 + 0.5, ny / ln * 0.5 + 0.5, nz / ln * 0.5 + 0.5], -1)
+
+
+def write_gray(name, g):
+    g = np.clip(g, 0, 1)
+    return write_png(name, np.repeat(g[..., None], 3, 2))

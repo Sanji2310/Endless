@@ -56,16 +56,25 @@ def _ccw(pts):
     return pts if a > 0 else pts[::-1]
 
 
-def eye_g(name="d_eye_pongo_g", size=512, top=COL["iris_top"], mid=COL["iris_mid"], bot=COL["iris_bot"]):
+EYE_CHEER = dict(lid_top=((30, 112), (66, 204), (176, 214), (232, 150)), lid_bot=((232, 150), (210, 70), (92, 50), (30, 112)),
+                 iris=(136, 122, 60, 80), crease=((58, 186), (96, 222), (170, 228), (214, 188)), hl=1.0)
+# calm, determined gaze: flatter upper lid resting low on the iris, lifted lower lid, sharper outer corner
+EYE_CALM = dict(lid_top=((28, 114), (70, 190), (178, 202), (238, 158)), lid_bot=((238, 158), (216, 92), (100, 66), (28, 114)),
+                iris=(138, 126, 55, 74), crease=((56, 178), (96, 210), (172, 216), (222, 180)), hl=0.82)
+
+
+def eye_g(name="d_eye_pongo_g", size=512, top=COL["iris_top"], mid=COL["iris_mid"], bot=COL["iris_bot"], shape=None):
     """Layered anime eye (outer corner at the right of the texture):
     almond white with lid shadow, tall gradient iris with ring, radial streaks and pupil,
     soft lower glow, two crisp highlights, thick upper lash line with outer wings,
     double-lid crease and a fine lower lash."""
+    sh_ = shape or EYE_CHEER
     c = PT.Canvas(name, size, size)
     s = size / 256.0
     S = lambda pts: [(x * s, y * s) for (x, y) in pts]
-    topc = FA._bez((30, 112), (66, 204), (176, 214), (232, 150), 28)
-    botc = FA._bez((232, 150), (210, 70), (92, 50), (30, 112), 28)
+    topc = FA._bez(*sh_["lid_top"], 28)
+    botc = FA._bez(*sh_["lid_bot"], 28)
+    ox, oy = sh_["lid_top"][3][0] - 232, sh_["lid_top"][3][1] - 150      # outer-corner shift for the lash wings
     almond = _ccw(topc[:-1] + botc[:-1])
     A = S(almond)
     c.poly(A, 0xFFFFFF)
@@ -76,7 +85,7 @@ def eye_g(name="d_eye_pongo_g", size=512, top=COL["iris_top"], mid=COL["iris_mid
     band2 = FA._clip(S([(0, 168), (256, 186), (256, 256), (0, 256)]), A)
     if band2:
         c.poly(band2, 0xA9A6DA)
-    icx, icy, irx, iry = 136, 122, 60, 80
+    icx, icy, irx, iry = sh_["iris"]
     ringp = FA._clip(S(FA._ellipse(icx, icy, irx, iry, 72)), A)
     if ringp:
         c.poly(ringp, E.shade_hex(top, 0.7))
@@ -91,12 +100,23 @@ def eye_g(name="d_eye_pongo_g", size=512, top=COL["iris_top"], mid=COL["iris_mid
             cols.append((col, 1.0))
         c.gradient_poly(ir, cols)
         # radial streaks (iris fibres)
+        def inside(q):
+            return all((almond[(j + 1) % len(almond)][0] - almond[j][0]) * (q[1] - almond[j][1]) -
+                       (almond[(j + 1) % len(almond)][1] - almond[j][1]) * (q[0] - almond[j][0]) >= 0
+                       for j in range(len(almond)))
         for k in range(26):
             a = 2 * math.pi * k / 26 + 0.07 * math.sin(k * 3.1)
             r0, r1 = 0.36, 0.86
             p0 = (icx + math.cos(a) * irx * r0, icy + math.sin(a) * iry * r0)
-            p1 = (icx + math.cos(a) * irx * r1, icy + math.sin(a) * iry * r1)
-            seg = FA._clip(S([p0, (p0[0] + 0.6, p0[1] + 0.6), (p1[0] + 0.6, p1[1] + 0.6), p1]), A)
+            if not inside(p0):
+                continue
+            # trim the streak where it leaves the eye opening (no lines leaking onto the skin)
+            rr = r0
+            while rr < r1 and inside((icx + math.cos(a) * irx * (rr + 0.04), icy + math.sin(a) * iry * (rr + 0.04))):
+                rr += 0.04
+            if rr - r0 < 0.1:
+                continue
+            p1 = (icx + math.cos(a) * irx * rr, icy + math.sin(a) * iry * rr)
             c.stroke(S([p0, p1]), 2.2 * s, 0.6 * s, E.mix_hex(mid, 0xFFFFFF, 0.5) if k % 2 else E.shade_hex(top, 0.9),
                      0.35, cap=False)
         # mid ring around the pupil
@@ -114,21 +134,23 @@ def eye_g(name="d_eye_pongo_g", size=512, top=COL["iris_top"], mid=COL["iris_mid
     if lid:
         c.poly(lid, 0x2A1430, 0.38)
     # highlights: big soft-edged one up-left, small crisp one low-right, a tiny sparkle
-    c.ellipse((icx - 24) * s, (icy + 34) * s, 19 * s, 14 * s, 0xFFFFFF, rot=-25)
-    c.ellipse((icx + 28) * s, (icy - 28) * s, 8 * s, 6 * s, 0xFFFFFF, rot=-25)
-    c.circle((icx - 4) * s, (icy - 40) * s, 4 * s, 0xFFF6D8, 0.9)
+    h = sh_["hl"]
+    c.ellipse((icx - 24) * s, (icy + 30) * s, 19 * s * h, 14 * s * h, 0xFFFFFF, rot=-25)
+    c.ellipse((icx + 26) * s, (icy - 26) * s, 8 * s * h, 6 * s * h, 0xFFFFFF, rot=-25)
+    c.circle((icx - 4) * s, (icy - 38) * s, 4 * s * h, 0xFFF6D8, 0.9)
     # upper lash line: thick tapered band following the top lid, heavier toward the outer corner
     lash = 0x23171F
     up = S(topc)
     c.stroke(up, 6 * s, 15 * s, lash)
     # outer wings and lash spikes
-    c.curve(S([(220, 156)])[0], S([(236, 166)])[0], S([(246, 180)])[0], S([(254, 196)])[0], 12 * s, 1.5 * s, lash)
-    c.curve(S([(214, 160)])[0], S([(228, 166)])[0], S([(240, 168)])[0], S([(252, 166)])[0], 8 * s, 1.2 * s, lash)
-    c.curve(S([(196, 178)])[0], S([(206, 190)])[0], S([(214, 198)])[0], S([(222, 206)])[0], 5 * s, 1 * s, lash)
+    W = lambda x, y: S([(min(255.0, x + ox), y + oy)])[0]
+    c.curve(W(220, 156), W(236, 166), W(246, 180), W(254, 196), 12 * s, 1.5 * s, lash)
+    c.curve(W(214, 160), W(228, 166), W(240, 168), W(252, 166), 8 * s, 1.2 * s, lash)
+    c.curve(W(196, 178), W(206, 190), W(214, 198), W(222, 206), 5 * s, 1 * s, lash)
     # inner-corner hook
     c.curve(S([(32, 114)])[0], S([(26, 110)])[0], S([(22, 104)])[0], S([(20, 98)])[0], 4 * s, 1 * s, lash)
     # double-lid crease
-    crease = S(FA._bez((58, 186), (96, 222), (170, 228), (214, 188), 20))
+    crease = S(FA._bez(*sh_["crease"], 20))
     c.stroke(crease, 1.5 * s, 3.2 * s, 0x8A5C5C, 0.55)
     # fine lower lash (outer two thirds) with a couple of short spikes
     low = S(botc[:int(len(botc) * 0.6)])
@@ -153,16 +175,22 @@ def mouth_g(name="d_mouth_pongo_g", w=256, h=128, kind="open"):
         c.poly(FA._clip([(70, 72), (186, 72), (186, 84), (70, 84)], shape) or [(0, 0), (1, 0), (1, 1)], 0xFFFFFF, 0.95)
         c.stroke(top, 5, 6, line)
         c.stroke(FA._bez((104, 30), (118, 24), (138, 24), (152, 30), 10), 3, 3, 0xE07A80, 0.6)
+    elif kind == "calm":
+        # small closed mouth: a short level line, heavier in the middle, soft lower-lip shade beneath
+        c.ellipse(128, 50, 26, 9, 0xE98F93, 0.4)
+        c.curve((84, 66), (100, 71), (114, 73), (128, 73), 5.0, 11.0, line)
+        c.curve((128, 73), (142, 73), (156, 71), (172, 66), 11.0, 5.0, line)
+        c.stroke([(112, 40), (144, 40)], 4.0, 4.0, 0xC86A72, 0.45)
     else:
         c.curve((80, 74), (104, 60), (152, 60), (176, 74), 5, 5, line)
     return c.save()
 
 
-def blush_g(name="d_blush_g", w=256, h=128):
+def blush_g(name="d_blush_g", w=256, h=128, alpha=0.5, hatch=3):
     c = PT.Canvas(name, w, h)
-    c.radial(128, 64, 0, 120, 0xFF8FA0, 0xFF8FA0, 0.5, 0.0, 64, 1.0, 0.45)
-    for i in range(3):
-        x = 96 + i * 26
+    c.radial(128, 64, 0, 120, 0xFF8FA0, 0xFF8FA0, alpha, 0.0, 64, 1.0, 0.45)
+    for i in range(hatch):
+        x = 96 + i * 26 + (13 if hatch == 2 else 0)
         c.stroke([(x, 52), (x + 10, 78)], 4, 2, 0xF06A82, 0.4)
     return c.save()
 
@@ -170,9 +198,12 @@ def blush_g(name="d_blush_g", w=256, h=128):
 def build_face_art():
     E.reset()
     eye_g()
+    eye_g("d_eye_pongo_g_calm", shape=EYE_CALM)
     mouth_g()
     mouth_g("d_mouth_pongo_g_closed", kind="closed")
+    mouth_g("d_mouth_pongo_g_calm", kind="calm")
     blush_g()
+    blush_g("d_blush_g_soft", alpha=0.3, hatch=2)
 
 
 # ============================================================================ proportions / head
@@ -187,15 +218,15 @@ class Girl(CH.Body):
 
 
 HEAD_KEYS_G = [
-    (-1.00, 0.10, 0.50, 0.05, 0.32, 2.4),
-    (-0.975, 0.2, 0.555, 0.08, 0.30, 2.3),
-    (-0.93, 0.305, 0.62, 0.13, 0.27, 2.15),
-    (-0.86, 0.425, 0.69, 0.21, 0.22, 2.05),
-    (-0.77, 0.56, 0.775, 0.33, 0.16, 2.0),
-    (-0.65, 0.685, 0.85, 0.48, 0.10, 2.05),
-    (-0.52, 0.775, 0.90, 0.66, 0.05, 2.1),
-    (-0.36, 0.85, 0.93, 0.83, 0.01, 2.2),
-    (-0.15, 0.89, 0.95, 0.97, -0.01, 2.2),
+    (-1.00, 0.09, 0.50, 0.05, 0.32, 2.2),
+    (-0.975, 0.175, 0.555, 0.08, 0.30, 2.1),
+    (-0.93, 0.27, 0.62, 0.13, 0.27, 2.0),
+    (-0.86, 0.385, 0.69, 0.21, 0.22, 1.95),
+    (-0.77, 0.515, 0.77, 0.33, 0.16, 1.95),
+    (-0.65, 0.645, 0.84, 0.48, 0.10, 2.0),
+    (-0.52, 0.745, 0.89, 0.66, 0.05, 2.1),
+    (-0.36, 0.83, 0.925, 0.83, 0.01, 2.2),
+    (-0.15, 0.88, 0.95, 0.97, -0.01, 2.2),
     (0.10, 0.90, 0.94, 1.03, -0.02, 2.1),
     (0.30, 0.875, 0.90, 1.04, -0.02, 2.0),
     (0.50, 0.81, 0.82, 0.98, -0.02, 2.0),
@@ -213,9 +244,10 @@ def mats():
     M("g_hair", 0xFFFFFF, "g_hair_grad", flags=E.F_HAIR, spec=0.05, rim=0.05, soft=0.05, shadow=0x7E86D8)
     M("g_hair_tie", COL["orange"], spec=0.3, rim=0.3, soft=0.08)
     M("g_brow", COL["brow"], rim=0.0, soft=0.05, outline=0.0)
-    M("g_eye", 0xFFFFFF, "d_eye_pongo_g", flags=E.F_DECAL | E.F_NOCAST, outline=0, rim=0, spec=0, soft=0.02)
-    M("g_mouth", 0xFFFFFF, "d_mouth_pongo_g", flags=E.F_DECAL | E.F_NOCAST, outline=0, rim=0, soft=0.02)
-    M("g_blush", 0xFFFFFF, "d_blush_g", flags=E.F_DECAL | E.F_NOCAST, outline=0, rim=0)
+    M("g_eye", 0xFFFFFF, "d_eye_pongo_g_calm", flags=E.F_DECAL | E.F_NOCAST, outline=0, rim=0, spec=0, soft=0.02)
+    M("g_mouth", 0xFFFFFF, "d_mouth_pongo_g_calm", flags=E.F_DECAL | E.F_NOCAST, outline=0, rim=0, soft=0.02)
+    M("g_blush", 0xFFFFFF, "d_blush_g_soft", flags=E.F_DECAL | E.F_NOCAST, outline=0, rim=0)
+    M("g_lash", 0x23171F, rim=0.0, soft=0.05, outline=0.0, flags=E.F_DOUBLE)
     M("g_bandaid", 0xF6DDBE, outline=0.0, rim=0.1, soft=0.1)
     M("g_bandaid_pad", 0xEBCBA3, outline=0.0, rim=0.0, soft=0.1)
 
@@ -246,7 +278,7 @@ def hair_gradient(name="g_hair_grad", w=128, h=512):
 
 def head(B):
     hd = P4.head4(B, "g_skin", "pongo_head", rings=36, seg=44, keys=HEAD_KEYS_G)
-    P4.face_normals_gfn(hd, B, bend=8.0, bend_top=-0.5, xs_mid=1.04, xs_low=0.93, width=0.9, flat_z=0.35)
+    P4.face_normals_gfn(hd, B, bend=8.0, bend_top=-0.5, xs_mid=1.03, xs_low=0.9, width=0.88, flat_z=0.35)
     return hd
 
 
@@ -256,7 +288,8 @@ def face(B, hd):
     c = B.headc
     r = B.head_r
     m = E.Mesher("pongo_face")
-    eye_w, eye_h, eye_x, eye_z = 0.092, 0.086, 0.045, -0.034
+    eye_w, eye_h, eye_x, eye_z = 0.082, 0.0765, 0.044, -0.034
+    brow_z = eye_z + 0.086 * 0.56                     # brow height from the original eye size
     m.mat("g_eye")
     for side in (1, -1):
         CH.project_decal(m, bvh, side * eye_x, c.z + eye_z, eye_w, eye_h, 9, 9, off=0.0012, mirror=(side < 0))
@@ -265,18 +298,34 @@ def face(B, hd):
     m.mat("g_blush")
     for side in (1, -1):
         CH.project_decal(m, bvh, side * 0.054, c.z - 0.06, 0.036, 0.018, 7, 5, off=0.0009)
-    # brows: thin tapered strokes, gently arched, slightly raised (energetic)
+    # brows: straight, set a little lower, heavier at the head with a slight inner furrow (calm, determined)
     m.mat("g_brow")
     for side in (1, -1):
         pts2 = []
-        for i in range(9):
-            t = i / 8
-            x = side * (eye_x - eye_w * 0.38 + t * eye_w * 0.86)
-            z = c.z + eye_z + eye_h * 0.66 + 0.011 * math.sin(math.pi * (0.15 + 0.85 * t)) - 0.003 * t
+        for i in range(11):
+            t = i / 10
+            x = side * (eye_x - eye_w * 0.36 + t * eye_w * 0.86)
+            z = (c.z + brow_z + 0.0045 * math.sin(math.pi * min(1.0, t * 1.1)) + 0.002 * t
+                 - 0.0022 * (1 - t) ** 3)
             pts2.append((x, z))
         path = CH.surface_path(bvh, pts2, 0.0015)
         m.sweep(path, [(-1, -0.3), (1, -0.3), (1, 0.3), (-1, 0.3)], closed=True, cap=True,
-                scale=lambda t: (0.0034 * (1.0 - 0.7 * t) + 0.0005, 0.003), up=(0, 1, 0))
+                scale=lambda t: (0.0036 * (1.0 - 0.72 * t ** 0.9) + 0.0005, 0.003), up=(0, 1, 0))
+    # 3D lash flicks at the outer corners: silhouette depth in 3/4 views
+    m.mat("g_lash")
+    for side in (1, -1):
+        u, v = EYE_CALM["lid_top"][3][0] / 256.0, EYE_CALM["lid_top"][3][1] / 256.0
+        x0 = side * (eye_x - eye_w / 2 + u * eye_w)
+        z0 = c.z + eye_z - eye_h / 2 + v * eye_h
+        hit = bvh.ray_cast(V((x0, 1.0, z0)), V((0, -1, 0)))
+        if hit[0] is None:
+            continue
+        base, nrm = hit[0] + hit[1] * 0.0012, hit[1]
+        for (L, up, out, w) in ((0.0105, 0.55, 1.0, 0.0016), (0.0075, 0.15, 1.0, 0.0012), (0.006, 0.95, 0.55, 0.001)):
+            d = (V((side * out, 0.0, up)) + nrm * 0.35).normalized()
+            path = [base, base + d * L * 0.5 + nrm * 0.0012, base + d * L + V((0, 0, 0.0015))]
+            m.sweep(path, [(-1, -0.25), (1, -0.25), (1, 0.25), (-1, 0.25)], closed=True, cap=True,
+                    scale=lambda t, w=w: (w * max(0.08, 1 - t ** 1.2), w * 0.5), up=(0, 1, 0))
     # nose: tiny soft tip, reads as a single small highlight/shadow
     m.mat("g_skin_detail")
     m.push(CH.surface_frame(bvh, 0.0, c.z - 0.06, -0.0006))
@@ -287,10 +336,10 @@ def face(B, hd):
     # band-aid on HER left cheek (-X), below the eye, slight tilt
     # band-aid: a strip projected onto the cheek (follows the surface), pad in the middle
     m.mat("g_bandaid")
-    bf = CH.project_decal(m, bvh, -0.05, c.z - 0.077, 0.027, 0.0095, 7, 3, off=0.0011,
-                          curve_z=lambda u: (u - 0.5) * 0.007)
+    bf = CH.project_decal(m, bvh, -0.043, c.z - 0.071, 0.022, 0.0085, 7, 3, off=0.0011,
+                          curve_z=lambda u: (u - 0.5) * 0.006)
     m.mat("g_bandaid_pad")
-    CH.project_decal(m, bvh, -0.05, c.z - 0.077, 0.0085, 0.007, 3, 3, off=0.0016)
+    CH.project_decal(m, bvh, -0.043, c.z - 0.071, 0.0072, 0.0062, 3, 3, off=0.0016)
     return m.obj("pongo_face", smooth_angle=60)
 
 
@@ -644,26 +693,26 @@ def body_mats():
 
 
 TORSO_KEYS = [
-    # z      w      f      b      cy
-    (0.66, 0.122, 0.074, 0.088, 0.000),
-    (0.71, 0.131, 0.078, 0.096, 0.000),
-    (0.76, 0.128, 0.076, 0.094, 0.000),
-    (0.81, 0.115, 0.070, 0.082, 0.002),
-    (0.86, 0.098, 0.066, 0.072, 0.004),
-    (0.91, 0.100, 0.068, 0.072, 0.006),
-    (0.96, 0.108, 0.072, 0.074, 0.008),
-    (1.01, 0.114, 0.078, 0.076, 0.010),
-    (1.06, 0.118, 0.080, 0.078, 0.010),
-    (1.11, 0.122, 0.076, 0.078, 0.008),
-    (1.15, 0.124, 0.068, 0.074, 0.004),
-    (1.18, 0.104, 0.056, 0.062, 0.000),
-    (1.205, 0.06, 0.042, 0.046, -0.002),
-    (1.22, 0.042, 0.036, 0.038, -0.003),
+    # z      w      f      b      cy        (slim build: narrow waist, slender hips and ribcage)
+    (0.66, 0.108, 0.066, 0.078, 0.000),
+    (0.71, 0.116, 0.070, 0.086, 0.000),
+    (0.76, 0.112, 0.068, 0.083, 0.000),
+    (0.81, 0.099, 0.062, 0.072, 0.002),
+    (0.86, 0.084, 0.058, 0.063, 0.004),
+    (0.91, 0.087, 0.060, 0.063, 0.006),
+    (0.96, 0.096, 0.064, 0.066, 0.008),
+    (1.01, 0.104, 0.070, 0.069, 0.010),
+    (1.06, 0.109, 0.072, 0.071, 0.010),
+    (1.11, 0.114, 0.069, 0.071, 0.008),
+    (1.15, 0.117, 0.062, 0.068, 0.004),
+    (1.18, 0.099, 0.051, 0.057, 0.000),
+    (1.205, 0.056, 0.038, 0.042, -0.002),
+    (1.22, 0.038, 0.033, 0.035, -0.003),
 ]
 
 
 def bust(z):
-    return 0.028 * math.exp(-((z - 1.045) / 0.045) ** 2)
+    return 0.024 * math.exp(-((z - 1.045) / 0.045) ** 2)
 
 
 def torso_ring(z, n, grow=0.0, keys=TORSO_KEYS):
@@ -710,19 +759,19 @@ def sports_top(m, B, n=36):
 def neck_g(m, B):
     m.mat("g_skin")
     CH.limb(m, [V((0, -0.004, 1.17)), V((0, -0.002, 1.215)), V((0, 0.0, 1.26)), V((0, 0.006, 1.3))],
-            [(0.042, 0.04), (0.034, 0.033), (0.031, 0.031), (0.03, 0.03)], n=20)
+            [(0.037, 0.035), (0.03, 0.029), (0.0275, 0.0275), (0.0265, 0.0265)], n=20)
 
 
 def choker(m, B):
     m.mat("g_choker")
-    m.torus((0, -0.001, 1.235), R=0.0335, r=0.0042, seg=36, sides=8)
+    m.torus((0, -0.001, 1.235), R=0.0298, r=0.0038, seg=36, sides=8)
     m.mat("g_charm")
     # small orange star charm hanging at the front
-    m.push(Matrix.Translation((0, 0.036, 1.222)) @ Matrix.Rotation(math.radians(90), 4, 'X'))
+    m.push(Matrix.Translation((0, 0.0322, 1.222)) @ Matrix.Rotation(math.radians(90), 4, 'X'))
     m.extrude(E.star_pts(5, 0.009, 0.0042), 0.003, bevel=(0.0008, 1))
     m.pop()
     m.mat("g_zip")
-    m.torus((0, 0.0355, 1.2315), R=0.0025, r=0.0008, seg=10, sides=4, axis='Y')
+    m.torus((0, 0.0318, 1.2315), R=0.0025, r=0.0008, seg=10, sides=4, axis='Y')
 
 
 def arms_g(m, B):
@@ -735,7 +784,7 @@ def arms_g(m, B):
         m.mat("g_skin")
         pts = [sh + V((-side * 0.015, 0, 0)), sh.lerp(el, 0.35), sh.lerp(el, 0.7), el, el.lerp(w, 0.25), el.lerp(w, 0.55),
                el.lerp(w, 0.85), w + d * 0.006]
-        rad = [0.042, 0.038, 0.033, 0.03, 0.031, 0.028, 0.024, 0.022]
+        rad = [0.035, 0.031, 0.027, 0.0245, 0.026, 0.0235, 0.0202, 0.0186]
         CH.limb(m, pts, [(r, r * 0.92) for r in rad], n=18)
 
 
@@ -748,8 +797,8 @@ def legs_g(m, B):
         m.mat("g_skin")
         pts = [h + V((side * 0.008, 0, 0.04)), h.lerp(k, 0.25), h.lerp(k, 0.55), h.lerp(k, 0.85), k, k.lerp(a, 0.15),
                k.lerp(a, 0.35), k.lerp(a, 0.6), k.lerp(a, 0.85), a + V((0, 0, 0.012))]
-        rad = [(0.072, 0.068), (0.066, 0.064), (0.056, 0.054), (0.045, 0.044), (0.042, 0.043), (0.042, 0.044),
-               (0.043, 0.047), (0.036, 0.038), (0.029, 0.029), (0.026, 0.027)]
+        rad = [(0.061, 0.058), (0.056, 0.054), (0.047, 0.046), (0.038, 0.038), (0.035, 0.036), (0.036, 0.038),
+               (0.037, 0.041), (0.031, 0.033), (0.025, 0.025), (0.0225, 0.0235)]
         CH.limb(m, pts, rad, n=20)
 
 
@@ -763,7 +812,7 @@ def socks_g(m, B):
         d = (top - a).normalized()
         stripes = [(top.z - 0.03, top.z - 0.02), (top.z - 0.05, top.z - 0.04)]
         cuts = sorted(set([0.0, 0.2, 0.45, 0.62, 0.75, 0.85] + [((z - a.z) / (top.z - a.z)) for st in stripes for z in st] + [1.0]))
-        prof = [(0.0, 0.031), (0.2, 0.0315), (0.45, 0.039), (0.7, 0.0465), (0.85, 0.047), (1.0, 0.047)]
+        prof = [(0.0, 0.0268), (0.2, 0.0272), (0.45, 0.0335), (0.7, 0.0405), (0.85, 0.041), (1.0, 0.041)]
         def rad(t):
             for i in range(len(prof) - 1):
                 if prof[i][0] <= t <= prof[i + 1][0]:
@@ -772,7 +821,7 @@ def socks_g(m, B):
             return prof[-1][1]
         pts = [a.lerp(top, t) for t in cuts]
         m.mat("g_sock")
-        fs = CH.limb(m, pts, [(rad(t), rad(t) * 1.04) for t in cuts], n=22, cap=False)
+        fs = CH.limb(m, pts, [(rad(t), rad(t) * 1.06) for t in cuts], n=22, cap=False)
         si = m.mats.index("g_sock_stripe") if "g_sock_stripe" in m.mats else (m.mats.append("g_sock_stripe") or len(m.mats) - 1)
         for f in fs:
             z = f.calc_center_median().z
@@ -780,7 +829,7 @@ def socks_g(m, B):
                 if z0 < z < z1:
                     f.material_index = si
         m.mat("g_sock")
-        m.torus(tuple(top), R=0.0475, r=0.0042, seg=28, sides=8)
+        m.torus(tuple(top), R=0.0418, r=0.0038, seg=28, sides=8)
 
 
 def shorts_g(m, B, n=40):
@@ -795,10 +844,10 @@ def shorts_g(m, B, n=40):
         top = h + V((side * 0.012, 0, 0.02))
         bot = h.lerp(k, 0.3)
         d = (bot - top).normalized()
-        fs = CH.limb(m, [top, top.lerp(bot, 0.5), bot - d * 0.01, bot], [(0.08, 0.076), (0.077, 0.074), (0.074, 0.072), (0.075, 0.073)],
+        fs = CH.limb(m, [top, top.lerp(bot, 0.5), bot - d * 0.01, bot], [(0.069, 0.066), (0.066, 0.063), (0.063, 0.061), (0.064, 0.062)],
                      n=24, cap=False)
         # hem cuff
-        m.torus(tuple(bot), R=0.074, r=0.005, seg=28, sides=8, axis='Z')
+        m.torus(tuple(bot), R=0.063, r=0.0045, seg=28, sides=8, axis='Z')
     # belt: orange band + metal buckle + belt loops
     m.mat("g_belt")
     m.quad_strip([torso_ring(0.86, n, 0.014), torso_ring(0.885, n, 0.014)], closed=True)
@@ -883,7 +932,7 @@ def jacket(B, n=40):
     crow = []
     for j in range(4):
         z = 1.2 + 0.02 * j
-        r0 = 0.05 + 0.006 * j
+        r0 = 0.0445 + 0.006 * j
         ring = []
         for i in range(n + 1):
             th = math.radians(28) + (2 * math.pi - math.radians(56)) * i / n
@@ -913,7 +962,7 @@ def jacket(B, n=40):
         start = sh + V((-side * 0.03, 0, 0.012))
         end = el - d * 0.01
         pts = [start, sh.lerp(el, 0.15), sh.lerp(el, 0.45), sh.lerp(el, 0.75), end]
-        rad = [(0.056, 0.06), (0.054, 0.056), (0.05, 0.051), (0.047, 0.047), (0.046, 0.046)]
+        rad = [(0.049, 0.052), (0.047, 0.049), (0.043, 0.044), (0.04, 0.04), (0.039, 0.039)]
         sm.mat("g_jacket")
         fs = CH.limb(sm, pts, rad, n=24, cap=False)
         bi = sm.mats.index("g_jacket_blue") if "g_jacket_blue" in sm.mats else (sm.mats.append("g_jacket_blue") or len(sm.mats) - 1)
@@ -931,9 +980,9 @@ def jacket(B, n=40):
         sm.mat("g_jacket")
         R = d.to_track_quat('Z', 'Y').to_matrix().to_4x4()
         sm.push(Matrix.Translation(end) @ R)
-        sm.torus((0, 0, 0), R=0.047, r=0.009, seg=28, sides=10)
+        sm.torus((0, 0, 0), R=0.04, r=0.0082, seg=28, sides=10)
         sm.mat("g_jacket_blue")
-        sm.torus((0, 0, 0.004), R=0.0505, r=0.0035, seg=28, sides=6)
+        sm.torus((0, 0, 0.004), R=0.0435, r=0.0032, seg=28, sides=6)
         sm.pop()
     sleeves = sm.obj("pongo_sleeves", smooth_angle=180, subsurf=SUB())
     E.apply_modifiers(sleeves)
@@ -958,7 +1007,9 @@ def jacket(B, n=40):
 
 
 def hands_g(B):
-    """Fingerless gloves: padded palm, knuckle band and orange strap; slim skin fingers in a relaxed curl."""
+    """Fingerless gloves in gilded snack gear: a cookie plate on the back of the hand (scalloped gold rim,
+    chocolate-chip studs), gold knuckle rivets, gold cuff rings and a mini soda-can cartridge clipped over the
+    wrist; slim skin fingers in a relaxed curl."""
     m = E.Mesher("pongo_hands")
     for side in (1, -1):
         w = B.mirror(B.wrist, side)
@@ -971,30 +1022,105 @@ def hands_g(B):
         R = Matrix((xl, yl, zl)).transposed().to_4x4()
         m.push(Matrix.Translation(w) @ R)
         m.mat("g_glove")
-        m.rbox((0.0, 0.0, -0.042), (0.024, 0.062, 0.058), 0.011, 3)
-        m.cyl((0, 0, -0.006), 0.026, 0.024, 20, r2=0.029)
-        m.mat("g_glove_strap")
-        m.rbox((0.0, 0.0, -0.02), (0.027, 0.064, 0.012), 0.004, 2)
+        m.rbox((0.0, 0.0, -0.04), (0.022, 0.056, 0.054), 0.010, 3)
+        m.cyl((0, 0, -0.006), 0.022, 0.024, 20, r2=0.025)
+        # gold cuff rings framing the wrist band
+        m.mat("g_gold")
+        m.torus((0, 0, -0.0165), R=0.0222, r=0.0022, seg=28, sides=8)
+        m.torus((0, 0, 0.0055), R=0.0252, r=0.0022, seg=28, sides=8)
+        # cookie plate on the back of the hand
+        m.push(Matrix.Translation((0.0118, 0.0, -0.035)) @ Matrix.Rotation(math.radians(90), 4, 'Y'))
+        cookie_disc(m, 0.0135, chips=5, seed=7 if side > 0 else 11, dome=0.0026)
+        m.pop()
+        # knuckle rivets
+        m.mat("g_gold")
+        for k in range(4):
+            m.sphere((0.0112, -0.0195 + k * 0.013, -0.0625), 1.0, 10, 6, s=(0.0018, 0.0024, 0.0024))
+        # soda-can cartridge on the back of the wrist (top toward the fingers), gold clip band
+        m.push(Matrix.Translation((0.0305, 0.0, -0.002)) @ Matrix.Rotation(math.radians(180), 4, 'X'))
+        soda_can(m, 0.0068, 0.024)
+        m.mat("g_gold")
+        m.torus((0, 0, 0.0), R=0.0072, r=0.0012, seg=20, sides=6)
+        m.pop()
+        m.rbox((0.0262, 0.0, -0.002), (0.004, 0.006, 0.01), 0.0015, 1)
         m.mat("g_skin")
         for k in range(4):
-            yy = -0.022 + k * 0.0148
+            yy = -0.0198 + k * 0.0133
             L = 1.0 - 0.13 * abs(k - 1.2)
-            a = V((0.0, yy, -0.068))
-            b = V((-0.012, yy, -0.092 * L))
-            cpt = V((-0.028, yy, -0.098 * L))
+            a = V((0.0, yy, -0.064))
+            b = V((-0.011, yy, -0.088 * L))
+            cpt = V((-0.026, yy, -0.094 * L))
             path = [a, a.lerp(b, 0.5), b, b.lerp(cpt, 0.5), cpt]
             m.sweep(path, [(math.cos(2 * math.pi * i / 10), math.sin(2 * math.pi * i / 10)) for i in range(10)], closed=True,
-                    cap=True, scale=lambda t: 0.0074 * (1 - 0.18 * t))
-        path = [V((-0.01, 0.026, -0.022)), V((-0.022, 0.036, -0.044)), V((-0.031, 0.03, -0.062))]
+                    cap=True, scale=lambda t: 0.0066 * (1 - 0.18 * t))
+        path = [V((-0.009, 0.0235, -0.021)), V((-0.02, 0.0325, -0.042)), V((-0.029, 0.027, -0.059))]
         m.sweep(path, [(math.cos(2 * math.pi * i / 10), math.sin(2 * math.pi * i / 10)) for i in range(10)], closed=True,
-                cap=True, scale=lambda t: 0.0085 * (1 - 0.2 * t))
+                cap=True, scale=lambda t: 0.0076 * (1 - 0.2 * t))
         m.pop()
     ob = m.obj("pongo_hands", smooth_angle=50, subsurf=SUB())
     E.apply_modifiers(ob)
+    _recalc(ob)
     return ob
 
 
 # ============================================================================ sneakers (JAEY canvas-shoe method)
+
+def gear_mats():
+    """Gilded snack gear: gold, cookie dough with chocolate chips, soda glass with fizz bubbles, soda cans."""
+    M = E.mat
+    M("g_gold", 0xF2C35C, spec=0.95, rim=0.45, soft=0.04, flags=E.F_METAL, outline=0.6, shadow=0xB07A3A)
+    M("g_gold_dark", 0xC48A34, spec=0.7, rim=0.3, soft=0.05, flags=E.F_METAL, outline=0.0)
+    M("g_cookie", 0xDCA35E, spec=0.08, rim=0.25, soft=0.1, outline=0.5, shadow=0xA8704A)
+    M("g_choco", 0x4A2A1C, spec=0.6, rim=0.2, soft=0.05, outline=0.0)
+    M("g_soda", 0x5ED7EA, spec=1.0, rim=0.55, soft=0.04, emis=0.12, flags=E.F_GLASS, outline=0.5, shadow=0x3C8FC8)
+    M("g_bubble", 0xEFFDFF, spec=0.6, rim=0.3, soft=0.05, emis=0.35, outline=0.0, flags=E.F_NOCAST)
+    M("g_can", 0x2FAFCB, spec=0.7, rim=0.4, soft=0.05, flags=E.F_METAL, outline=0.5)
+    M("g_can_stripe", COL["orange"], spec=0.5, rim=0.35, soft=0.05, outline=0.0)
+    M("g_alu", 0xD9DEE6, spec=0.9, rim=0.4, soft=0.05, flags=E.F_METAL, outline=0.5)
+
+
+def crimp_ring(m, R, r, crimps=21, depth=0.06, z=0.0, seg=84):
+    """Bottle-cap style crimped ring (local XY plane, centred on Z)."""
+    path = []
+    for i in range(seg + 2):
+        a = 2 * math.pi * i / seg
+        rr = R * (1 + depth * math.cos(crimps * a))
+        path.append(V((rr * math.cos(a), rr * math.sin(a), z)))
+    m.sweep(path, [(math.cos(2 * math.pi * k / 8), math.sin(2 * math.pi * k / 8)) for k in range(8)], closed=True,
+            cap=False, scale=lambda t: r)
+
+
+def cookie_disc(m, r, chips=5, seed=1, rim=True, dome=0.0028):
+    """Gilded cookie (local +Z out): scalloped gold rim, domed dough face, chocolate-chip studs."""
+    if rim:
+        m.mat("g_gold")
+        crimp_ring(m, r * 1.02, r * 0.11, crimps=12, depth=0.05, z=dome * 0.35)
+        m.cyl((0, 0, dome * 0.15), r=r * 1.02, h=dome * 0.3, seg=36)
+    m.mat("g_cookie")
+    m.sphere((0, 0, 0.0), 1.0, 28, 10, s=(r * 0.94, r * 0.94, dome))
+    m.mat("g_choco")
+    rnd = random.Random(seed)
+    for k in range(chips):
+        a = 2 * math.pi * k / chips + rnd.uniform(-0.35, 0.35)
+        rr = r * (0.25 + 0.4 * rnd.random()) if k else 0.0
+        cr = r * rnd.uniform(0.13, 0.18)
+        m.sphere((math.cos(a) * rr, math.sin(a) * rr, dome * 0.85), 1.0, 8, 5, s=(cr, cr * 0.85, cr * 0.55))
+
+
+def soda_can(m, r, h, tab=True):
+    """Mini soda can along local +Z (top at +Z): teal body, orange band, aluminium rims, gold pull tab."""
+    m.mat("g_can")
+    m.cyl((0, 0, 0), r=r, h=h * 0.86, seg=24)
+    m.mat("g_can_stripe")
+    m.cyl((0, 0, -h * 0.05), r=r * 1.015, h=h * 0.22, seg=24, caps=False)
+    m.mat("g_alu")
+    m.cyl((0, 0, h * 0.465), r=r * 0.86, h=h * 0.07, seg=24, r2=r * 0.8)
+    m.torus((0, 0, h * 0.5), R=r * 0.8, r=r * 0.09, seg=24, sides=6)
+    m.cyl((0, 0, -h * 0.465), r=r * 0.86, h=h * 0.07, seg=24)
+    if tab:
+        m.mat("g_gold")
+        m.rbox((0, r * 0.25, h * 0.52), (r * 0.5, r * 0.85, r * 0.08), r * 0.12, 1)
+
 
 def shoe_mats():
     M = E.mat
@@ -1048,7 +1174,7 @@ def sneaker(B, side):
     orange heel pull-tab. Separate overlapping pieces like a real shoe build."""
     a = B.mirror(B.ankle, side)
     m = E.Mesher("pongo_shoe_" + ("R" if side > 0 else "L"))
-    O = Matrix.Translation((a.x, a.y + 0.004, 0.0)) @ Matrix.Diagonal((side * 0.93, 0.93, 0.93, 1))
+    O = Matrix.Translation((a.x, a.y + 0.004, 0.0)) @ Matrix.Diagonal((side * 0.86, 0.9, 0.9, 1))
     m.push(O)
     n = 28
     ys = [SHOE[0][0] + (SHOE[-1][0] - SHOE[0][0]) * i / 16 for i in range(17)]
@@ -1090,12 +1216,27 @@ def sneaker(B, side):
     outline += [(-p[0] + 2 * P4.catmull([(k[0], k[3]) for k in SHOE], p[1])[0], p[1]) for p in reversed(outline)]
     outline = [(x, y) for (x, y) in outline]
     tip_y = SHOE[-1][0] + 0.004
-    m.mat("g_sole")
-    m.extrude(outline, 0.024, bevel=(0.004, 2), c=(0, 0, 0.012))
-    m.mat("g_sole_line")
-    m.extrude([(x * 1.0, y) for (x, y) in outline], 0.003, c=(0, 0, 0.016)) if False else None
-    m.push(Matrix.Translation((0, 0, 0.0165)) @ Matrix.Diagonal((1.012, 1.008, 1, 1)))
-    m.extrude(outline, 0.0035)
+    # outsole (dark rubber) + translucent-looking soda midsole with fizz bubbles + gold foxing stripe
+    m.mat("g_tread")
+    m.extrude(outline, 0.006, bevel=(0.002, 1), c=(0, 0, 0.003))
+    m.mat("g_soda")
+    m.extrude(outline, 0.0175, bevel=(0.003, 2), c=(0, 0, 0.0145))
+    m.mat("g_bubble")
+    rnd = random.Random(21 + (side > 0))
+    for k in range(len(outline)):
+        if rnd.random() < 0.45:
+            continue
+        x, y = outline[k]
+        x2, y2 = outline[(k + 1) % len(outline)]
+        nx_, ny_ = (y2 - y), -(x2 - x)
+        ln = math.hypot(nx_, ny_) or 1.0
+        f = rnd.random()
+        bx, by = x + (x2 - x) * f, y + (y2 - y) * f
+        br = rnd.uniform(0.0007, 0.0019) * (1.0 if rnd.random() < 0.8 else 1.5)
+        m.sphere((bx + nx_ / ln * 0.0024, by + ny_ / ln * 0.0024, rnd.uniform(0.0085, 0.0215)), 1.0, 8, 5, s=(br, br, br))
+    m.mat("g_gold")
+    m.push(Matrix.Translation((0, 0, 0.0238)) @ Matrix.Diagonal((1.012, 1.008, 1, 1)))
+    m.extrude(outline, 0.0028)
     m.pop()
     m.mat("g_tread")
     for i in range(9):
@@ -1106,7 +1247,7 @@ def sneaker(B, side):
     m.mat("g_shoe")
     tpath = [V((0.002, 0.075, 0.064)), V((0.002, 0.046, 0.083)), V((0.001, 0.031, 0.11)), V((0.0, 0.027, 0.152))]
     m.sweep(tpath, [(-0.024, -0.003), (0.024, -0.003), (0.024, 0.003), (-0.024, 0.003)], closed=True, cap=True, up=(0, 1, 0.3))
-    m.mat("g_tab")
+    m.mat("g_gold")
     m.rbox((0.0, 0.029, 0.152), (0.016, 0.006, 0.012), 0.002, 1)
     # eyelets and laces along the opening (front of the shaft down the instep)
     lace_pts = []
@@ -1114,7 +1255,7 @@ def sneaker(B, side):
         t = i / 4
         for sd in (1, -1):
             p = V((sd * (0.021 + 0.004 * t), y, z + 0.002))
-            m.mat("g_eyelet")
+            m.mat("g_gold")
             m.push(Matrix.Translation(p) @ Matrix.Rotation(math.radians(-sd * 28), 4, 'Y') @ Matrix.Rotation(math.radians(-50 * t), 4, 'X'))
             m.torus((0, 0, 0), R=0.0042, r=0.0013, seg=12, sides=6)
             m.mat("g_hole")
@@ -1140,17 +1281,26 @@ def sneaker(B, side):
         m.sweep([top, top + V((sd * 0.006, 0.01, -0.012)), top + V((sd * 0.01, 0.012, -0.024))],
                 [(-0.0024, -0.0007), (0.0024, -0.0007), (0.0024, 0.0007), (-0.0024, 0.0007)], closed=True, cap=True,
                 up=(0, 1, 0))
+        # gold aglet on the lace end
+        m.mat("g_gold")
+        tipd = V((sd * 0.004, 0.002, -0.012)).normalized()
+        m.push(Matrix.Translation(top + V((sd * 0.01, 0.012, -0.024)) + tipd * 0.002) @ tipd.to_track_quat('Z', 'Y').to_matrix().to_4x4())
+        m.cyl((0, 0, 0), r=0.0016, h=0.006, seg=10)
+        m.pop()
+        m.mat("g_lace")
     m.rbox(tuple(top), (0.006, 0.004, 0.005), 0.0015, 1)
-    # ankle star patch (outer side) and heel pull tab
-    m.mat("g_patch")
-    m.push(Matrix.Translation((0.049, -0.017, 0.098)) @ Matrix.Rotation(math.radians(90), 4, 'Y'))
-    m.cyl((0, 0, 0), 0.016, 0.003, 24)
-    m.mat("g_patch_star")
-    m.extrude(E.star_pts(5, 0.012, 0.005), 0.002, c=(0, 0, 0.0018))
+    # ankle cookie patch (outer side) and a gold soda-can pull tab at the heel
+    m.push(Matrix.Translation((0.0505, -0.017, 0.098)) @ Matrix.Rotation(math.radians(90), 4, 'Y'))
+    cookie_disc(m, 0.0145, chips=5, seed=31, dome=0.003)
     m.pop()
-    m.mat("g_tab")
-    m.sweep([V((0, -0.068, 0.128)), V((0, -0.078, 0.14)), V((0, -0.074, 0.156)), V((0, -0.064, 0.15))],
-            [(-0.007, -0.0012), (0.007, -0.0012), (0.007, 0.0012), (-0.007, 0.0012)], closed=True, cap=True, up=(1, 0, 0))
+    m.mat("g_gold")
+    hp = V((0, -0.071, 0.146))
+    m.push(Matrix.Translation(hp) @ Matrix.Rotation(math.radians(90), 4, 'X') @ Matrix.Rotation(math.radians(-12), 4, 'X'))
+    loop = [V((x, y, 0.0)) for (x, y) in E.rounded_rect(0.014, 0.026, 0.006, 4)]
+    m.sweep(loop + loop[:2], [(math.cos(2 * math.pi * k / 6), math.sin(2 * math.pi * k / 6)) for k in range(6)],
+            closed=True, cap=False, scale=lambda t: 0.0016)
+    m.rbox((0.0, -0.007, 0.0), (0.011, 0.01, 0.0026), 0.002, 1)
+    m.pop()
     m.pop()
     ob = m.obj(m.name, smooth_angle=45, subsurf=SUB())
     if side < 0:
@@ -1182,12 +1332,11 @@ def _flip(ob):
 
 
 def goggles_g(B):
-    """Goggles pushed up over the bangs: strap around the hair volume, two orange lenses in metal rims."""
+    """Gilded soda goggles pushed up over the bangs: leather strap with cookie rivets, gold cups with crimped
+    bottle-cap rims, fizzy soda-blue lenses with bubbles, and a gold soda-can pull tab as the bridge."""
     c, r = B.headc, B.head_r
     m = E.Mesher("pongo_goggles")
-    E.mat("g_gstrap", 0x2E2A36, rim=0.3, soft=0.08, outline=0.7)
-    E.mat("g_gframe", COL["frame"], flags=E.F_METAL, spec=0.9, rim=0.4, soft=0.05, outline=0.7)
-    E.mat("g_lens", COL["lens"], flags=E.F_GLASS, spec=1.0, rim=0.5, soft=0.05, outline=0.5)
+    E.mat("g_gstrap", 0x3B2A24, rim=0.3, soft=0.08, outline=0.7)
     m.mat("g_gstrap")
     path = []
     for i in range(49):
@@ -1195,19 +1344,42 @@ def goggles_g(B):
         p, nn = scalp(B, th, 0.46 + 0.26 * math.cos(math.radians(th)) ** 2 * (1 if abs(th) < 90 else 0.2), 0.036)
         path.append(p)
     m.sweep(path, [(-0.0035, -0.008), (0.0035, -0.008), (0.0035, 0.008), (-0.0035, 0.008)], closed=True, cap=False, up=(0, 0, 1))
+    # cookie rivets on the strap at the temples
+    for side in (1, -1):
+        th = side * 68
+        p, nn = scalp(B, th, 0.46 + 0.26 * math.cos(math.radians(th)) ** 2, 0.04)
+        m.push(Matrix.Translation(p) @ nn.to_track_quat('Z', 'Y').to_matrix().to_4x4())
+        cookie_disc(m, 0.0068, chips=3, seed=3 + side, dome=0.0018)
+        m.pop()
     for side in (1, -1):
         p, nn = scalp(B, side * 22, 0.72, 0.046)
         R = nn.to_track_quat('Z', 'Y').to_matrix().to_4x4()
         m.push(Matrix.Translation(p) @ R)
-        m.mat("g_gframe")
-        m.lathe([(0.0, -0.009), (0.024, -0.009), (0.027, -0.003), (0.027, 0.008), (0.022, 0.011), (0.018, 0.007)], seg=28)
-        m.mat("g_lens")
-        m.sphere((0, 0, 0.004), 1.0, 22, 10, s=(0.019, 0.019, 0.007))
+        m.mat("g_gold")
+        m.lathe([(0.0, -0.009), (0.024, -0.009), (0.027, -0.003), (0.027, 0.006), (0.023, 0.009), (0.019, 0.007)], seg=32)
+        crimp_ring(m, 0.0255, 0.0024, crimps=21, depth=0.055, z=0.0075)
+        m.mat("g_soda")
+        m.sphere((0, 0, 0.0045), 1.0, 24, 10, s=(0.0195, 0.0195, 0.0072))
+        m.mat("g_bubble")
+        rnd = random.Random(5 + side)
+        for k in range(8):
+            a = rnd.uniform(0, 2 * math.pi)
+            rr = 0.0165 * math.sqrt(rnd.random())
+            br = rnd.uniform(0.0008, 0.0019)
+            zz = 0.0045 + 0.0072 * math.sqrt(max(0.0, 1 - (rr / 0.0195) ** 2)) - br * 0.3
+            m.sphere((math.cos(a) * rr, math.sin(a) * rr, zz), 1.0, 8, 5, s=(br, br, br))
         m.pop()
+    # bridge: a gold pull tab (rounded loop + rivet plate)
     p, nn = scalp(B, 0, 0.75, 0.052)
-    m.mat("g_gframe")
     m.push(Matrix.Translation(p) @ nn.to_track_quat('Z', 'Y').to_matrix().to_4x4())
-    m.rbox((0, 0, 0), (0.026, 0.01, 0.009), 0.003, 1)
+    m.mat("g_gold")
+    loop = [V((x, y, 0.0)) for (x, y) in E.rounded_rect(0.03, 0.013, 0.006, 4)]
+    loop = loop + loop[:2]
+    m.sweep(loop, [(math.cos(2 * math.pi * k / 6), math.sin(2 * math.pi * k / 6)) for k in range(6)], closed=True, cap=False,
+            scale=lambda t: 0.0017)
+    m.rbox((0.0085, 0.0, 0.0), (0.011, 0.011, 0.0028), 0.002, 1)
+    m.mat("g_gold_dark")
+    m.cyl((0.0085, 0.0, 0.0018), r=0.0022, h=0.0012, seg=12)
     m.pop()
     return m.obj("pongo_goggles", smooth_angle=45, subsurf=SUB())
 
@@ -1219,6 +1391,7 @@ def design_body():
     B = Girl()
     mats()
     body_mats()
+    gear_mats()
     objs = []
     hd = head(B)
     objs += [hd, P4.ears(B, "g_skin"), face(B, hd)]
@@ -1294,6 +1467,7 @@ def build_pongo_g(lod=0):
     mats()
     body_mats()
     shoe_mats()
+    gear_mats()
     hd = head(B)
     ear = P4.ears(B, "g_skin", subsurf=SUB())
     fc = face(B, hd)
@@ -1386,39 +1560,172 @@ def _replace_action(arm, name):
     E.new_action(arm, name)
 
 
+RUN_LEG = {0: (52, -12, 8), 5: (10, -28, -6), 10: (-38, -22, 28), 14: (4, -130, 40), 17: (62, -95, 5), 20: (52, -12, 8)}
+
+
+def _run_leg(f):
+    keys = sorted(RUN_LEG)
+    f = f % 20
+    for i in range(len(keys) - 1):
+        a, b = keys[i], keys[i + 1]
+        if a <= f <= b:
+            t = (f - a) / (b - a)
+            t = t * t * (3 - 2 * t)
+            return tuple(RUN_LEG[a][j] + (RUN_LEG[b][j] - RUN_LEG[a][j]) * t for j in range(3))
+    return RUN_LEG[0]
+
+
+def run_pose(f, Z):
+    """Pongo's run pose at frame f (20-frame loop): forward lean, high knees, compact arm pump, hip roll."""
+    th, sh, ft = _run_leg(f)
+    th2, sh2, ft2 = _run_leg(f + 10)
+    ph = 2 * math.pi * f / 20
+    sw = math.sin(ph)
+    bob = 0.034 * math.cos(2 * ph) - 0.016
+    p = CH._merge(Z, {
+        "root": (0, 3 * math.cos(2 * ph), -9 * sw), "spine": (-14, 0, 7 * sw), "chest": (-4, 0, 10 * sw),
+        "neck": (6, 0, -8 * sw), "head": (8, 0, -9 * sw),
+        "thigh.R": (th, 0, 0), "shin.R": (sh, 0, 0), "foot.R": (ft, 0, 0),
+        "thigh.L": (th2, 0, 0), "shin.L": (sh2, 0, 0), "foot.L": (ft2, 0, 0),
+        "clav.R": (0, 0, 5 * sw), "clav.L": (0, 0, 5 * sw),
+        "upper_arm.R": (-44 * sw + 4, 16, 6), "forearm.R": (100 + 18 * sw, 0, 14), "hand.R": (0, 0, -12),
+        "upper_arm.L": (44 * sw + 4, -16, -6), "forearm.L": (100 - 18 * sw, 0, -14), "hand.L": (0, 0, 12)})
+    return p, (0, 0, bob)
+
+
+def _key_all(arm, keys, Z):
+    for (f, pose, root) in keys:
+        CH.pose_key(arm, f, CH._merge(Z, pose), root)
+
+
+# Action key poses (degrees about armature axes; thigh/arm +X swings forward, shin -X bends the knee,
+# spine/root +X lean back, head +X looks up; right arm +Y lowers it, left arm -Y lowers it).
+JUMP_KEYS = [
+    # load: stance leg bends, arms counter-swing
+    (1, {"spine": (-16, 0, 0), "chest": (-4, 0, 0), "neck": (8, 0, 0), "head": (10, 0, 0),
+         "thigh.R": (30, 0, 0), "shin.R": (-55, 0, 0), "thigh.L": (-8, 0, 0), "shin.L": (-42, 0, 0), "foot.L": (-6, 0, 0),
+         "upper_arm.R": (-35, 18, 4), "forearm.R": (75, 0, 10), "upper_arm.L": (30, -16, -4), "forearm.L": (85, 0, -10)},
+     (0, 0, -0.045)),
+    # push: knee drive, the stance leg extends, the right arm swings up
+    (3, {"spine": (-8, 0, 0), "neck": (6, 0, 0), "head": (6, 0, 0),
+         "thigh.R": (80, 0, 0), "shin.R": (-95, 0, 0), "foot.R": (12, 0, 0),
+         "thigh.L": (-24, 0, 0), "shin.L": (-10, 0, 0), "foot.L": (28, 0, 0),
+         "upper_arm.R": (105, -10, 0), "forearm.R": (35, 0, 0), "upper_arm.L": (-40, -10, 0), "forearm.L": (45, 0, 0)},
+     (0, 0, 0.03)),
+    # rise: the trailing leg tucks up, arms open
+    (6, {"spine": (-2, 0, 0), "head": (2, 0, 0),
+         "thigh.R": (88, 0, 0), "shin.R": (-118, 0, 0), "foot.R": (18, 0, 0),
+         "thigh.L": (38, 0, 0), "shin.L": (-98, 0, 0), "foot.L": (20, 0, 0),
+         "upper_arm.R": (70, -45, 0), "forearm.R": (30, 0, 0), "upper_arm.L": (40, 45, 0), "forearm.L": (30, 0, 0)},
+     (0, 0, 0.06)),
+    # apex tuck: compact, arms out for balance, eyes forward
+    (9, {"spine": (3, 0, 0), "chest": (-2, 0, 0), "head": (-2, 0, 0),
+         "thigh.R": (78, 0, 4), "shin.R": (-125, 0, 0), "foot.R": (16, 0, 0),
+         "thigh.L": (62, 0, -4), "shin.L": (-120, 0, 0), "foot.L": (16, 0, 0),
+         "upper_arm.R": (38, -62, 0), "forearm.R": (26, 0, 0), "upper_arm.L": (28, 62, 0), "forearm.L": (26, 0, 0)},
+     (0, 0, 0.07)),
+    (12, {"spine": (4, 0, 0), "chest": (-2, 0, 0), "head": (-3, 0, 0),
+          "thigh.R": (74, 0, 4), "shin.R": (-122, 0, 0), "foot.R": (14, 0, 0),
+          "thigh.L": (64, 0, -4), "shin.L": (-118, 0, 0), "foot.L": (14, 0, 0),
+          "upper_arm.R": (34, -66, 0), "forearm.R": (24, 0, 0), "upper_arm.L": (26, 66, 0), "forearm.L": (24, 0, 0)},
+     (0, 0, 0.07)),
+]
+
+
+def _fall_pose(s):
+    return {"spine": (4, 0, 0), "head": (-6, 0, 0),
+            "thigh.R": (32 + 6 * s, 0, 3), "shin.R": (-42 - 6 * s, 0, 0), "foot.R": (8, 0, 0),
+            "thigh.L": (14 - 6 * s, 0, -3), "shin.L": (-56 + 6 * s, 0, 0), "foot.L": (8, 0, 0),
+            "upper_arm.R": (44 + 6 * s, -74, 0), "forearm.R": (22, 0, 0),
+            "upper_arm.L": (34 - 6 * s, 74, 0), "forearm.L": (22, 0, 0)}
+
+
+LAND_KEYS = [
+    # contact: legs reach for the ground, arms still up
+    (1, {"spine": (2, 0, 0), "head": (-4, 0, 0),
+         "thigh.R": (28, 0, 2), "shin.R": (-16, 0, 0), "foot.R": (-8, 0, 0),
+         "thigh.L": (6, 0, -2), "shin.L": (-24, 0, 0), "foot.L": (-4, 0, 0),
+         "upper_arm.R": (40, -60, 0), "forearm.R": (24, 0, 0), "upper_arm.L": (30, 60, 0), "forearm.L": (24, 0, 0)},
+     (0, 0, 0.0)),
+    # impact squash: deep knees, torso folds forward, arms drop
+    (3, {"spine": (-26, 0, 0), "chest": (-6, 0, 0), "neck": (14, 0, 0), "head": (12, 0, 0),
+         "thigh.R": (64, 0, 4), "shin.R": (-108, 0, 0), "foot.R": (-18, 0, 0),
+         "thigh.L": (40, 0, -4), "shin.L": (-84, 0, 0), "foot.L": (-10, 0, 0),
+         "upper_arm.R": (28, 6, 0), "forearm.R": (62, 0, 8), "upper_arm.L": (14, -6, 0), "forearm.L": (62, 0, -8)},
+     (0, 0, -0.12)),
+    # recover: rising into the run lean
+    (6, {"spine": (-17, 0, 0), "chest": (-4, 0, 0), "neck": (8, 0, 0), "head": (8, 0, 0),
+         "thigh.R": (46, 0, 0), "shin.R": (-58, 0, 0), "foot.R": (0, 0, 0),
+         "thigh.L": (8, 0, 0), "shin.L": (-40, 0, 0), "foot.L": (6, 0, 0),
+         "upper_arm.R": (-10, 14, 4), "forearm.R": (95, 0, 12), "upper_arm.L": (20, -14, -4), "forearm.L": (95, 0, -12)},
+     (0, 0, -0.045)),
+]
+
+SLIDE_KEYS = [
+    # entry from the run: hips start to drop, lead leg swings through
+    (1, {"root": (8, 0, 4), "spine": (-10, 0, 0), "neck": (4, 0, 0), "head": (4, 0, 0),
+         "thigh.R": (48, 0, 0), "shin.R": (-38, 0, 0), "thigh.L": (-6, 0, 0), "shin.L": (-72, 0, 0),
+         "upper_arm.R": (40, -10, 0), "forearm.R": (60, 0, 0), "upper_arm.L": (-30, -6, 0), "forearm.L": (50, 0, 0)},
+     (0, 0, -0.08)),
+    # dropping: lean back, trailing knee folds under
+    (3, {"root": (16, 0, 9), "spine": (-6, 0, 0), "neck": (-4, 0, 0), "head": (-4, 0, 0),
+         "thigh.R": (58, 0, 0), "shin.R": (-14, 0, 0), "foot.R": (-14, 0, 0),
+         "thigh.L": (30, 0, -4), "shin.L": (-112, 0, 0), "foot.L": (10, 0, 0),
+         "upper_arm.R": (62, -36, 0), "forearm.R": (40, 0, 0), "upper_arm.L": (-42, 28, 0), "forearm.L": (16, 0, 0)},
+     (0, 0.02, -0.4)),
+    # slide: low on the lead leg, torso back, head level, trailing hand skims the ground behind
+    (5, {"root": (20, 0, 12), "spine": (-10, 0, -4), "chest": (-6, 0, -4), "neck": (-8, 0, 2), "head": (-6, 0, 4),
+         "thigh.R": (56, 0, 2), "shin.R": (-4, 0, 0), "foot.R": (-22, 0, 0),
+         "thigh.L": (38, 0, -6), "shin.L": (-128, 0, 0), "foot.L": (12, 0, 0),
+         "upper_arm.R": (74, -48, 0), "forearm.R": (26, 0, 0), "hand.R": (0, 0, -10),
+         "upper_arm.L": (-56, 38, 0), "forearm.L": (10, 0, 0), "hand.L": (20, 0, 0)},
+     (0, 0.03, -0.54)),
+    (9, {"root": (21, 0, 12), "spine": (-11, 0, -4), "chest": (-6, 0, -4), "neck": (-8, 0, 2), "head": (-7, 0, 5),
+         "thigh.R": (55, 0, 2), "shin.R": (-5, 0, 0), "foot.R": (-24, 0, 0),
+         "thigh.L": (39, 0, -6), "shin.L": (-129, 0, 0), "foot.L": (12, 0, 0),
+         "upper_arm.R": (78, -52, 0), "forearm.R": (24, 0, 0), "hand.R": (0, 0, -12),
+         "upper_arm.L": (-58, 40, 0), "forearm.L": (8, 0, 0), "hand.L": (22, 0, 0)},
+     (0, 0.03, -0.55)),
+    (13, {"root": (20, 0, 11), "spine": (-12, 0, -4), "chest": (-6, 0, -4), "neck": (-8, 0, 2), "head": (-6, 0, 4),
+          "thigh.R": (56, 0, 2), "shin.R": (-6, 0, 0), "foot.R": (-20, 0, 0),
+          "thigh.L": (38, 0, -6), "shin.L": (-126, 0, 0), "foot.L": (12, 0, 0),
+          "upper_arm.R": (72, -50, 0), "forearm.R": (28, 0, 0), "hand.R": (0, 0, -10),
+          "upper_arm.L": (-54, 36, 0), "forearm.L": (12, 0, 0), "hand.L": (18, 0, 0)},
+     (0, 0.03, -0.53)),
+    # push up: trailing leg drives, torso comes forward
+    (16, {"root": (8, 0, 5), "spine": (-18, 0, 0), "chest": (-4, 0, 0), "neck": (8, 0, 0), "head": (8, 0, 0),
+          "thigh.R": (40, 0, 0), "shin.R": (-34, 0, 0), "foot.R": (-6, 0, 0),
+          "thigh.L": (22, 0, -2), "shin.L": (-100, 0, 0), "foot.L": (14, 0, 0),
+          "upper_arm.R": (24, 6, 0), "forearm.R": (80, 0, 10), "upper_arm.L": (-14, -8, 0), "forearm.L": (80, 0, -10)},
+     (0, 0.01, -0.26)),
+]
+
+
 def girl_clips(arm):
-    """Shared gameplay clips, with Pongo's own run and idle on top."""
+    """Shared gameplay clips, with Pongo's own run, idle, jump/fall/land and slide on top."""
     clips = CH.make_clips(arm)
     Z = CH.all_bones_zero(arm)
     # ---- run: 20 frames, forward lean, high knees, compact arm pump, hip roll, light bounce
     _replace_action(arm, "run")
-    legR = {0: (52, -12, 8), 5: (10, -28, -6), 10: (-38, -22, 28), 14: (4, -130, 40), 17: (62, -95, 5), 20: (52, -12, 8)}
-
-    def leg_at(f):
-        keys = sorted(legR)
-        f = f % 20
-        for i in range(len(keys) - 1):
-            a, b = keys[i], keys[i + 1]
-            if a <= f <= b:
-                t = (f - a) / (b - a)
-                t = t * t * (3 - 2 * t)
-                return tuple(legR[a][j] + (legR[b][j] - legR[a][j]) * t for j in range(3))
-        return legR[0]
     for f in range(0, 21):
-        th, sh, ft = leg_at(f)
-        th2, sh2, ft2 = leg_at(f + 10)
-        ph = 2 * math.pi * f / 20
-        sw = math.sin(ph)
-        bob = 0.034 * math.cos(2 * ph) - 0.016
-        p = CH._merge(Z, {
-            "root": (0, 3 * math.cos(2 * ph), -9 * sw), "spine": (-14, 0, 7 * sw), "chest": (-4, 0, 10 * sw),
-            "neck": (6, 0, -8 * sw), "head": (8, 0, -9 * sw),
-            "thigh.R": (th, 0, 0), "shin.R": (sh, 0, 0), "foot.R": (ft, 0, 0),
-            "thigh.L": (th2, 0, 0), "shin.L": (sh2, 0, 0), "foot.L": (ft2, 0, 0),
-            "clav.R": (0, 0, 5 * sw), "clav.L": (0, 0, 5 * sw),
-            "upper_arm.R": (-44 * sw + 4, 16, 6), "forearm.R": (100 + 18 * sw, 0, 14), "hand.R": (0, 0, -12),
-            "upper_arm.L": (44 * sw + 4, -16, -6), "forearm.L": (100 - 18 * sw, 0, -14), "hand.L": (0, 0, 12)})
-        CH.pose_key(arm, f + 1, p, (0, 0, bob))
+        p, root = run_pose(f, Z)
+        CH.pose_key(arm, f + 1, p, root)
+    # ---- jump (takeoff -> apex), fall loop, land (impact -> run), slide (drop -> slide -> push up)
+    _replace_action(arm, "jump")
+    _key_all(arm, JUMP_KEYS, Z)
+    _replace_action(arm, "fall")
+    for f, s_ in ((1, 0.0), (9, 1.0), (17, 0.0)):
+        CH.pose_key(arm, f, CH._merge(Z, _fall_pose(s_)), (0, 0, 0.0))
+    _replace_action(arm, "land")
+    _key_all(arm, LAND_KEYS, Z)
+    p, root = run_pose(0, Z)
+    CH.pose_key(arm, 9, p, root)
+    clips.append(("land", False))
+    _replace_action(arm, "slide")
+    _key_all(arm, SLIDE_KEYS, Z)
+    p, root = run_pose(10, Z)
+    CH.pose_key(arm, 20, p, root)
+    clips.append(("slide", False))
     # ---- idle: weight on her left leg, head tilt, left hand drifting behind, gentle breathing sway
     _replace_action(arm, "idle")
     for f, br in ((1, 0.0), (19, 1.0), (37, 0.0), (55, -0.6), (73, 0.0)):
@@ -1433,3 +1740,27 @@ def girl_clips(arm):
         CH.pose_key(arm, f, p, (0.012 + 0.004 * br, 0, -0.01 + 0.004 * br))
     arm.animation_data.action = bpy.data.actions["idle"]
     return clips
+
+
+# ============================================================================ action design renders
+
+def _set_frame_pose(arm, action, frame):
+    arm.animation_data.action = bpy.data.actions[action]
+    bpy.context.scene.frame_set(frame)
+
+
+def design_action_keys():
+    """Key-pose check sheet: each action key from the side and three-quarter views."""
+    E.reset()
+    studio.stage(res=(500, 620))
+    B, arm, objs = build_pongo_g()
+    for o in objs:
+        if o.type == 'MESH' and "face" not in o.name:
+            E.add_outline(o, 0.0022)
+    girl_clips(arm)
+    shots = [("jump", 1), ("jump", 3), ("jump", 6), ("jump", 9), ("fall", 1), ("land", 3), ("land", 6),
+             ("slide", 3), ("slide", 5), ("slide", 16)]
+    for (act, f) in shots:
+        _set_frame_pose(arm, act, f)
+        studio.shoot("k_%s_%02d_side" % (act, f), target=(0, 0, 0.6), dist=2.6, yaw=270, pitch=4, lens=50)
+        studio.shoot("k_%s_%02d_34" % (act, f), target=(0, 0, 0.6), dist=2.6, yaw=215, pitch=8, lens=50)
