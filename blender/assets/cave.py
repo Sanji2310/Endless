@@ -40,23 +40,26 @@ LANES = (-2.4, 0.0, 2.4)
 GAUGE = 1.067
 FLOOR = -0.1
 
-# cave lighting palette (also mirrored in src/com/pongo/core/Zones.java)
-SHADOW = 0x2E2850          # tinted shadow band inside the cave
-SHADOW_WARM = 0x4A3446
-CRYSTALS = (0x7FF0FF, 0xB59CFF, 0xFF9AD6)
+# cave lighting palette (also mirrored in src/com/pongo/core/Zones.java). Same manner as the Sakura Line renders:
+# a high-key lavender shadow band, warm lantern light, clean pale stone, ink outlines on the shapes.
+SHADOW = 0x6E62AE          # tinted shadow band inside the cave (the Sakura Line uses 0x6A5FA8)
+SHADOW_WARM = 0x8A6A8A
+CRYSTALS = (0x45D6F2, 0x9C7CFF, 0xFF74C4)
 
 
 def mats():
     M = E.mat
     sh = dict(shadow=SHADOW)
-    M("c_rock", 0x8C84A6, "t_cave_rock", soft=0.4, rim=0.18, spec=0.05, outline=0, **sh)
-    M("c_rock_wet", 0x7C7598, "t_cave_rock", soft=0.18, rim=0.3, spec=0.45, outline=0.5, **sh)
-    M("c_rock_dark", 0x4E4866, "t_cave_rock", soft=0.2, rim=0.1, outline=0.6, **sh)
-    M("c_floor", 0xA89A8C, "t_cave_floor", soft=0.25, rim=0.05, outline=0, **sh)
-    M("c_tie", 0x8A6448, "t_timber", soft=0.15, rim=0.15, outline=0.6, shadow=SHADOW_WARM)
-    M("c_timber", 0xB0845C, "t_timber", soft=0.15, rim=0.25, outline=0.8, shadow=SHADOW_WARM)
-    M("c_timber_dark", 0x7A5638, "t_timber", soft=0.15, rim=0.2, outline=0.8, shadow=SHADOW_WARM)
-    M("c_rail", 0x6E6A70, spec=0.45, rim=0.35, soft=0.08, flags=E.F_METAL, outline=0.7, **sh)
+    M("c_rock", 0xBDB2DC, "t_cave_rock", soft=0.12, rim=0.22, spec=0.05, outline=0.55, **sh)
+    M("c_rock_wet", 0xA99ED0, "t_cave_rock", soft=0.1, rim=0.35, spec=0.45, outline=0.6, **sh)
+    M("c_rock_dark", 0x8F84BC, "t_cave_rock", soft=0.1, rim=0.2, outline=0.7, **sh)
+    M("c_floor", 0xD9C7AC, "t_cave_floor", soft=0.15, rim=0.05, outline=0, **sh)
+    M("c_ballast", 0xF2EEE8, "t_cave_floor", soft=0.12, rim=0.05, outline=0, **sh)
+    M("c_tie", 0xB98258, "t_timber", soft=0.1, rim=0.15, outline=0.6, shadow=SHADOW_WARM)
+    M("c_timber", 0xDDA46C, "t_timber", soft=0.1, rim=0.25, outline=0.8, shadow=SHADOW_WARM)
+    M("c_timber_dark", 0xA8724A, "t_timber", soft=0.1, rim=0.2, outline=0.8, shadow=SHADOW_WARM)
+    M("c_plank", 0xC8925E, "t_timber", soft=0.1, rim=0.15, outline=0.7, shadow=SHADOW_WARM)
+    M("c_rail", 0x7A7E8C, spec=0.45, rim=0.35, soft=0.08, flags=E.F_METAL, outline=0.7, **sh)
     M("c_rail_top", 0xD8DCE6, spec=1.0, rim=0.5, soft=0.05, flags=E.F_METAL, outline=0, **sh)
     M("c_rust", 0x8E4E32, spec=0.2, rim=0.2, soft=0.1, outline=0.6, **sh)
     M("c_iron", 0x4B4F58, spec=0.6, rim=0.35, soft=0.06, flags=E.F_METAL, **sh)
@@ -65,17 +68,25 @@ def mats():
     M("c_rope", 0xC9A86A, rim=0.2, soft=0.12, outline=0.5, shadow=SHADOW_WARM)
     M("c_lamp", 0xFFD27A, emis=1.2, rim=0.2, soft=0.05, outline=0.3, flags=E.F_NOCAST)
     M("c_lamp_hot", 0xFFF1C8, emis=2.0, rim=0.0, soft=0.05, outline=0.0, flags=E.F_NOCAST)
-    M("c_crystal", CRYSTALS[0], emis=0.4, spec=1.0, rim=0.6, soft=0.04, flags=E.F_GLASS | E.F_NOCAST, outline=0.5, **sh)
-    M("c_crystal_violet", CRYSTALS[1], emis=0.38, spec=1.0, rim=0.6, soft=0.04, flags=E.F_GLASS | E.F_NOCAST, outline=0.5, **sh)
-    M("c_crystal_pink", CRYSTALS[2], emis=0.36, spec=1.0, rim=0.6, soft=0.04, flags=E.F_GLASS | E.F_NOCAST, outline=0.5, **sh)
-    M("c_ore", 0x3A3440, rim=0.2, soft=0.1, **sh)
+    M("c_crystal", CRYSTALS[0], emis=0.6, spec=1.0, rim=0.6, soft=0.04, flags=E.F_GLASS | E.F_NOCAST, outline=0.6, **sh)
+    M("c_crystal_violet", CRYSTALS[1], emis=0.6, spec=1.0, rim=0.6, soft=0.04, flags=E.F_GLASS | E.F_NOCAST, outline=0.6, **sh)
+    M("c_crystal_pink", CRYSTALS[2], emis=0.6, spec=1.0, rim=0.6, soft=0.04, flags=E.F_GLASS | E.F_NOCAST, outline=0.6, **sh)
+    M("c_crystal_tip", 0xF4FDFF, emis=0.8, spec=1.0, rim=0.6, soft=0.04, flags=E.F_GLASS | E.F_NOCAST, outline=0.6, **sh)
+    M("c_ore", 0x6B6088, rim=0.25, soft=0.1, **sh)
     M("c_water", 0x2E5C8A, spec=1.0, rim=0.6, soft=0.05, emis=0.15, flags=E.F_WATER | E.F_NOCAST, outline=0, **sh)
     M("c_bat", 0x3A3150, rim=0.45, soft=0.1, spec=0.1, **sh)
     M("c_bat_wing", 0x5A4A72, rim=0.4, soft=0.1, flags=E.F_DOUBLE, **sh)
+    M("c_bat_belly", 0x8C7BB0, rim=0.4, soft=0.1, **sh)
+    M("c_bat_ear", 0xD48FB8, rim=0.3, soft=0.1, outline=0.4, **sh)
     M("c_eye", 0xFFE36A, emis=1.2, rim=0.0, soft=0.05, outline=0.0)
     M("c_paint_red", 0xD9443A, rim=0.25, soft=0.1, shadow=SHADOW_WARM)
     M("c_paint_yellow", 0xF2C230, rim=0.25, soft=0.1, shadow=SHADOW_WARM)
     M("c_paint_white", 0xEFEBE2, rim=0.25, soft=0.1, shadow=SHADOW_WARM)
+    M("c_paint_black", 0x2C2A34, rim=0.25, soft=0.1, outline=0.6, **sh)
+    M("c_cable", 0x2A2832, rim=0.2, soft=0.1, outline=0.0, **sh)
+    M("c_porcelain", 0xF4F2EC, spec=0.6, rim=0.3, soft=0.06, outline=0.5, **sh)
+    M("c_moss", 0x9BD6A0, emis=0.25, rim=0.3, soft=0.1, outline=0.4, **sh)
+    M("c_mushroom", 0xF6A6C8, emis=0.45, rim=0.3, soft=0.08, outline=0.5, **sh)
     M("c_loco", 0x2F7A6A, spec=0.35, rim=0.35, soft=0.08, shadow=SHADOW)
     M("c_loco_trim", 0xF2C230, spec=0.3, rim=0.3, soft=0.08, shadow=SHADOW_WARM)
     M("c_glass", 0x9FD8F0, spec=1.0, rim=0.5, soft=0.05, emis=0.25, flags=E.F_GLASS)
@@ -139,15 +150,15 @@ def crystal_cluster(m, base, normal, size=1.0, rnd=None, mats=("c_crystal",), n=
     t1 = nrm.orthogonal().normalized()
     t2 = nrm.cross(t1)
     m.mat("c_rock_dark")
-    m.ico(tuple(V(base) - nrm * 0.05 * size), 0.28 * size, 1, s=(1.0, 1.0, 0.6))
+    m.ico(tuple(V(base) - nrm * 0.05 * size), 0.34 * size, 1, s=(1.0, 1.0, 0.55))
     for k in range(n if lod == 0 else max(3, n // 2)):
         a = rnd.random() * 2 * math.pi
-        spread = 0.15 + 0.55 * rnd.random() * (0.4 if k == 0 else 1.0)
+        spread = 0.15 + 0.6 * rnd.random() * (0.4 if k == 0 else 1.0)
         d = (nrm + (t1 * math.cos(a) + t2 * math.sin(a)) * spread).normalized()
-        off = (t1 * math.cos(a) + t2 * math.sin(a)) * rnd.random() * 0.16 * size
-        L = size * (1.0 if k == 0 else rnd.uniform(0.35, 0.8))
-        crystal(m, tuple(V(base) + off), d, L, L * rnd.uniform(0.11, 0.16), rnd.choice(mats),
-                seg=6, twist=rnd.random())
+        off = (t1 * math.cos(a) + t2 * math.sin(a)) * rnd.random() * 0.2 * size
+        L = size * (1.0 if k == 0 else rnd.uniform(0.35, 0.75))
+        crystal(m, tuple(V(base) + off), d, L, L * rnd.uniform(0.2, 0.27), rnd.choice(mats),
+                seg=6, tip=0.36, twist=rnd.random())
 
 
 # ----------------------------------------------------------------------------- track
@@ -196,7 +207,7 @@ def cave_track(lod=0, seg=SEG, seed=5, lanes=LANES, name="cave_track"):
     m.poly([(-6.4, 0, FLOOR), (6.4, 0, FLOOR), (6.4, seg, FLOOR), (-6.4, seg, FLOOR)])   # runs in under the vault foot
     for lx in lanes:
         # low gravel bed under each track
-        m.mat("c_floor", uvscale=1.2, tint=0xC9BDB0)
+        m.mat("c_ballast", uvscale=1.2)
         m.poly([(lx - 0.95, 0, -0.06), (lx + 0.95, 0, -0.06), (lx + 0.95, seg, -0.06), (lx - 0.95, seg, -0.06)])
         for s in (-1, 1):
             x0, x1 = lx + s * 0.95, lx + s * 1.15
@@ -256,14 +267,16 @@ def shell_point(x, z, nx, nz, s, y, seed):
     # strata: a terraced step every 1.15 m of height, lips pushed in
     if z < 6.6:
         f = (z / 1.15) % 1.0
-        d += amp * 0.16 * (f ** 3)
+        d += amp * 0.3 * (f ** 3)
     d -= amp * 0.25          # bias outward so the lanes keep their clearance
     return V((x + nx * d, y, z + nz * d))
 
 
 def cave_shell(lod=0, seed=1, seg=SEG):
-    prof, arc = vault_profile(22 if lod == 0 else 10)
-    rows = int(seg / (0.5 if lod == 0 else 1.5)) + 1
+    """The rock vault as big flat facets (flat shaded, ink on the ledge lips), like the chunky stone in an anime
+    background rather than a smooth noisy surface."""
+    prof, arc = vault_profile(15 if lod == 0 else 9)
+    rows = int(seg / (1.0 if lod == 0 else 2.0)) + 1
     rings = []
     for r in range(rows):
         y = seg * r / (rows - 1)
@@ -271,7 +284,7 @@ def cave_shell(lod=0, seed=1, seg=SEG):
     m = E.Mesher("cave_shell")
     m.mat("c_rock", uvscale=2.5)
     _grid(m, rings, inward=True)
-    return m.obj("cave_shell_%d" % seed + ("" if lod == 0 else "@1"), smooth_angle=50)
+    return m.obj("cave_shell_%d" % seed + ("" if lod == 0 else "@1"), smooth_angle=18)
 
 
 def _surface_at(px, pz_hint, y, seed, side):
@@ -304,11 +317,11 @@ def cave_deco(lod=0, seed=1, seg=SEG):
     palette = [("c_crystal",), ("c_crystal", "c_crystal_violet"), ("c_crystal_pink", "c_crystal_violet")][seed % 3]
     # wall clusters, two to three per side
     for side in (-1, 1):
-        for k in range(rnd.randint(2, 3)):
+        for k in range(rnd.randint(3, 4)):
             y = rnd.uniform(1.0, seg - 1.0)
             p, nrm = _surface_at(0, rnd.uniform(0.6, 4.2), y, seed, side)
             up = (nrm + V((0, 0, 0.35))).normalized()
-            crystal_cluster(m, tuple(p - nrm * 0.12), up, size=rnd.uniform(0.7, 1.5), rnd=rnd, mats=palette,
+            crystal_cluster(m, tuple(p - nrm * 0.12), up, size=rnd.uniform(0.9, 1.8), rnd=rnd, mats=palette,
                             n=rnd.randint(5, 9), lod=lod)
         # a big floor cluster at the wall foot (outside the lanes)
         if rnd.random() < 0.7:
@@ -339,6 +352,19 @@ def cave_deco(lod=0, seed=1, seg=SEG):
             r = L * rnd.uniform(0.2, 0.28)
             m.cyl((x, y, FLOOR + L * 0.2), r=r * 1.2, r2=r, h=L * 0.4, seg=8 if lod == 0 else 5)
             m.cyl((x, y, FLOOR + L * 0.7), r=r, r2=0.02, h=L * 0.6, seg=8 if lod == 0 else 5, caps=False)
+    # glowing mushrooms and moss at the wall foot, and loose crystal shards on the floor (small detail)
+    for side in (-1, 1):
+        for k in range(rnd.randint(1, 3) if lod == 0 else 1):
+            x, y = side * rnd.uniform(4.7, 5.1), rnd.uniform(0.8, seg - 0.8)
+            _mushrooms(m, x, y, FLOOR, rnd, n=rnd.randint(3, 6))
+        m.mat("c_moss")
+        for k in range(rnd.randint(2, 4)):
+            p, nrm = _surface_at(0, rnd.uniform(0.3, 2.5), rnd.uniform(0.5, seg - 0.5), seed, side)
+            m.ico(tuple(p - nrm * 0.02), rnd.uniform(0.18, 0.35), 1, s=(1.0, 1.0, 0.35))
+        for k in range(rnd.randint(2, 5) if lod == 0 else 1):
+            crystal(m, (side * rnd.uniform(3.7, 4.5), rnd.uniform(0.5, seg - 0.5), FLOOR),
+                    (rnd.uniform(-0.5, 0.5), rnd.uniform(-0.5, 0.5), 1.0), rnd.uniform(0.15, 0.3), 0.05,
+                    rnd.choice(palette), twist=rnd.random())
     # a puddle between the tracks (catches the crystal glow)
     if rnd.random() < 0.8:
         m.mat("c_water")
@@ -404,11 +430,36 @@ def cave_frame(lod=0):
         m.mat("c_timber_dark")
         m.box((x, 0, top + 1.2), (0.22, 0.22, 1.75), smooth=False)
         m.box((x, 0, top + 2.1), (0.6, 0.3, 0.12), smooth=False)
-    # warning paint on the posts (white/red, readable in the lamp light)
+    # hazard bands on the posts: yellow and black, like the Sakura Line poles and crossing gates
     for s in (-1, 1):
-        for k in range(3):
-            m.mat("c_paint_red" if k % 2 == 0 else "c_paint_white")
-            m.box((s * 5.3, 0, 1.0 + k * 0.18), (0.31, 0.31, 0.18), smooth=False)
+        for k in range(5):
+            m.mat("c_paint_yellow" if k % 2 == 0 else "c_paint_black")
+            m.box((s * 5.3, 0, 0.7 + k * 0.16), (0.31, 0.31, 0.16), smooth=False)
+    # lagging: rough boards behind the posts holding the wall back, running to the next set (6 m on)
+    rnd = random.Random(23)
+    for s in (-1, 1):
+        z = 0.15
+        while z < 2.6:
+            h = rnd.uniform(0.2, 0.26)
+            m.mat("c_plank" if rnd.random() > 0.3 else "c_timber_dark", uvscale=1.0)
+            m.push(Matrix.Translation((s * 5.52, 3.0, z + h / 2)) @ Matrix.Rotation(math.radians(rnd.uniform(-1.2, 1.2)), 4, 'X'))
+            m.box((0, 0, 0), (0.05, 5.7, h - 0.03), smooth=False)
+            m.pop()
+            z += h
+        # cable run on porcelain insulators along the boards, sagging between the sets
+        if lod == 0:
+            pts = [(s * 5.12, y, 3.0 - 0.18 * math.sin(math.pi * y / 6.0)) for y in [6.0 * i / 12 for i in range(13)]]
+            m.mat("c_cable")
+            m.sweep(pts, [(0.018 * math.cos(a), 0.018 * math.sin(a)) for a in [2 * math.pi * i / 6 for i in range(6)]],
+                    closed=True, cap=False, up=(0, 0, 1))
+            m.mat("c_porcelain")
+            m.cyl((s * 5.12, 0, 3.04), r=0.045, r2=0.03, h=0.09, seg=8)
+            m.mat("c_iron_dark")
+            m.box((s * 5.2, 0, 3.08), (0.18, 0.025, 0.025), smooth=False)
+    # crown boards over the cap beams, between the struts
+    for x in (-1.8, -0.6, 0.6, 1.8):
+        m.mat("c_plank", uvscale=1.0)
+        m.box((x, 3.0, top + 0.37), (0.9, 5.7, 0.06), smooth=False)
     # lanterns hang from the cap beam outside the lanes
     for s in (-1, 1):
         lantern(m, (s * LANTERN_X, 0, top), lod)
@@ -449,25 +500,39 @@ def _bat_into(m, pose="up"):
     m.mat("c_bat")
     m.sphere((0, 0, 0), 0.055, 12, 8, s=(1.0, 1.25, 0.95))                            # body
     m.sphere((0, -0.07, 0.025), 0.04, 12, 8)                                          # head
+    m.mat("c_bat_belly")
+    m.sphere((0, -0.022, -0.012), 0.042, 10, 6, s=(0.9, 1.0, 0.85))                   # pale belly
     for s in (-1, 1):
+        m.mat("c_bat")
         m.cyl((s * 0.022, -0.075, 0.075), r=0.016, r2=0.0, h=0.05, seg=6)             # ears
+        m.mat("c_bat_ear")
+        m.cyl((s * 0.022, -0.087, 0.07), r=0.008, r2=0.0, h=0.03, seg=4)
         m.mat("c_eye")
         m.sphere((s * 0.016, -0.104, 0.035), 0.008, 6, 4)
+        m.mat("c_porcelain")
+        m.cyl((s * 0.008, -0.106, 0.008), r=0.004, r2=0.0, h=0.012, seg=4)             # fangs
         m.mat("c_bat")
-    m.mat("c_bat_wing")
+        m.cyl((s * 0.018, 0.06, -0.045), r=0.006, r2=0.002, h=0.03, seg=4)             # feet
     for s in (-1, 1):
-        # wing: membrane fan between finger bones, lifted or lowered at the tips
+        # wing: membrane between finger bones from the wrist, the trailing edge scalloped between the tips,
+        # lifted or lowered at the tips
         root = V((s * 0.04, 0.0, 0.01))
-        tips = [V((s * 0.24, -0.02, 0.1 * up)), V((s * 0.23, 0.06, 0.06 * up)), V((s * 0.17, 0.11, 0.0)),
+        wrist = V((s * 0.13, -0.05, 0.08 * up))
+        tips = [V((s * 0.25, -0.03, 0.1 * up)), V((s * 0.24, 0.06, 0.06 * up)), V((s * 0.17, 0.12, 0.0)),
                 V((s * 0.07, 0.09, -0.01))]
-        elbow = V((s * 0.13, -0.05, 0.08 * up))
-        ring = [root, elbow] + tips
+        ring = [root, wrist, tips[0]]
+        for a, b in zip(tips, tips[1:]):
+            mid = (a + b) / 2
+            ring += [mid + (wrist - mid) * 0.22, b]
+        m.mat("c_bat_wing")
         for i in range(1, len(ring) - 1):
             tri = [ring[0], ring[i], ring[i + 1]]
             m.poly([tuple(p) for p in (tri if s > 0 else tri[::-1])])
         m.mat("c_bat")
-        m.tube([tuple(root), tuple(elbow), tuple(tips[0])], r=0.006, seg=4)
-        m.mat("c_bat_wing")
+        m.tube([tuple(root), tuple(wrist), tuple(tips[0])], r=0.006, seg=4)
+        for t in tips[1:3]:
+            m.tube([tuple(wrist), tuple(t)], r=0.004, seg=4)                          # finger bones
+        m.cyl(tuple(wrist + V((0, -0.012, 0.012))), r=0.006, r2=0.0, h=0.02, seg=4)    # thumb claw
 
 
 def bat(pose="up", lod=0):
@@ -515,6 +580,56 @@ def _rock(m, c, r, rnd, s=(1, 1, 1), mat="c_rock_dark", sub=1):
         v.co += d * rnd.uniform(-0.12, 0.12)
 
 
+def _R(deg, axis):
+    return Matrix.Rotation(math.radians(deg), 4, axis)
+
+
+def _mushrooms(m, x, y, z, rnd, n=4, spread=0.18, hmin=0.06, hmax=0.16):
+    """A tuft of glowing pink mushrooms: pale stalks, flat caps."""
+    for j in range(n):
+        h = rnd.uniform(hmin, hmax)
+        px, py = x + rnd.uniform(-spread, spread), y + rnd.uniform(-spread * 1.4, spread * 1.4)
+        m.mat("c_porcelain")
+        m.cyl((px, py, z + h / 2), r=0.012, h=h, seg=5)
+        m.mat("c_mushroom")
+        m.sphere((px, py, z + h), h * 0.45, 8, 4, s=(1.0, 1.0, 0.55))
+
+
+def _gravel(m, x0, x1, y0, y1, rnd, n=10, rmin=0.05, rmax=0.11):
+    """Loose pebbles and chips on the floor."""
+    for k in range(n):
+        _rock(m, (rnd.uniform(x0, x1), rnd.uniform(y0, y1), 0.03), rnd.uniform(rmin, rmax), rnd, s=(1.0, 1.0, 0.6),
+              mat=rnd.choice(("c_rock", "c_rock_dark", "c_rock")))
+
+
+def _shards(m, x0, x1, y0, y1, rnd, n=4, mats=("c_crystal", "c_crystal_violet", "c_crystal_pink")):
+    """Loose crystal points lying or standing on the floor."""
+    for k in range(n):
+        crystal(m, (rnd.uniform(x0, x1), rnd.uniform(y0, y1), 0.0),
+                (rnd.uniform(-0.6, 0.6), rnd.uniform(-0.6, 0.6), 1.0), rnd.uniform(0.12, 0.26), 0.035,
+                rnd.choice(mats), twist=rnd.random())
+
+
+def _chain(m, top, n=5, link=0.07):
+    """A short hanging chain (links alternate planes) from `top` down; returns the bottom point."""
+    x, y, z = top
+    for k in range(n):
+        m.torus((x, y, z - link * 0.6 - k * link), R=link * 0.33, r=link * 0.085, seg=8, sides=4,
+                axis='X' if k % 2 else 'Y')
+    return (x, y, z - link * (n + 0.2))
+
+
+def _hard_hat(m, c, yaw=0.0):
+    """A miner's yellow helmet with a lamp, hung on a nail."""
+    m.push(Matrix.Translation(c) @ _R(yaw, 'Z') @ _R(-12, 'X'))
+    m.mat("c_paint_yellow")
+    m.sphere((0, 0, 0), 0.13, 12, 6, s=(1.0, 1.12, 0.8))
+    m.cyl((0, 0, -0.005), r=0.16, h=0.015, seg=14, r2=0.17)
+    m.mat("c_lamp_hot")
+    m.cyl((0, -0.13, 0.04), r=0.03, h=0.03, seg=10, axis='Y')
+    m.pop()
+
+
 def rockpile(name="ob_rockpile", seed=3):
     """SIDE: rubble from a roof fall heaped over one track (top ~0.9 m) with a broken timber and crystal shards.
     The cart cannot ride over it: tilt onto another track."""
@@ -539,6 +654,24 @@ def rockpile(name="ob_rockpile", seed=3):
     m.pop()
     crystal(m, (-0.45, -0.1, 0.65), (-0.3, -0.2, 1.0), 0.4, 0.06, "c_crystal")
     crystal(m, (0.55, 0.0, 0.55), (0.4, -0.1, 1.0), 0.3, 0.05, "c_crystal_violet")
+    # small detail: a snapped lagging board, a crystal spray grown through the heap, a pickaxe left in it, the
+    # 落石注意 (falling rocks) sign knocked over onto the rubble, and gravel and shards spilling toward the rider
+    m.mat("c_plank", uvscale=1.0)
+    m.push(Matrix.Translation((-0.55, 0.22, 0.78)) @ _R(24, 'Y') @ _R(-28, 'Z'))
+    m.box((0, 0, 0), (1.05, 0.17, 0.05), smooth=False)
+    m.pop()
+    m.mat("c_timber")
+    for k in range(4):                     # splinters on the snapped end
+        m.push(Matrix.Translation((-0.08 + 0.02 * k, 0.0 - 0.04 * k, 1.0 - 0.02 * k)) @ _R(-60 + 12 * k, 'Y'))
+        m.cyl((0, 0, 0.07), r=0.025, r2=0.0, h=0.14, seg=4, smooth=False)
+        m.pop()
+    crystal_cluster(m, (0.22, 0.05, 0.86), (0.15, -0.35, 1.0), size=0.5, rnd=rnd, mats=("c_crystal", "c_crystal_pink"), n=5)
+    pickaxe(m, (-0.85, -0.2, 0.25), yaw=-20, lean=38)
+    m.push(Matrix.Translation((1.15, -0.45, 0.02)) @ _R(-38, 'Y'))
+    signboard(m, (0, 0, 0), "落石注意", h=1.25, w=0.72, col="c_paint_white", ink="c_paint_red")
+    m.pop()
+    _gravel(m, -1.25, 1.25, -0.85, -0.3, rnd, n=12)
+    _shards(m, -1.1, 1.1, -0.9, -0.45, rnd, n=3)
     ob = m.obj(name, smooth_angle=40)
     return ob
 
@@ -551,16 +684,37 @@ def timber_beam(name="ob_timber_beam"):
     a hazard board above it and a lantern. Duck in the cart to pass."""
     m = E.Mesher(name)
     W = 2.3
+    rnd = random.Random(7)
     for s in (-1, 1):
         m.mat("c_timber", uvscale=1.0)
         m.push(Matrix.Translation((s * W / 2, 0, 0.0)) @ Matrix.Rotation(math.radians(s * -4), 4, 'Y'))
         m.box((0, 0, (BEAM_UNDERSIDE + 0.12) / 2), (0.24, 0.24, BEAM_UNDERSIDE + 0.12), bevel=(0.015, 1), smooth=False)
+        for k in range(4):                 # hazard bands at the foot, like the gallery frames
+            m.mat("c_paint_yellow" if k % 2 == 0 else "c_paint_black")
+            m.box((0, 0, 0.2 + k * 0.14), (0.25, 0.25, 0.14), smooth=False)
+        m.mat("c_iron_dark")
+        for z in (0.95, BEAM_UNDERSIDE - 0.08):
+            m.box((0, 0, z), (0.27, 0.27, 0.05), smooth=False)                          # iron strap
+            for bx in (-0.06, 0.06):
+                m.cyl((bx, -0.14, z), r=0.017, h=0.02, seg=8, axis='Y')                # bolt heads
         m.pop()
         m.mat("c_rock_dark")
         m.box((s * W / 2, 0, 0.05), (0.36, 0.36, 0.12), smooth=False)
+        for k in range(3):                 # rubble round the sill
+            _rock(m, (s * (W / 2 + rnd.uniform(0.15, 0.35)), rnd.uniform(-0.3, 0.3), 0.06), rnd.uniform(0.07, 0.13), rnd,
+                  s=(1.0, 1.0, 0.65), mat=rnd.choice(("c_rock", "c_rock_dark")))
+    _mushrooms(m, W / 2 + 0.25, 0.2, 0.0, rnd, n=5)
+    # a chain and hook off the cap's end (outside the lane) and a hard hat on a nail
+    m.mat("c_iron_dark")
+    bx, by, bz = _chain(m, (-W / 2 - 0.2, -0.1, BEAM_UNDERSIDE), n=5)
+    m.torus((bx, by, bz - 0.03), R=0.04, r=0.01, seg=10, sides=4, arc=270.0, axis='Y')
+    _hard_hat(m, (W / 2 - 0.02, -0.27, 1.06), yaw=8)
     m.mat("c_timber", uvscale=1.0)
     m.push(Matrix.Translation((0, 0, BEAM_UNDERSIDE + 0.14)) @ Matrix.Rotation(math.radians(2), 4, 'Y'))
     m.box((0, 0, 0), (W + 0.5, 0.28, 0.28), bevel=(0.015, 1), smooth=False)       # underside at the crouch line
+    for k in range(13):                    # painted yellow and black across the lane, like a crossing gate
+        m.mat("c_paint_yellow" if k % 2 == 0 else "c_paint_black")
+        m.box((-0.72 + k * 0.12, 0, 0), (0.12, 0.295, 0.295), smooth=False)
     m.pop()
     m.mat("c_iron_dark")
     for s in (-1, 1):
@@ -598,6 +752,28 @@ def crystal_rock(name="ob_crystal_rock", seed=9):
     crystal_cluster(m, (0.0, 0.0, 1.35), (0.0, -0.25, 1.0), size=1.2, rnd=rnd, mats=("c_crystal", "c_crystal_violet"), n=8)
     crystal_cluster(m, (-0.65, -0.45, 0.75), (-0.6, -0.6, 0.6), size=0.6, rnd=rnd, mats=("c_crystal_pink",), n=5)
     crystal_cluster(m, (0.75, -0.4, 0.7), (0.6, -0.6, 0.6), size=0.55, rnd=rnd, mats=("c_crystal",), n=5)
+    # small detail: a cluster on the back shoulder, moss over the top, rubble, shards and mushrooms round the foot
+    crystal_cluster(m, (0.45, 0.45, 1.25), (0.4, 0.6, 0.8), size=0.5, rnd=rnd, mats=("c_crystal_pink", "c_crystal"), n=4)
+
+    def surf(dx, dy, dz):                  # a point on the big boulder's surface along a direction
+        d = V((dx, dy, dz)).normalized()
+        return V((0, 0, 0.75)) + V((d.x * 1.0, d.y * 0.84, d.z * 0.8))
+
+    m.mat("c_moss")
+    for d, rr in (((-0.5, -0.3, 0.8), 0.2), ((0.3, -0.45, 0.85), 0.16), ((-0.75, 0.2, 0.65), 0.18)):
+        for j in range(4):                 # a ragged patch from a few overlapping flat blobs
+            dd = V(d) + V((rnd.uniform(-0.15, 0.15), rnd.uniform(-0.15, 0.15), 0.0))
+            m.push(Matrix.Translation(surf(*dd)) @ _orient(dd))
+            m.ico((0, 0, -0.03), rr * rnd.uniform(0.55, 0.9), 1, s=(1.0, 0.8, 0.28))
+            m.pop()
+    for k in range(10):
+        a = math.radians(rnd.uniform(-170, -10))
+        rr = rnd.uniform(1.15, 1.5)
+        _rock(m, (math.cos(a) * rr, math.sin(a) * rr * 0.8, 0.05), rnd.uniform(0.07, 0.16), rnd, s=(1.0, 1.0, 0.65),
+              mat=rnd.choice(("c_rock", "c_rock_dark")))
+    _shards(m, -1.3, 1.3, -1.25, -0.9, rnd, n=5)
+    _mushrooms(m, -1.05, -0.55, 0.0, rnd, n=5)
+    _mushrooms(m, 1.1, -0.3, 0.0, rnd, n=3)
     return m.obj(name, smooth_angle=40)
 
 
@@ -648,7 +824,7 @@ def _wagon_body(m, y0, L, rnd, lod=0, cargo=True):
         for k in range(6 if lod == 0 else 2):
             _rock(m, (rnd.uniform(-0.5, 0.5), rnd.uniform(y0 + 0.4, y0 + L - 0.4), z1 + 0.15), rnd.uniform(0.1, 0.16), rnd,
                   mat="c_ore")
-        for k in range(3 if lod == 0 else 1):
+        for k in range(5 if lod == 0 else 1):
             crystal(m, (rnd.uniform(-0.45, 0.45), rnd.uniform(y0 + 0.4, y0 + L - 0.4), z1 + 0.1),
                     (rnd.uniform(-0.4, 0.4), rnd.uniform(-0.4, 0.4), 1.0), rnd.uniform(0.25, 0.4), 0.05,
                     rnd.choice(("c_crystal", "c_crystal_pink", "c_crystal_violet")))
@@ -697,6 +873,36 @@ def ore_train(name="ob_ore_train", wagons=3, seed=11, lod=0):
            Matrix.Rotation(math.radians(90), 4, 'X'))
     m.text("水晶鉱山", size=0.16, depth=0.006, font=E.FONT_JP, c=(0, 0, 0))
     m.pop()
+    if lod == 0:
+        # small detail: rivets and louvres on the hood, yellow handrails, a horn, a roof beacon, number plate
+        m.mat("c_iron")
+        for s in (-1, 1):
+            for z in (0.7, 1.3):
+                for k in range(8):
+                    m.sphere((s * 0.655, 0.3 + k * 0.2, z), 0.016, 6, 3)
+        m.mat("c_iron_dark")
+        for s in (-1, 1):
+            for k in range(5):
+                m.box((s * 0.656, 1.4 + k * 0.09, 1.0), (0.012, 0.045, 0.3), smooth=False)
+        m.mat("c_loco_trim")
+        for s in (-1, 1):
+            m.tube([(s * 0.76, 0.3, 1.2), (s * 0.76, 1.75, 1.2)], r=0.018, seg=6)
+            for yy in (0.3, 1.0, 1.75):
+                m.cyl((s * 0.76, yy, 0.94), r=0.014, h=0.52, seg=6)
+        m.mat("c_brass")
+        m.cyl((-0.35, 0.55, 1.45), r=0.025, r2=0.07, h=0.26, seg=10, axis='Y')                # horn
+        m.mat("c_iron_dark")
+        m.box((0.3, 1.25, 1.44), (0.42, 0.3, 0.1), smooth=False)                             # sand box
+        m.mat("c_lamp")
+        m.cyl((0.45, 2.35, 2.22), r=0.075, h=0.12, seg=12)                                    # amber beacon
+        m.mat("c_iron_dark")
+        m.cyl((0.45, 2.35, 2.3), r=0.08, r2=0.05, h=0.04, seg=12)
+        m.mat("c_paint_white")
+        m.box((0, 0.185, 0.88), (0.36, 0.012, 0.17), smooth=False)                           # number plate
+        m.mat("c_paint_black")
+        m.push(Matrix.Translation((0, 0.175, 0.88)) @ _R(90, 'X'))
+        m.text("03", size=0.12, depth=0.006, font=E.FONT_JP, c=(0, 0, 0))
+        m.pop()
     y = L + 0.3
     for k in range(wagons):
         m.mat("c_iron_dark")
@@ -737,6 +943,54 @@ def fallen_log(name="ob_fallen_log", seed=4):
         m.tube([tuple(b), tuple(b + d * L)], r=0.045, seg=6, taper=0.5)                   # branch stubs
     crystal(m, (-0.2, -0.05, zc + r * 0.8), (0.1, -0.3, 1.0), 0.32, 0.05, "c_crystal")
     crystal(m, (-0.05, 0.05, zc + r * 0.85), (-0.2, 0.2, 1.0), 0.22, 0.04, "c_crystal_violet")
+
+    def axis_at(x):                        # the log's centre line and radius at x (the tube is a plain polyline)
+        x = min(max(x, pts[0][0]), pts[-1][0])
+        for a, b in zip(pts, pts[1:]):
+            if x <= b[0]:
+                u = (x - a[0]) / (b[0] - a[0])
+                return V(a).lerp(V(b), u), r * (1 - 0.15 * (x - pts[0][0]) / (pts[-1][0] - pts[0][0]))
+        return V(pts[-1]), r * 0.85
+
+    # bark: inked grooves broken into short runs over the front and top
+    m.mat("c_strap")
+    for a in (-110, -75, -40, -5, 30, 65):
+        x = pts[0][0] + rnd.uniform(0.05, 0.4)
+        while x < pts[-1][0] - 0.2:
+            L = min(rnd.uniform(0.35, 0.9), pts[-1][0] - 0.05 - x)
+            run = []
+            for t in (0.0, 0.5, 1.0):
+                c, rr = axis_at(x + L * t)
+                run.append(tuple(c + V((0, math.cos(math.radians(a)), math.sin(math.radians(a)))) * rr * 1.0))
+            m.tube(run, r=0.018, seg=5)
+            x += L + rnd.uniform(0.15, 0.5)
+    # end grain on the sawn end; the other end is snapped into splinters
+    c_end = V(pts[-1])
+    m.mat("c_timber_dark")
+    for f in (0.3, 0.55, 0.8):
+        m.torus(tuple(c_end + V((0.012, 0, 0))), R=r * 0.86 * f, r=0.007, seg=16, sides=4, axis='X')
+    m.mat("c_timber")
+    c0 = V(pts[0])
+    for k in range(7):
+        a = 2 * math.pi * k / 7 + rnd.uniform(0, 0.5)
+        rr = r * rnd.uniform(0.15, 0.8)
+        m.push(Matrix.Translation(tuple(c0 + V((0.02, math.cos(a) * rr, math.sin(a) * rr)))) @ _R(-90, 'Y'))
+        L = rnd.uniform(0.1, 0.24)
+        m.cyl((0, 0, L / 2), r=0.045, r2=0.0, h=L, seg=4, smooth=False)
+        m.pop()
+    # moss and glowing mushrooms on top, a little crystal spray, gravel at the rubble feet
+    for x in (-0.9, 0.1, 0.95):
+        c, rr = axis_at(x)
+        m.mat("c_moss")
+        m.ico(tuple(c + V((0, 0.03, rr * 0.82))), rnd.uniform(0.14, 0.2), 1, s=(1.6, 1.0, 0.35))
+    c, rr = axis_at(-0.55)
+    _mushrooms(m, c.x, c.y, c.z + rr * 0.9, rnd, n=4, spread=0.08, hmin=0.05, hmax=0.1)
+    c, rr = axis_at(0.4)
+    crystal_cluster(m, tuple(c + V((0, -0.05, rr * 0.85))), (0.15, -0.35, 1.0), size=0.34, rnd=rnd,
+                    mats=("c_crystal_pink", "c_crystal_violet"), n=4)
+    for sx in (-1, 1):
+        _gravel(m, sx * (W / 2 - 0.1) - 0.6, sx * (W / 2 - 0.1) + 0.6, -0.75, -0.4, rnd, n=5)
+        _mushrooms(m, sx * (W / 2 - 0.1) + 0.45 * sx, -0.4, 0.0, rnd, n=3)
     # rope and a red warning rag tied round it (makes the crouch line readable)
     m.mat("c_rope")
     m.torus((0.75, 0.0, zc), R=r * 1.02, r=0.018, seg=16, sides=5, axis='X')
@@ -1018,7 +1272,7 @@ def cave_lights(segments, y0=0.0, crystal_glow=True, energy=1.0):
         for k in range(2):
             y = y0 + i * SEG + k * 6.0
             for s in (-1, 1):
-                point("lantern", (s * LANTERN_X, y, LANTERN_Z - 0.1), 0xFFC27A, 120)
+                point("lantern", (s * LANTERN_X, y, LANTERN_Z - 0.1), 0xFFC27A, 170, 0.3)
     if crystal_glow:
         for ob in list(bpy.data.objects):
             if ob.type == 'MESH' and ob.name.startswith("cave_deco"):
@@ -1031,11 +1285,11 @@ def cave_lights(segments, y0=0.0, crystal_glow=True, energy=1.0):
 
 def cave_tint():
     """Lit band takes the lantern colour, shadow band the cave violet (game: Zones.CAVERN)."""
-    E.set_light_tint(light=0xFFDDB0, shadow=SHADOW, rimc=0xA8ECFF)
+    E.set_light_tint(light=0xFFE8C8, shadow=SHADOW, rimc=0xA8ECFF)
 
 
 def cave_world():
-    E.world_sky(0x0B0A1A, 0x1C1734, 1.0)
+    E.world_sky(0x2B2452, 0x4A3F7A, 1.0)
 
 
 def cave_run(n=4, y0=0.0, seeds=(1, 2, 3, 1), outlines=True, pipe=True, props=True, fork_at=None):
@@ -1165,6 +1419,20 @@ def design_cave_props(only=""):
         h = hotaru_lamp(); h.location = (0.6, -1.4, 0.45); h.scale = (4, 4, 4); h.rotation_euler.z = math.radians(-30)
         E.add_outline(h, 0.004)
         studio.shoot("cave_smallprops", target=(0.7, 0, 0.6), dist=12.5, yaw=10, pitch=16, lens=40)
+    if "closeups" in only:                 # one still per obstacle, for checking the small detail
+        shots = [("rockpile", rockpile, dict(target=(0.1, -0.2, 0.55), dist=4.0, yaw=22, pitch=16)),
+                 ("timber_beam", timber_beam, dict(target=(0, 0, 1.1), dist=4.6, yaw=18, pitch=10)),
+                 ("fallen_log", fallen_log, dict(target=(0, 0, 0.95), dist=4.8, yaw=16, pitch=12)),
+                 ("crystal_rock", crystal_rock, dict(target=(0, -0.2, 0.9), dist=5.0, yaw=20, pitch=14)),
+                 ("ore_train", lambda: ore_train(wagons=1), dict(target=(0, 1.8, 1.1), dist=5.6, yaw=32, pitch=12)),
+                 ("bat_swarm", lambda: bat_swarm(0), dict(target=(0, 0, 1.5), dist=3.6, yaw=12, pitch=6))]
+        for name, fn, cam in shots:
+            E.reset()
+            studio.stage(res=(1200, 900), floor=False)
+            mats()
+            _sheet_floor()
+            E.add_outline(fn(), 0.012)
+            studio.shoot("cave_ob_" + name, lens=40, **cam)
 
 
 def export_cave():

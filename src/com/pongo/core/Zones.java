@@ -61,23 +61,24 @@ public final class Zones {
 
     static {
         Palette c = new Palette();
-        // see blender/assets/cave.py: SHADOW 0x2E2850, cave_tint() light 0xFFDDB0 / rim 0xA8ECFF
-        c.shade = rgb(0x2E2850);
-        c.skinShade = rgb(0x5A3A52);
-        c.light = rgb(0x5E5482);         // no sun underground: the "lit" band is the crystals' cool glow
-        c.rim = rgb(0xA8ECFF);
-        c.skyTop = rgb(0x0B0A1A);
-        c.skyHor = rgb(0x1C1734);
-        c.skyLow = rgb(0x0B0A1A);
-        c.fog = rgb(0x120E26);
-        c.fogStart = 14f;
-        c.fogEnd = 85f;
+        // see blender/assets/cave.py: SHADOW 0x6E62AE, cave_tint() light 0xFFE8C8 / rim 0xA8ECFF, cave_world() sky.
+        // The Sakura Line manner underground: high-key, a lavender shadow band, warm lantern light, violet distance.
+        c.shade = rgb(0x6E62AE);
+        c.skinShade = rgb(0xB8849C);
+        c.light = rgb(0xFFE8C8);         // lantern-warm lit band
+        c.rim = rgb(0xA8ECFF);           // crystal-cool rim
+        c.skyTop = rgb(0x2B2452);
+        c.skyHor = rgb(0x4A3F7A);
+        c.skyLow = rgb(0x2B2452);
+        c.fog = rgb(0x3E3570);
+        c.fogStart = 20f;
+        c.fogEnd = 110f;
         c.heightFog = 0.12f;           // low dust haze over the tracks
-        c.ink = rgb(0x120C1C);
+        c.ink = rgb(0x2A2040);
         c.lampCol = new float[]{1.25f, 1.0f, 0.68f};   // Hotaru Lamp: warm brass beam
         c.lampRadius = 16f;
         c.shadowStrength = 0f;         // the sun shadow map means nothing in here
-        c.vignette = new float[]{0.06f, 0.04f, 0.14f, 0.45f};
+        c.vignette = new float[]{0.16f, 0.12f, 0.3f, 0.3f};
         c.night = 0f;
         PALETTE[CAVERN] = c;
     }

@@ -10,48 +10,42 @@ import texgen as T
 
 
 def cave_rock(n=256, seed=201):
-    """Layered cave rock: warped strata bands (v runs up the wall), blocky cracks between plates,
-    lit upper lips and shadowed undersides on each ledge, a few mineral flecks."""
+    """Clean painted rock in the Sakura Line manner: big flat value patches (two or three tones), a few wavy strata
+    lines drawn like ink, and sparse cracks with a lit lip. No fine grain: shape and colour come from the mesh."""
     ys, xs = np.mgrid[0:n, 0:n].astype(np.float64)
-    warp = (T.noise(n, 2, seed, 2) - 0.5) * 2.2 + (T.noise(n, 6, seed + 1) - 0.5) * 0.5
-    v = (n - 1 - ys) / n * 5 + warp            # 5 strata per tile
+    patch = T.poster(T.noise(n, 2, seed, 2), 3, 1.0)                  # broad flat tones
+    lum = 0.9 + (patch - 0.5) * 0.12
+    warp = (T.noise(n, 2, seed + 1, 2) - 0.5) * 1.4
+    v = (n - 1 - ys) / n * 3 + warp                                     # 3 strata per tile
     fv = v % 1.0
-    band = np.floor(v)
-    # each stratum: bright lip at the top, darker toward its underside
-    lum = 0.9 - 0.2 * (1 - fv) ** 2
-    lum *= 1 - 0.42 * (1 - T.smooth(fv, 0.0, 0.07))
-    lum += (1 - T.smooth(np.abs(fv - 0.93), 0.0, 0.04)) * 0.07
-    lum *= 0.94 + ((band * 7) % 4) * 0.025
-    # plates: wrapped Voronoi cracks
+    line = 1 - T.smooth(np.abs(fv - 0.5), 0.0, 0.018)                   # thin strata line
+    lip = (1 - T.smooth(np.abs(fv - 0.53), 0.0, 0.03)) * 0.06           # lit lip just above it
+    lum = lum * (1 - 0.28 * line) + lip
+    # sparse cracks: a few Voronoi edges only where a second noise allows, inked thin
     rng = np.random.default_rng(seed)
-    f1, f2, idx = T.voronoi(n, rng.random((26, 2)) * n)
-    crack = 1 - T.smooth(f2 - f1, 0.6, 2.6)
-    lum *= 1 - 0.38 * crack
-    lum *= 0.94 + 0.12 * rng.random(26)[idx]
-    lum = T.poster(np.clip(lum, 0, 1), 7, 0.45)
-    fleck = T.noise(n, 90, seed + 2)
-    lum += np.where(fleck > 0.74, 0.12, 0.0)
+    f1, f2, idx = T.voronoi(n, rng.random((9, 2)) * n)
+    crack = (1 - T.smooth(f2 - f1, 0.4, 1.6)) * (T.noise(n, 2, seed + 3) > 0.52)
+    lum *= 1 - 0.3 * crack
     img = np.repeat(np.clip(lum, 0, 1)[..., None], 3, -1)
     T.write_png("t_cave_rock", img)
 
 
 def cave_floor(n=256, seed=211):
-    """Packed mine floor: damp earth with scattered pebbles, each with a lit top and a contact shadow."""
+    """Packed mine floor, clean like the Sakura Line ballast: a flat light ground with a few tidy pebbles, each a
+    flat shape with a lit top and a crisp contact shadow."""
     rng = np.random.default_rng(seed)
-    lum = 0.78 + (T.poster(T.noise(n, 4, seed, 3), 5, 0.5) - 0.5) * 0.3
+    lum = 0.92 + (T.poster(T.noise(n, 2, seed, 2), 3, 1.0) - 0.5) * 0.06
     ys, xs = np.mgrid[0:n, 0:n].astype(np.float64)
-    for i in range(260):
+    for i in range(70):
         cx, cy = rng.random() * n, rng.random() * n
-        rx, ry = 2.0 + rng.random() * 4.0, 1.6 + rng.random() * 3.0
+        rx, ry = 2.5 + rng.random() * 3.5, 2.0 + rng.random() * 2.6
         dx = (xs - cx + n / 2) % n - n / 2
         dy = (ys - cy + n / 2) % n - n / 2
         d = (dx / rx) ** 2 + (dy / ry) ** 2
-        sh = ((dx - 1.2) / rx) ** 2 + ((dy - 1.4) / ry) ** 2
-        lum = np.where((sh < 1.0) & (d >= 1.0), lum * 0.7, lum)
-        tone = 0.8 + 0.25 * rng.random()
-        lit = np.clip(1.05 - 0.25 * (dx / rx + dy / ry), 0.7, 1.15)
-        lum = np.where(d < 1.0, tone * lit, lum)
-    lum = T.blur(lum, 0.4)
+        sh = ((dx - 1.0) / rx) ** 2 + ((dy - 1.2) / ry) ** 2
+        lum = np.where((sh < 1.0) & (d >= 1.0), lum * 0.82, lum)
+        top = ((dx + 0.6) / rx) ** 2 + ((dy + 0.7) / ry) ** 2 < 0.35
+        lum = np.where(d < 1.0, np.where(top, 1.0, 0.86 + 0.06 * rng.random()), lum)
     img = np.repeat(np.clip(lum, 0, 1)[..., None], 3, -1)
     T.write_png("t_cave_floor", img)
 

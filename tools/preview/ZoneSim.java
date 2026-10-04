@@ -45,7 +45,9 @@ public class ZoneSim {
                 RenderFrame g = new RenderFrame();
                 z.apply(g, 0, 1.5f, -d);
                 check(g.lamp[3] > 10f, "Hotaru Lamp on before the mouth (radius " + g.lamp[3] + ")");
-                check(g.shadeCol[0] < 0.25f, "shadow band dark in the tunnel (" + g.shadeCol[0] + ")");
+                float[] cs = Zones.PALETTE[Zones.CAVERN].shade;
+                check(Math.abs(g.shadeCol[0] - cs[0]) < 0.05f && Math.abs(g.shadeCol[2] - cs[2]) < 0.05f,
+                      "cave lavender shadow band in the tunnel (" + g.shadeCol[0] + ", " + g.shadeCol[2] + ")");
             }
         }
         check((seen & Zones.EV_APPROACH) != 0, "approach event");
