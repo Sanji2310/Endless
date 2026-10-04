@@ -20,7 +20,7 @@ V = Vector
 GRIP_CART = (V((0.24, 0.6, 1.0)), V((-0.24, 0.6, 1.0)))
 FLOOR_CART = 0.45
 SEAT_BOAT = V((0.0, -0.15, 0.12))
-TOGGLES = (V((0.3, 0.06, 0.86)), V((-0.3, 0.06, 0.86)))
+TOGGLES = (V((0.3, 0.1, 0.66)), V((-0.3, 0.1, 0.66)))   # shoulder height when seated
 RISERS = (V((0.2, 0.02, 1.0)), V((-0.2, 0.02, 1.0)))
 CARABINERS = (V((0.2, 0.0, 0.42)), V((-0.2, 0.0, 0.42)))
 GAUGE = 1.067
@@ -349,8 +349,14 @@ def glider(name="glider"):
                 closed=True, cap=True)
         m.mat("v_line")
         tg = TOGGLES[0 if sd > 0 else 1]
-        m.sweep([rp + V((0, -0.02, 0)), tg], [(math.cos(2 * math.pi * k / 4), math.sin(2 * math.pi * k / 4)) for k in range(4)],
+        # brake line: trailing edge of the outer canopy -> through a pulley on the rear riser -> toggle
+        te, tt_, ta = _canopy_pt(sd * 0.72, 1.0)
+        te = te - V((math.sin(ta), 0, math.cos(ta))) * tt_ * 0.5
+        pul = rp + V((0, -0.03, -0.02))
+        m.sweep([te, pul, tg], [(math.cos(2 * math.pi * k / 4), math.sin(2 * math.pi * k / 4)) for k in range(4)],
                 closed=True, cap=False, scale=lambda tt: 0.004)
+        m.mat("v_gold")
+        m.torus(tuple(pul), R=0.014, r=0.004, seg=10, sides=5, axis='X')
         m.mat("v_canopy_orange")
         m.rbox(tuple(tg + V((0, 0, -0.04))), (0.03, 0.03, 0.09), 0.01, 1)
         m.mat("v_gold")

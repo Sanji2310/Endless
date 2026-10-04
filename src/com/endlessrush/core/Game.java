@@ -72,6 +72,9 @@ public final class Game {
     // generation
     private float genS, nextPowerS, lastMystery;
 
+    /** Vehicle segments (cart, canoe, glider) and the set pieces between them. */
+    public final Ride ride = new Ride(this);
+
     public Game(Profile profile, Listener listener) {
         this.profile = profile;
         this.listener = listener;
@@ -89,7 +92,7 @@ public final class Game {
         if (listener != null) listener.onStateChanged(st);
     }
 
-    private void sound(int id) { if (listener != null) listener.onSound(id); }
+    void sound(int id) { if (listener != null) listener.onSound(id); }
 
     private void message(String m) { if (listener != null) listener.onMessage(m); }
 
@@ -111,6 +114,7 @@ public final class Game {
         genS = 45;
         nextPowerS = 260;
         lastMystery = 0;
+        ride.reset();
         coinLine(0, 18, 8, 3f);
     }
 
@@ -135,9 +139,12 @@ public final class Game {
 
     // ------------------------------------------------------------------ input
 
-    public void left() { changeLane(-1); }
+    public void left() { if (state == RUNNING && ride.swipe(0)) return; changeLane(-1); }
 
-    public void right() { changeLane(1); }
+    public void right() { if (state == RUNNING && ride.swipe(1)) return; changeLane(1); }
+
+    /** Phone tilt, normalised to -1..1 (x: right, y: toward the player). Used by the vehicle rides. */
+    public void tilt(float tx, float ty) { ride.setTilt(tx, ty); }
 
     private void changeLane(int d) {
         if (state != RUNNING) return;
@@ -153,6 +160,7 @@ public final class Game {
     }
 
     public void jump() {
+        if (state == RUNNING && ride.swipe(2)) return;
         if (state != RUNNING || jetT > 0) return;
         if (grounded || airT < 0.12f) {
             vy = sneakT > 0 ? SNEAK_V : JUMP_V;
@@ -167,6 +175,7 @@ public final class Game {
     }
 
     public void roll() {
+        if (state == RUNNING && ride.swipe(3)) return;
         if (state != RUNNING || jetT > 0) return;
         if (!grounded) {
             vy = Math.min(vy, -38f);
@@ -185,7 +194,7 @@ public final class Game {
     }
 
     public boolean hoverboard() {
-        if (state != RUNNING || boardT > 0 || profile.boards <= 0) return false;
+        if (state != RUNNING || boardT > 0 || profile.boards <= 0 || ride.active()) return false;
         profile.boards--;
         boardT = BOARD_TIME;
         mission(Missions.BOARDS, 1);
@@ -218,6 +227,7 @@ public final class Game {
         invulnT = 3f;
         chaseT = 0;
         speedFactor = 1;
+        ride.onRevive();
         setState(RUNNING);
     }
 
@@ -260,14 +270,20 @@ public final class Game {
 
         speedFactor = Math.min(1, speedFactor + dt * 0.35f);
         float target = Math.min(MAX_SPEED, BASE_SPEED + s * 0.0028f);
-        speed = target * speedFactor;
+        speed = target * speedFactor * (ride.riding() ? ride.speedScale : 1f);
         s += speed * dt;
 
+        // on a vehicle (or boarding one) the ride moves her; otherwise the runner rules below
+        boolean riding = ride.step(dt);
+        if (riding) chaseT = 0;
+
         // lateral
-        float tx = lane * LANE_W;
-        float dx = tx - x;
-        float mv = LAT_SPEED * dt;
-        x = Math.abs(dx) <= mv ? tx : x + Math.signum(dx) * mv;
+        if (!riding) {
+            float tx = lane * LANE_W;
+            float dx = tx - x;
+            float mv = LAT_SPEED * dt;
+            x = Math.abs(dx) <= mv ? tx : x + Math.signum(dx) * mv;
+        }
 
         // timers
         if (boardT > 0) boardT = Math.max(0, boardT - dt);
@@ -293,7 +309,9 @@ public final class Game {
 
         // vertical
         boolean lenient = invulnT > 0 || jetT > 0;
-        if (jetT > 0) {
+        if (riding) {
+            airT = 0;
+        } else if (jetT > 0) {
             jetT = Math.max(0, jetT - dt);
             y += (JET_Y - y) * Math.min(1, dt * 3f);
             vy = 0;
@@ -324,7 +342,7 @@ public final class Game {
             if (rollT <= 0) rolling = false;
         }
 
-        if (!lenient) collide();
+        if (!lenient && !riding) collide();
         if (state != RUNNING) return;
 
         collectPickups(dt);
@@ -420,7 +438,7 @@ public final class Game {
         sound(SND_BREAK);
     }
 
-    private void die(int kind) {
+    void die(int kind) {
         deathKind = kind;
         deathT = 0;
         shake = 0.5f;
@@ -556,7 +574,13 @@ public final class Game {
     // ------------------------------------------------------------------ level generation
 
     private void generate() {
-        while (genS < s + 240) spawnPattern();
+        // ride zones generate their own hazards (Ride); stop short of the next one and resume after it
+        if (ride.vehicle != Ride.NONE) {
+            genS = Math.max(genS, ride.zones.nextZoneStart(s) + 40);
+            return;
+        }
+        float limit = Math.min(s + 240, ride.runGenLimit(s) - 40);
+        while (genS < limit) spawnPattern();
     }
 
     private float difficulty() { return Math.min(1f, genS / 5000f); }
