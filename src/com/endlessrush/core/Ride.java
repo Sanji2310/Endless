@@ -39,7 +39,9 @@ public final class Ride {
     /** World scale: Pongo and her vehicles are modelled in metres and drawn 1.2x (PongoScene.HERO_SCALE). */
     public static final float K = 1.2f;
     public static final float TRACK_W = Game.LANE_W;
-    public static final float CART_FLOOR = 0.45f * K, CART_TOP_STAND = 1.85f * K, CART_TOP_CROUCH = 1.05f * K;
+    // Pongo rides at 1.2x her model (vehicles.py PONGO_SCALE): head top 1.96 standing, 1.14 ducked (+ hair)
+    public static final float PONGO_SCALE = 1.2f;
+    public static final float CART_FLOOR = 0.45f * K, CART_TOP_STAND = 2.0f * K, CART_TOP_CROUCH = 1.19f * K;
     public static final float SWITCH_TIME = 0.3f, CROUCH_HOLD = 0.85f;
     public static final float RIVER_HALF = 4.6f, BOAT_HALF = 0.62f, BOAT_LAT = 8.5f;
     public static final float GL_LAT = 9f, GL_VERT = 5.5f, GL_SINK = 0.5f, ALT_MIN = 3f, ALT_MAX = 12f, ALT_START = 7f;

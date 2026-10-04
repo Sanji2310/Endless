@@ -51,6 +51,19 @@ def mats():
     M("sk_terrace_water", 0xB9E4F0, rim=0.1, soft=0.2, spec=0.5)
     M("sk_roof", 0x4A4E66, rim=0.2, soft=0.1)
     M("sk_wall", 0xF2EAD8, rim=0.2, soft=0.1)
+    M("sk_grass", 0xA8D46E, rim=0.2, soft=0.2, shadow=0x9A9AD0)
+    M("sk_tree", 0x8CCB6A, rim=0.3, soft=0.25, shadow=0x6E9AA8)
+    M("sk_tree2", 0x6FB46A, rim=0.3, soft=0.25, shadow=0x5E88A0)
+    M("sk_flower", 0xFFD25E, rim=0.3, soft=0.2, emis=0.08)
+    M("sk_flower2", 0xFF9E7A, rim=0.3, soft=0.2, emis=0.05)
+    M("sk_timber", 0x7A5A48, rim=0.25, soft=0.1, shadow=0x5E4A70)
+    M("sk_moss", 0x96C66A, rim=0.2, soft=0.15)
+    M("sk_far", 0xA6C4E2, rim=0.1, soft=0.3, outline=0.0, flags=E.F_NOCAST, shadow=0xA6B0E0)
+    M("sk_far2", 0xC4CEEC, rim=0.1, soft=0.3, outline=0.0, flags=E.F_NOCAST, shadow=0xBAB8E8)
+    M("sk_snow", 0xF6F8FF, rim=0.1, soft=0.3, outline=0.0, flags=E.F_NOCAST)
+    M("sk_water", 0xBFEAF6, rim=0.2, soft=0.15, emis=0.15, flags=E.F_WATER | E.F_NOCAST, outline=0.0)
+    M("sk_foam", 0xFFFFFF, rim=0.2, soft=0.3, emis=0.2, flags=E.F_NOCAST, outline=0.0)
+    M("sk_rope", 0xD8C29A, rim=0.2, soft=0.1)
 
 
 # ----------------------------------------------------------------------------- crow
@@ -268,6 +281,147 @@ def terraces(name="terraces", seed=2, w=60.0, d=60.0):
         m.mat("sk_roof")
         m.cyl((x, y, z + 1.5), r=1.6, h=0.7, seg=4, r2=0.1)
     return m.obj(name, smooth_angle=30)
+
+
+# ----------------------------------------------------------------------------- the gorge either side of the glide
+
+PAL = {"trunk": "sk_bark", "leaf": "sk_tree", "leaf2": "sk_tree2", "leaf3": "sk_pine", "flower": "sk_flower",
+       "flower2": "sk_flower2", "wall": "sk_wall", "timber": "sk_timber", "roof": "sk_roof", "stone": "sk_rock",
+       "stone2": "sk_rock_dark", "moss": "sk_moss", "far": "sk_far", "far2": "sk_far2", "snow": "sk_snow",
+       "water": "sk_water", "foam": "sk_foam", "rope": "sk_rope", "red": "sk_red", "glow": "sk_glow", "culm": "sk_stick"}
+GORGE = 9.0         # cliff faces start this far either side of the glide line (Ride.SKY_HALF is 6 game m = 5 here)
+FLOOR = -14.0       # valley floor below the glide line
+
+
+def _cliff_column(m, rnd, x, y, z0, z1, r):
+    """Stacked eroded rock drums from z0 up to z1; returns the top centre."""
+    z = z0
+    while z < z1:
+        dh = rnd.uniform(1.6, 3.0)
+        m.mat("sk_rock" if rnd.random() < 0.6 else "sk_rock_dark")
+        m.cyl((x + rnd.uniform(-0.15, 0.15), y + rnd.uniform(-0.15, 0.15), z + dh / 2), r=r, h=dh, seg=9,
+              r2=r * rnd.uniform(0.86, 0.98))
+        z += dh * 0.9
+        r *= rnd.uniform(0.94, 1.0)
+    return V((x, y, z)), r
+
+
+def sky_gorge(name="sky_gorge", L=40.0, seed=3):
+    """One tile of the gorge the glider flies along: cliff columns either side with grassy tops, pines, shrines,
+    a waterfall, fences and hamlets on the ledges, a rope bridge high across now and then, terraces on the floor."""
+    import scenery as SC
+    mats()
+    rnd = random.Random(seed)
+    m = E.Mesher(name)
+    P = PAL
+    for sd in (-1, 1):
+        y = 0.0
+        while y < L:
+            r = rnd.uniform(2.0, 3.4)
+            x = sd * (GORGE + r + rnd.uniform(0.0, 2.5))
+            top_z = rnd.uniform(-2.0, 12.0)
+            top, rt = _cliff_column(m, rnd, x, y + r, FLOOR, top_z, r)
+            # grassy cap with dressing
+            m.mat("sk_grass")
+            m.ico(tuple(top + V((0, 0, 0.1))), rt * 1.05, 2, s=(1, 1, 0.22))
+            k = rnd.random()
+            if k < 0.35:
+                SC.pine(m, P, tuple(top + V((-sd * rt * 0.4, 0, 0.2))), rnd, h=rnd.uniform(2.5, 4.0))
+                SC.shrub(m, P, tuple(top + V((sd * rt * 0.3, 0.6, 0.2))), rnd, r=0.5, flowers=P["flower"])
+            elif k < 0.55:
+                SC.house(m, P, top + V((0, 0, 0.1)), rnd, rot=math.radians(90 * sd), w=2.0, d=1.6, h=1.2)
+                SC.round_tree(m, P, tuple(top + V((0, rt * 0.6, 0.2))), rnd, h=2.4, r=1.0)
+            elif k < 0.7:
+                SC.pagoda(m, P, tuple(top + V((0, 0, 0.1))), tiers=3, s=0.6)
+            else:
+                for j in range(3):
+                    SC.round_tree(m, P, tuple(top + V((rnd.uniform(-1, 1) * rt * 0.5, rnd.uniform(-1, 1) * rt * 0.5, 0.2))),
+                                  rnd, h=rnd.uniform(2.0, 3.2), r=rnd.uniform(0.8, 1.2))
+            SC.grass_tufts(m, P, tuple(top + V((0, 0, 0.25))), rnd, n=5, spread=rt * 0.6, h=0.4)
+            # ledge pines and moss clinging to the cliff face on the gorge side
+            for j in range(2):
+                zz = rnd.uniform(FLOOR + 4, top_z - 1)
+                p = V((x - sd * r * 0.95, y + r + rnd.uniform(-r, r) * 0.6, zz))
+                SC.rock(m, P, tuple(p), rnd, r=0.6)
+                if rnd.random() < 0.5:
+                    SC.pine(m, P, tuple(p + V((-sd * 0.2, 0, 0.3))), rnd, h=1.8)
+            if rnd.random() < 0.2:
+                SC.waterfall(m, P, (x - sd * r * 0.98, y + r, top_z - 0.5), drop=top_z - FLOOR - 1, w=1.0)
+            y += 2 * r + rnd.uniform(-0.5, 0.8)
+        # second rank behind: taller, simpler
+        y = rnd.uniform(-4, 0)
+        while y < L:
+            r = rnd.uniform(3.0, 4.5)
+            x = sd * (GORGE + 7 + r + rnd.uniform(0, 4))
+            top, rt = _cliff_column(m, rnd, x, y + r, FLOOR, rnd.uniform(8, 20), r)
+            m.mat("sk_grass")
+            m.ico(tuple(top + V((0, 0, 0.1))), rt * 1.05, 1, s=(1, 1, 0.25))
+            for j in range(2):
+                SC.round_tree(m, P, tuple(top + V((rnd.uniform(-1, 1) * rt * 0.5, rnd.uniform(-1, 1) * rt * 0.5, 0.2))),
+                              rnd, h=rnd.uniform(2.4, 3.6), r=rnd.uniform(1.0, 1.5))
+            y += 2 * r
+    # rope bridge across, well above the glide ceiling (ALT_MAX 12 game = 10 here) so it is scenery, not a hazard
+    if rnd.random() < 0.6:
+        y = rnd.uniform(8, L - 8)
+        a, b = V((-GORGE - 1.5, y, 13.0)), V((GORGE + 1.5, y, 13.0))
+        n = 24
+        pts = [a.lerp(b, k / n) + V((0, 0, -1.6 * math.sin(math.pi * k / n))) for k in range(n + 1)]
+        m.mat("sk_timber")
+        for p in pts[1:-1]:
+            m.box(tuple(p), (0.5, 1.0, 0.06), smooth=False)
+        m.mat("sk_rope")
+        for dy in (-0.5, 0.5):
+            m.tube([tuple(p + V((0, dy, 0.7))) for p in pts], r=0.025, seg=5)
+        m.mat("sk_paper_red")
+        for k in range(2, n - 1, 3):
+            m.box(tuple(pts[k] + V((0, 0.5, 0.45))), (0.03, 0.2, 0.32), smooth=False)
+    # valley floor: terrace bands and a stream
+    m.mat("sk_terrace")
+    m.box((0, L / 2, FLOOR - 0.2), (2 * GORGE + 8, L, 0.4), smooth=False)
+    m.mat("sk_terrace_water")
+    for k in range(8):
+        for sd in (-1, 1):
+            m.box((sd * rnd.uniform(2.5, 7), rnd.uniform(0, L), FLOOR + 0.02), (rnd.uniform(2, 4), rnd.uniform(2, 4), 0.02),
+                  smooth=False)
+    m.mat("sk_water")
+    m.box((rnd.uniform(-1, 1), L / 2, FLOOR + 0.03), (1.2, L, 0.02), smooth=False)
+    return m.obj(name, smooth_angle=30)
+
+
+def sky_backdrop(name="sky_far", seed=9):
+    import scenery as SC
+    mats()
+    rnd = random.Random(seed)
+    m = E.Mesher(name)
+    SC.mountains(m, PAL, (0, 150, FLOOR), rnd, n=7, w=200, h=(26, 46), depth=18)
+    return m.obj(name, smooth_angle=30)
+
+
+def design_sky_gorge():
+    import studio
+    E.reset()
+    studio.stage(res=(1280, 720), floor=False, sky_top=0x8FC8F4, sky_hor=0xEAF6FF)
+    outl = []
+    for k in range(4):
+        g = sky_gorge("sky_gorge_%d" % k, seed=3 + k)
+        g.location = (0, k * 40.0, 0)
+        outl.append(g)
+    sky_backdrop()
+    for k, (x, y, z, sz) in enumerate(((-4, 30, -6, 6), (5, 55, -5, 7), (-6, 80, 4, 5), (3, 18, 13, 4), (8, 100, -3, 8))):
+        c = cloud("cloud_%d" % k, seed=k + 2, size=sz)
+        c.location = (x, y, z)
+    bo, wo = crow()
+    bo.location = (1.5, 22, 6.0)
+    wo.location = (1.6, 22, 6.02)
+    sl = sky_lantern()
+    sl.location = (-2.0, 30, 5.0)
+    k = kite()
+    k.location = (3.0, 38, 8.0)
+    for o in outl + [bo, wo, sl, k]:
+        E.add_outline(o, 0.012)
+    studio.aim_sun(150)
+    studio.shoot("sky_gorge_runner", target=(0, 30, 5.0), dist=14, yaw=0, pitch=10, lens=30, light=False)
+    studio.shoot("sky_gorge_overview", target=(0, 50, 0.0), dist=48, yaw=330, pitch=28, lens=30, light=False)
 
 
 # ----------------------------------------------------------------------------- design render

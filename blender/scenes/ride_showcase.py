@@ -206,7 +206,7 @@ def _render(name, frames, strip_times):
 
 def ride_loop(veh="cart"):
     E.reset()
-    studio.stage(res=(720, 720))
+    studio.stage(res=(720, 720), **({"floor_col": 0x8FD3E8} if veh == "boat" else {}))   # boat: floor = waterline
     arm = _pongo()
     objs = _vehicles()
     rate = {"cart": 1 / 0.8, "boat": 1 / 1.25, "glider": 1 / 1.4}[veh]

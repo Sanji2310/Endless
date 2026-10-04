@@ -59,6 +59,19 @@ def mats():
     M("rv_heron", 0xF7F8FC, rim=0.35, soft=0.12)
     M("rv_beak", 0xF2B84A, rim=0.2, soft=0.1)
     M("rv_leaf_float", 0xC8D86A, rim=0.2, soft=0.2, outline=0.0, flags=E.F_NOCAST | E.F_DOUBLE)
+    M("rv_trunk", 0x8A6A58, rim=0.25, soft=0.12, shadow=0x6E5A86)
+    M("rv_tree", 0x86C870, rim=0.3, soft=0.25, shadow=0x6E9AA8)
+    M("rv_tree2", 0x6CB466, rim=0.3, soft=0.25, shadow=0x5E88A0)
+    M("rv_pine", 0x4E9A72, rim=0.3, soft=0.25, shadow=0x4E7698)
+    M("rv_hydrangea", 0x9DB6F2, rim=0.3, soft=0.2, emis=0.05)
+    M("rv_hydrangea2", 0xC9A8EE, rim=0.3, soft=0.2, emis=0.05)
+    M("rv_wall", 0xF6EEDC, rim=0.25, soft=0.1, shadow=0xB8B0D8)
+    M("rv_timber", 0x7A5A48, rim=0.25, soft=0.1, shadow=0x5E4A70)
+    M("rv_roof", 0x5E6A8E, rim=0.3, soft=0.1, shadow=0x4A4E7E)
+    M("rv_far", 0x9CC6C8, rim=0.1, soft=0.3, outline=0.0, flags=E.F_NOCAST, shadow=0x9CB0D8)
+    M("rv_far2", 0xB8C8E4, rim=0.1, soft=0.3, outline=0.0, flags=E.F_NOCAST, shadow=0xB0B4E0)
+    M("rv_snow", 0xF4F6FF, rim=0.1, soft=0.3, outline=0.0, flags=E.F_NOCAST)
+    M("rv_rope", 0xD8C29A, rim=0.2, soft=0.1)
     M("rv_whirl", 0xE8F8FF, emis=0.3, rim=0.0, soft=0.2, flags=E.F_NOCAST | E.F_DECAL, outline=0.0)
 
 
@@ -81,6 +94,10 @@ def bamboo_clump(m, c, rnd, n=7, h=6.5):
         for k in range(1, 6):
             p = pts[k]
             m.torus(tuple(p), R=0.05 * (1 - 0.06 * k), r=0.012, seg=10, sides=4)
+        m.mat("rv_tree" if i % 2 else "rv_tree2")      # soft leaf masses so a grove reads full, not wiry
+        for k in range(3):
+            p = pts[6].lerp(pts[4], k / 3) + V((math.cos(a), math.sin(a), 0)) * 0.3
+            m.ico(tuple(p), rnd.uniform(0.45, 0.7) * h / 6.5, 1, s=(1.2, 1.2, 0.55))
         m.mat("rv_leaf")
         for k in range(5):
             p = pts[6].lerp(pts[3], k / 5) + V((rnd.uniform(-0.2, 0.2), rnd.uniform(-0.2, 0.2), 0))
@@ -169,11 +186,73 @@ def leaf_drift(m, c, rnd, n=14, r=0.9):
 
 # ----------------------------------------------------------------------------- river segment
 
+PAL = {"trunk": "rv_trunk", "leaf": "rv_tree", "leaf2": "rv_tree2", "leaf3": "rv_pine", "flower": "rv_hydrangea",
+       "flower2": "rv_hydrangea2", "wall": "rv_wall", "timber": "rv_timber", "roof": "rv_roof", "stone": "rv_stone",
+       "stone2": "rv_stone_dark", "moss": "rv_moss", "far": "rv_far", "far2": "rv_far2", "snow": "rv_snow",
+       "water": "rv_water", "foam": "rv_foam", "rope": "rv_rope", "red": "rv_torii", "glow": "rv_lantern_glow",
+       "culm": "rv_bamboo"}
+
+
 def _bank_profile(side):
-    """Cross-section of one bank from the water's edge outward (x, z)."""
+    """Cross-section of one bank from the water's edge outward (x, z): low grassy bank, then the valley side
+    rising into wooded hills so the frame is full either side of the river."""
     e = RIVER_HALF
     return [(side * (e - 0.1), -0.25), (side * e, 0.12), (side * (e + 0.5), 0.3), (side * (e + 1.6), 0.55),
-            (side * (e + 4.0), 0.75), (side * (e + 9.0), 1.0)]
+            (side * (e + 4.0), 0.75), (side * (e + 9.0), 1.2), (side * (e + 14.0), 2.6), (side * (e + 22.0), 6.0)]
+
+
+def _bank_z(d):
+    """Ground height at distance d outward from the river's edge (matches _bank_profile)."""
+    prof = [(-0.1, -0.25), (0, 0.12), (0.5, 0.3), (1.6, 0.55), (4.0, 0.75), (9.0, 1.2), (14.0, 2.6), (22.0, 6.0)]
+    for (a, za), (b, zb) in zip(prof, prof[1:]):
+        if d <= b:
+            return za + (zb - za) * (d - a) / (b - a)
+    return prof[-1][1]
+
+
+def river_sides(m, L, rnd, sd):
+    """Dense dressing for one bank: water's edge, the near bank, the bamboo grove, the hillside village."""
+    import scenery as SC
+    e = RIVER_HALF
+    P = PAL
+    at = lambda d, y: (sd * (e + d), y, _bank_z(d))
+    # water's edge: reed beds, lily pads, mossy boulders, stepping stones
+    for k in range(4):
+        reeds(m, (sd * (e - 0.35), rnd.uniform(0.5, L - 0.5), -0.02), rnd, n=9)
+    for k in range(2):
+        lily_pads(m, (sd * (e - 1.0), rnd.uniform(1, L - 1), 0), rnd, n=4)
+    for k in range(5):
+        SC.rock(m, P, at(rnd.uniform(-0.2, 0.6), rnd.uniform(0, L)), rnd, r=rnd.uniform(0.2, 0.45))
+    # near bank: grass tufts, hydrangea shrubs, a bamboo fence run, lanterns
+    for k in range(6):
+        SC.grass_tufts(m, P, at(rnd.uniform(0.6, 3.5), rnd.uniform(0, L)), rnd, n=6)
+    for k in range(5):
+        y = rnd.uniform(0.5, L - 0.5)
+        SC.shrub(m, P, at(rnd.uniform(1.2, 3.8), y), rnd, r=rnd.uniform(0.35, 0.6),
+                 flowers=rnd.choice((P["flower"], P["flower2"])))
+    y0 = rnd.uniform(1, 6)
+    SC.bamboo_fence(m, P, at(2.2, y0), at(2.2, y0 + rnd.uniform(5, 9)))
+    # bamboo grove behind, thick
+    for k in range(6):
+        bamboo_clump(m, at(rnd.uniform(4.0, 8.5), rnd.uniform(0.5, L - 0.5)), rnd, n=rnd.randint(6, 10),
+                     h=rnd.uniform(5.5, 8.0))
+    # hillside: broadleaf trees and pines, with a house or a mill now and then
+    for k in range(7):
+        d = rnd.uniform(8.5, 20.0)
+        SC.round_tree(m, P, at(d, rnd.uniform(0, L)), rnd, h=rnd.uniform(2.8, 4.5), r=rnd.uniform(1.1, 1.8))
+    for k in range(3):
+        SC.pine(m, P, at(rnd.uniform(10, 21), rnd.uniform(0, L)), rnd, h=rnd.uniform(3.5, 5.5))
+    for k in range(4):
+        SC.shrub(m, P, at(rnd.uniform(8, 18), rnd.uniform(0, L)), rnd, r=rnd.uniform(0.6, 1.0))
+    r = rnd.random()
+    if r < 0.45:
+        SC.house(m, P, at(rnd.uniform(9, 13), rnd.uniform(4, L - 4)), rnd, rot=math.radians(90 if sd > 0 else -90))
+    elif r < 0.7:
+        y = rnd.uniform(4, L - 4)
+        SC.water_wheel(m, P, (sd * (e + 0.35), y, 0.6), rot=0.0)
+        SC.house(m, P, at(1.8, y), rnd, rot=math.radians(90 if sd > 0 else -90), w=2.2, d=1.8, h=1.3)
+    else:
+        SC.dock(m, P, (sd * (e - 0.2), rnd.uniform(4, L - 4), 0.0), rot=0.0)
 
 
 def river_seg(name="river_seg", L=20.0, seed=3, details=True):
@@ -209,15 +288,7 @@ def river_seg(name="river_seg", L=20.0, seed=3, details=True):
             y += w
     if details:
         for sd in (-1, 1):
-            for k in range(2):
-                bamboo_clump(m, (sd * (RIVER_HALF + rnd.uniform(2.2, 4.5)), rnd.uniform(2, L - 2), 0.7), rnd,
-                             n=rnd.randint(5, 9))
-            reeds(m, (sd * (RIVER_HALF - 0.35), rnd.uniform(1, L - 1), -0.02), rnd)
-            lily_pads(m, (sd * (RIVER_HALF - 0.9), rnd.uniform(2, L - 2), 0), rnd)
-            m.mat("rv_grass_dark")
-            for k in range(6):
-                m.ico((sd * (RIVER_HALF + rnd.uniform(0.8, 3.5)), rnd.uniform(0, L), 0.45), rnd.uniform(0.25, 0.5), 1,
-                      s=(1, 1, 0.6))
+            river_sides(m, L, rnd, sd)
         stone_lantern(m, (rnd.choice((-1, 1)) * (RIVER_HALF + 1.0), rnd.uniform(4, L - 4), 0.3))
         leaf_drift(m, (rnd.uniform(-2, 2), rnd.uniform(3, L - 3), 0), rnd)
     ob = m.obj(name, smooth_angle=40)
@@ -421,6 +492,20 @@ def heron(name="heron"):
 
 # ----------------------------------------------------------------------------- design renders
 
+def backdrop(name="river_far", seed=7):
+    """Far valley: two rows of soft peaks ahead and down both sides (no outlines, fogged by distance)."""
+    import scenery as SC
+    mats()
+    rnd = random.Random(seed)
+    m = E.Mesher(name)
+    SC.mountains(m, PAL, (0, 120, -1.0), rnd, n=7, w=160, h=(14, 30), depth=14)
+    for sd in (-1, 1):
+        m.push(Matrix.Translation((sd * 46, 50, -1.0)) @ Matrix.Rotation(math.radians(90 * sd), 4, 'Z'))
+        SC.mountains(m, PAL, (0, 0, 0), rnd, n=6, w=130, h=(10, 20), depth=12)
+        m.pop()
+    return m.obj(name, smooth_angle=30)
+
+
 def design_river():
     import studio
     E.reset()
@@ -430,6 +515,10 @@ def design_river():
         seg.location = (0, k * 20.0, 0)
     isl = fork_island()
     isl.location = (0, 62.0, 0)
+    for k in range(3, 5):
+        seg = river_seg("river_seg_%d" % k, seed=3 + k)
+        seg.location = (0, k * 20.0, 0)
+    backdrop("river_far")
     s1 = stone(seed=1)
     s1.location = (-1.6, 14, 0)
     s2 = stone("rv_stone2", seed=2, r=0.55)
