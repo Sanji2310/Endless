@@ -15,7 +15,8 @@ Each vehicle has a pose function (pose dict, root offset, IK targets) used three
   * the design sheet below.
 
 The character's origin sits at the vehicle mount point (CHAR_*): the vehicle is drawn at
-character_origin - CHAR_* and tilts with her.
+character_origin - CHAR_* and tilts with her. She is drawn SCALE x her model (VH.PONGO_SCALE), so every vehicle
+point is divided by SCALE to get her character space; the paddle is her prop and scales with her.
 """
 import math
 import bpy
@@ -25,12 +26,13 @@ import motion as MO
 import vehicles as VH
 
 V = Vector
+SCALE = VH.PONGO_SCALE
 CHAR_CART = V((0.0, 0.05, VH.FLOOR_CART))
 CHAR_BOAT = V((0.0, -0.15, 0.06))
-CHAR_GLIDE = V((0.0, 0.0, -0.68))
+CHAR_GLIDE = V((0.0, 0.0, -0.68 * SCALE))
 ARMS = {"R": ("upper_arm.R", "forearm.R"), "L": ("upper_arm.L", "forearm.L")}
 LEGS = {"R": ("thigh.R", "shin.R"), "L": ("thigh.L", "shin.L")}
-PADDLE_LOW = 0.5        # lower hand: distance down the shaft from the T-grip
+PADDLE_LOW = 0.45       # lower hand: distance down the shaft from the T-grip
 PADDLE_BLADE = 1.5      # blade centre: distance down the shaft
 
 
@@ -97,8 +99,8 @@ def key_ik(arm, rig, frame, pose, root, hands=None, feet=None, arm_pole=None, le
 
 CART_AP = lambda sd: V((sd * 0.35, -0.25, -0.45))
 CART_LP = lambda sd: V((sd * 0.12, 0.6, -0.1))
-CART_GRIPS = {"R": VH.GRIP_CART[0] - CHAR_CART + V((-0.03, -0.06, 0.0)),
-              "L": VH.GRIP_CART[1] - CHAR_CART + V((0.03, -0.06, 0.0))}
+CART_GRIPS = {"R": (VH.GRIP_CART[0] - CHAR_CART) / SCALE + V((-0.03, -0.06, 0.0)),
+              "L": (VH.GRIP_CART[1] - CHAR_CART) / SCALE + V((0.03, -0.06, 0.0))}
 CART_FEET = {"R": V((0.11, 0.0, 0.075)), "L": V((-0.11, -0.04, 0.075))}
 
 
@@ -113,10 +115,10 @@ def cart_pose(phase, tilt=0.0, crouch=0.0, hop=0.0):
     """phase 0..1 (rattle bob, two bumps per cycle), tilt -1..1 (her left/right), crouch 0..1, hop 0..1 (bump)."""
     c = _smooth(crouch)
     bob = 0.0175 * (1 - math.cos(4 * math.pi * phase)) * (1 - 0.6 * c)
-    lean = 34 + 40 * c + 6 * hop + 2 * abs(tilt)
-    hip = -0.2 - 0.26 * c - bob - 0.1 * hop
+    lean = 36 + 44 * c + 6 * hop + 2 * abs(tilt)
+    hip = -0.17 - 0.42 * c - bob - 0.1 * hop
     head = 14 - 2 * math.sin(4 * math.pi * phase) + 24 * c
-    pose, root = _cart_body(lean, hip, roll=tilt * 17, shift=tilt * 0.09, head=head, twist=-tilt * 6)
+    pose, root = _cart_body(lean, hip, roll=tilt * 17, shift=tilt * 0.05, head=head, twist=-tilt * 6)
     hands = {k: Target(p, 1.0, CART_AP) for k, p in CART_GRIPS.items()}
     feet = {k: Target(p + V((tilt * 0.03, 0, 0)), 1.0, CART_LP) for k, p in CART_FEET.items()}
     return pose, root, hands, feet
@@ -128,15 +130,18 @@ BOAT_AP = lambda sd: V((sd * 0.45, -0.15, -0.35))
 BOAT_LP = lambda sd: V((sd * 0.08, 0.6, -0.3))
 BOAT_ANKLES = {"R": V((0.1, -0.36, 0.07)), "L": V((-0.1, -0.36, 0.07))}
 
-# Paddle stroke (right side, character space): phase, T-grip (top hand), shaft direction (grip -> blade).
-# The top hand stays forward of her face and out to the stroke side so the shaft never crosses her head;
-# between strokes the blade swings high over the bow to the other side (cross-bow, right hand stays on top).
+# Paddle stroke on the right side (character space): phase, T-grip, shaft direction (grip -> blade).
+# Like a real canoeist the hand on the stroke side is the lower hand and the other hand caps the T-grip; the hands
+# swap grips while the blade swings high over the bow to the other side. The top hand sits out over the gunwale so
+# the shaft clears the hull, and only the blade (1.24..1.76 m down the shaft) goes under the water.
 _STROKE_R = [
-    (0.00, (0.10, 0.36, 0.98), (0.34, 0.40, -0.85)),    # catch: blade planted ahead
-    (0.20, (0.17, 0.20, 0.92), (0.30, -0.42, -0.86)),   # pull back along the hull
-    (0.30, (0.15, 0.22, 1.02), (0.33, -0.50, -0.55)),   # exit: blade lifts out behind
-    (0.42, (0.02, 0.34, 1.10), (0.02, 0.62, -0.42)),    # recover: blade high over the bow
+    (0.00, (0.26, 0.38, 1.06), (0.30, 0.24, -0.92)),    # catch: blade planted ahead, outside the hull
+    (0.20, (0.28, 0.10, 1.04), (0.28, -0.26, -0.92)),   # pull back along the hull
+    (0.30, (0.26, 0.02, 1.10), (0.42, -0.55, -0.50)),   # exit: blade lifts out wide behind
+    (0.40, (0.12, 0.16, 1.12), (0.25, 0.90, -0.24)),    # recover: blade high, swinging forward
+    (0.46, (-0.06, 0.20, 1.14), (-0.12, 0.95, -0.24)),  # cross over the bow
 ]
+SWAP = (0.34, 0.5)      # stroke-phase window in which the hands trade grips
 
 
 def _stroke(phase):
@@ -174,11 +179,21 @@ def paddle_at(phase, tilt=0.0):
     r = _smooth(min(1.0, abs(tilt) * 1.25))
     if r > 0:
         s = 1 if tilt > 0 else -1
-        rt = V((s * 0.06, 0.2, 0.92))
-        rd = V((s * 0.42, -0.62, -0.66)).normalized()
+        rt = V((s * 0.18, 0.15, 0.98))
+        rd = V((s * 0.40, -0.55, -0.75)).normalized()
         top = top.lerp(rt, r)
         d = d.lerp(rd, r).normalized()
     return top, d
+
+
+def paddle_hands(phase):
+    """Distance down the shaft of each hand: stroke-side hand low, the other on the T-grip, trading in SWAP."""
+    p = phase % 1.0
+    sd = 1 if p < 0.5 else -1
+    q = p if p < 0.5 else p - 0.5
+    w = _smooth((q - SWAP[0]) / (SWAP[1] - SWAP[0]))
+    side, other = ("R", "L") if sd > 0 else ("L", "R")
+    return {side: _lerp(PADDLE_LOW, 0.0, w), other: _lerp(0.0, PADDLE_LOW, w)}
 
 
 def boat_pose(phase, tilt=0.0):
@@ -190,9 +205,8 @@ def boat_pose(phase, tilt=0.0):
     reach = max(0.0, blade.y) * 14
     twist = -sd * blade.y * 12 * (1 - r)
     lean = 8 + reach
-    pose, root = _kneel(_lerp(lean, 12, r), _lerp(twist, -tilt * 10, r), roll=tilt * 15)
-    low = top + d * PADDLE_LOW
-    hands = {"R": Target(top, 1.0, BOAT_AP), "L": Target(low, 1.0, BOAT_AP)}
+    pose, root = _kneel(_lerp(lean, 12, r), _lerp(twist, -tilt * 10, r), roll=tilt * 15 + sd * 9 * (1 - r))
+    hands = {sfx: Target(top + d * at, 1.0, BOAT_AP) for sfx, at in paddle_hands(phase).items()}
     feet = {k: Target(p, 1.0, BOAT_LP) for k, p in BOAT_ANKLES.items()}
     return pose, root, hands, feet
 
@@ -200,7 +214,8 @@ def boat_pose(phase, tilt=0.0):
 # ----------------------------------------------------------------------------- paraglider
 
 GLIDE_AP = lambda sd: V((sd * 0.5, 0.05, -0.1))
-GLIDE_TOGGLES = {"R": VH.TOGGLES[0] - CHAR_GLIDE + V((0, 0, -0.05)), "L": VH.TOGGLES[1] - CHAR_GLIDE + V((0, 0, -0.05))}
+GLIDE_TOGGLES = {"R": (VH.TOGGLES[0] - CHAR_GLIDE) / SCALE + V((0, 0, -0.05)),
+                 "L": (VH.TOGGLES[1] - CHAR_GLIDE) / SCALE + V((0, 0, -0.05))}
 
 
 def _seated(lean=4.0, thigh=88.0, shin=-80.0, roll=0.0, sway=0.0):
@@ -294,12 +309,14 @@ def place_paddle(arm, paddle_ob, top=None, d=None):
         top = arm.matrix_world @ pr.tail
         low = arm.matrix_world @ (pl.head.lerp(pl.tail, 0.5))
         d = (low - top).normalized()
-        paddle_ob.matrix_world = Matrix.Translation(top) @ (-d).to_track_quat('Z', 'Y').to_matrix().to_4x4()
+        paddle_ob.matrix_world = Matrix.Translation(top) @ (-d).to_track_quat('Z', 'Y').to_matrix().to_4x4() @ \
+            Matrix.Diagonal(arm.matrix_world.to_scale().to_4d())
         return
     w = arm.matrix_world
     tw = w @ V(top)
     dw = (w.to_3x3() @ V(d)).normalized()
-    paddle_ob.matrix_world = Matrix.Translation(tw) @ (-dw).to_track_quat('Z', 'Y').to_matrix().to_4x4()
+    paddle_ob.matrix_world = Matrix.Translation(tw) @ (-dw).to_track_quat('Z', 'Y').to_matrix().to_4x4() @ \
+        Matrix.Diagonal(w.to_scale().to_4d())
 
 
 def design_vehicle_poses():
@@ -327,6 +344,7 @@ def design_vehicle_poses():
         arm.animation_data.action = bpy.data.actions[act]
         sc.frame_set(f)
         arm.location = (0, 0, 0)
+        arm.scale = (SCALE, SCALE, SCALE)
         for o, k, off in ((cart, "cart", CHAR_CART), (boat, "boat", CHAR_BOAT), (gl, "glider", CHAR_GLIDE)):
             o.hide_render = (k != veh)
             o.location = -off

@@ -17,12 +17,16 @@ import erlib as E
 
 V = Vector
 
-GRIP_CART = (V((0.24, 0.6, 1.0)), V((-0.24, 0.6, 1.0)))
+# Pongo is drawn PONGO_SCALE x her 1.55 m model (1.86 m) so she fills the cart, canoe and harness. The parts sized to
+# her body (harness seat, toggles, risers, paddle) scale with her; the hulls and the canopy do not.
+PONGO_SCALE = 1.2
+CART_RIM = 1.12        # rim height: her hips when standing, and still under the 1.25 m crouch beams
+GRIP_CART = (V((0.24, 0.62, CART_RIM)), V((-0.24, 0.62, CART_RIM)))
 FLOOR_CART = 0.45
 SEAT_BOAT = V((0.0, -0.15, 0.12))
-TOGGLES = (V((0.3, 0.1, 0.66)), V((-0.3, 0.1, 0.66)))   # shoulder height when seated
-RISERS = (V((0.2, 0.02, 1.0)), V((-0.2, 0.02, 1.0)))
-CARABINERS = (V((0.2, 0.0, 0.42)), V((-0.2, 0.0, 0.42)))
+TOGGLES = (V((0.3, 0.1, 0.66)) * PONGO_SCALE, V((-0.3, 0.1, 0.66)) * PONGO_SCALE)   # shoulder height when seated
+RISERS = (V((0.2, 0.02, 1.0)) * PONGO_SCALE, V((-0.2, 0.02, 1.0)) * PONGO_SCALE)
+CARABINERS = (V((0.2, 0.0, 0.42)) * PONGO_SCALE, V((-0.2, 0.0, 0.42)) * PONGO_SCALE)
 GAUGE = 1.067
 
 
@@ -89,7 +93,7 @@ def ore_cart(name="ore_cart", seed=4):
         for y in (-0.42, 0.42):
             m.box((sx * 0.46, y, zc), (0.06, 0.16, 0.14), smooth=False)
     # tapered body (open top): plank walls with gaps, iron corner angles and a tube rim
-    z0, z1 = 0.44, 1.0
+    z0, z1 = 0.44, CART_RIM
     bw0, bl0, bw1, bl1 = 0.46, 0.56, 0.54, 0.66          # half width / half length at bottom and top
     m.mat("v_wood_dark")
     m.box((0, 0, z0 - 0.02), (bw0 * 2, bl0 * 2, 0.04), smooth=False)
@@ -362,9 +366,10 @@ def glider(name="glider"):
         m.mat("v_gold")
         m.torus(tuple(CARABINERS[0 if sd > 0 else 1]), R=0.03, r=0.007, seg=14, sides=6, axis='Y')
     m.mat("v_strap")
-    m.rbox((0.0, -0.05, 0.0), (0.36, 0.32, 0.05), 0.02, 2)
+    k = PONGO_SCALE
+    m.rbox((0.0, -0.05 * k, 0.0), (0.36 * k, 0.32 * k, 0.05), 0.02, 2)
     for sd in (1, -1):
-        m.sweep([V((sd * 0.17, -0.18, 0.0)), V((sd * 0.2, -0.12, 0.22)), CARABINERS[0 if sd > 0 else 1]],
+        m.sweep([V((sd * 0.17 * k, -0.18 * k, 0.0)), V((sd * 0.2 * k, -0.12 * k, 0.22 * k)), CARABINERS[0 if sd > 0 else 1]],
                 [(-0.018, -0.004), (0.018, -0.004), (0.018, 0.004), (-0.018, 0.004)], closed=True, cap=True)
     ob = m.obj(name, smooth_angle=40)
     return ob

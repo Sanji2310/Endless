@@ -68,7 +68,7 @@ def _place(arm, objs, veh, base, roll=0.0, pitch=0.0, frame=None, paddle=None):
         M = Matrix.Translation(base) @ Matrix.Translation(piv) @ R @ Matrix.Translation(-piv)
     else:
         M = Matrix.Translation(base) @ R
-    arm.matrix_world = M
+    arm.matrix_world = M @ Matrix.Diagonal((PM.SCALE, PM.SCALE, PM.SCALE, 1.0))
     for k, o in objs.items():
         if k == "paddle":
             continue

@@ -103,6 +103,7 @@ def _tuck(arm):
 def pose_at(arm, samplers, name, u, phase=0.0):
     """Returns (quat pose with root motion, hands {sfx: Target}, feet, extras) for transition `name` at u 0..1."""
     dur, a0 = SPEC[name]
+    a0 = a0 / PM.SCALE          # previous mount, in her (scaled) character space
     t = u * dur
     E = lambda pose_root: MO.euler_pose(arm, pose_root[0], pose_root[1])
     if name == "board_cart":
@@ -136,7 +137,7 @@ def pose_at(arm, samplers, name, u, phase=0.0):
         q = _root_offset(arm, q, off, flip)
         # hands leave the rim at launch; reach for the stowed paddle on landing and lift it into the stroke
         lift = _ramp(u, 0.84, 1.0)
-        top_s, d_s = V((0.36, 0.42, -0.02)), V((0.0, -1.0, -0.03)).normalized()
+        top_s, d_s = V((0.30, 0.35, -0.02)), V((0.0, -1.0, -0.03)).normalized()
         top_r, d_r = PM.paddle_at(phase)
         top = top_s.lerp(top_r, lift)
         d = d_s.lerp(d_r, lift).normalized()
@@ -145,7 +146,7 @@ def pose_at(arm, samplers, name, u, phase=0.0):
         if cw > 0.001:
             hands = {k: PM.Target(v.pos + a0 - V((0, 0, 0)), cw, v.pole) for k, v in ch.items()}
         else:
-            hands = {"R": PM.Target(top, pw, PM.BOAT_AP), "L": PM.Target(top + d * PM.PADDLE_LOW, pw, PM.BOAT_AP)}
+            hands = {k: PM.Target(top + d * at, pw, PM.BOAT_AP) for k, at in PM.paddle_hands(phase).items()}
         fw = 1 - _ramp(u, 0.1, 0.14) if u < 0.4 else _ramp(u, 0.68, 0.75)
         feet = ({k: PM.Target(v.pos + a0, fw, v.pole) for k, v in cf.items()} if u < 0.4 else
                 {k: PM.Target(v.pos, fw, v.pole) for k, v in bfeet.items()})
