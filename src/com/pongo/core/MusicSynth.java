@@ -20,8 +20,10 @@ public final class MusicSynth {
     public static final int PIANO = 0, EPIANO = 1, GLOCK = 2, MUSICBOX = 3, HARP = 4, KOTO = 5, SHAMISEN = 6,
             PAD = 7, STRINGS = 8, FLUTE = 9, SHAKU = 10, LEAD = 11, SUPERSAW = 12, BASS = 13, SUBBASS = 14,
             SYNBASS = 15, GUITAR = 16, CLEANGTR = 17, CHOIR = 18, BRASS = 19, CELESTA = 20,
+            VOX_AH = 21, VOX_OO = 22, VOX_EE = 23, WHISTLE = 24,
             KICK = 40, SNARE = 41, CLAP = 42, HAT = 43, OHAT = 44, SHAKER = 45, RIDE = 46, CRASH = 47, TAIKO = 48,
-            TOM = 49, WOOD = 50, RIM = 51, CHIMES = 52, TRIANGLE = 53, SNAP = 54, KAKKO = 55, REVCYM = 56, SWELL = 57;
+            TOM = 49, WOOD = 50, RIM = 51, CHIMES = 52, TRIANGLE = 53, SNAP = 54, KAKKO = 55, REVCYM = 56, SWELL = 57,
+            KICK808 = 58, HEY = 59, HO = 60, YEAH = 61, SCRATCH = 62;
 
     // ------------------------------------------------------------------ tables / helpers
     private static final int TN = 4096;
@@ -251,6 +253,15 @@ public final class MusicSynth {
             case SNAP: return snap(vel);
             case REVCYM: return revcym(vel, gate);
             case SWELL: return swell(vel, gate);
+            case VOX_AH: return chop(f, gate, vel, V_AH, V_AH, 0.55f);
+            case VOX_OO: return chop(f, gate, vel, V_OO, V_OH, 0.55f);
+            case VOX_EE: return chop(f, gate, vel, V_EE, V_I, 0.7f);
+            case WHISTLE: return whistle(f, gate, vel);
+            case KICK808: return kick808(vel, midi > 0 ? f : 50f);
+            case HEY: return shout(vel, new float[][]{V_E, V_E, V_I}, 0.30f, 1.00f, 0.80f);
+            case HO: return shout(vel, new float[][]{V_OH, V_OH, V_OO}, 0.26f, 0.95f, 0.85f);
+            case YEAH: return shout(vel, new float[][]{V_I, V_E, V_AE, V_AH}, 0.42f, 0.95f, 0.75f);
+            case SCRATCH: return scratch(vel, gate);
         }
         return new float[1];
     }
@@ -805,6 +816,153 @@ public final class MusicSynth {
             int st = (int) (gate * j / (float) k);
             float[] b = bars(f, RATE, vel * (0.5f + 0.5f * rnd.nextFloat()), new float[]{1f, 2.76f, 5.4f}, new float[]{1f, .4f, .2f}, 1.8f, 0.001f);
             for (int i = 0; i < b.length && st + i < n; i++) o[st + i] += b[i] * 0.5f;
+        }
+        return o;
+    }
+
+    // ------------------------------------------------------------------ voices: vocal chops, shouts, whistle
+
+    /** Vowel formants (Hz) F1 F2 F3. */
+    static final float[] V_AH = {800, 1150, 2900}, V_OO = {370, 900, 2700}, V_EE = {320, 2700, 3300},
+            V_OH = {500, 900, 2800}, V_E = {550, 1900, 2600}, V_AE = {850, 1600, 2700}, V_I = {330, 2600, 3100};
+
+    /**
+     * Formant voice. path: vowels passed through evenly over `glide` seconds; pitch(t) = f0 * pmul(t); aspiration
+     * (breath noise) mixed by `breath`; `fs` scales the formants (1.0 male, ~1.15 female).
+     */
+    private float[] formant(int n, float f0, float[][] path, float glide, float[] pmulT, float[] pmulV, float breath,
+                            float fs, float vib, float[] envT, float[] envV) {
+        float[] o = new float[n];
+        Svf b1 = new Svf(), b2 = new Svf(), b3 = new Svf();
+        Svf tilt = new Svf();
+        tilt.set(Math.min(2400f, f0 * 6f), 0.7f);
+        float ph = 0;
+        for (int i = 0; i < n; i++) {
+            float t = i / (float) RATE;
+            if ((i & 7) == 0) {
+                float x = path.length < 2 ? 0 : clamp(t / glide, 0f, 1f) * (path.length - 1);
+                int k = Math.max(0, Math.min(path.length - 2, (int) x));
+                float u = path.length < 2 ? 0 : x - k;
+                u = u * u * (3 - 2 * u);
+                float[] a = path[k], b = path[Math.min(path.length - 1, k + 1)];
+                float F1 = (a[0] + (b[0] - a[0]) * u) * fs, F2 = (a[1] + (b[1] - a[1]) * u) * fs, F3 = (a[2] + (b[2] - a[2]) * u) * fs;
+                F1 = Math.max(F1, f0 * 1.08f);   // singers open the first formant up to a high note (keeps "ee" from going thin)
+                b1.set(F1, F1 / 80f); b2.set(F2, F2 / 110f); b3.set(F3, F3 / 160f);
+            }
+            float pm = lerpKeys(pmulT, pmulV, t);
+            float fr = f0 * pm * (1 + vib * sn(t * 5.6f) + 0.002f * (rnd.nextFloat() - 0.5f));
+            float d = fr / RATE;
+            float src = tilt.lp(saw(ph, d)) * 1.6f;
+            ph += d; if (ph >= 1) ph -= 1;
+            float nz = (rnd.nextFloat() * 2 - 1);
+            float ex = src * (1 - breath) + nz * breath * 0.9f;
+            float y = b1.bp(ex) * b1.k * 1.0f + b2.bp(ex) * b2.k * 0.55f + b3.bp(ex) * b3.k * 0.28f;
+            o[i] = y * lerpKeys(envT, envV, t);
+        }
+        return o;
+    }
+
+    private static float lerpKeys(float[] t, float[] v, float x) {
+        if (x <= t[0]) return v[0];
+        for (int k = 1; k < t.length; k++)
+            if (x < t[k]) { float u = (x - t[k - 1]) / (t[k] - t[k - 1]); return v[k - 1] + (v[k] - v[k - 1]) * u; }
+        return v[v.length - 1];
+    }
+
+    /** Vocal chop: a short sung vowel on the note (a female "ah" / "oo" / "ee" sample feel), double-tracked a few cents
+     *  apart so it reads like a produced vocal sample rather than one synth voice. */
+    private float[] chop(float f, int gate, float vel, float[] v0, float[] v1, float gain) {
+        float g = gate / (float) RATE;
+        int n = gate + (int) (0.07f * RATE);
+        float rel = g + 0.06f;
+        float[] o = new float[n];
+        for (int k = 0; k < 2; k++) {
+            float[] w = formant(n, f * (k == 0 ? 0.9955f : 1.0045f), new float[][]{v0, v1}, Math.max(0.15f, g),
+                    new float[]{0f, 0.035f, 1f}, new float[]{0.97f, 1f, 1f}, 0.12f, 1.12f, g > 0.4f ? 0.006f : 0f,
+                    new float[]{0f, 0.012f, Math.max(0.02f, g - 0.01f), rel}, new float[]{0f, 1f, 0.8f, 0f});
+            for (int i = 0; i < n; i++) o[i] += w[i] * vel * gain * 0.5f;
+        }
+        return o;
+    }
+
+    /**
+     * Gang shout ("Hey!", "Ho!", "Yeah!"): four people, two lower and two higher voices, a few ms apart, an "h" of
+     * breath into the vowel, the pitch falling as the shout lets go.
+     */
+    private float[] shout(float vel, float[][] path, float len, float lowPitch, float highPitch) {
+        int n = (int) ((len + 0.12f) * RATE);
+        float[] o = new float[n];
+        float[] f0s = {170f * lowPitch, 205f * lowPitch, 290f * highPitch, 340f * highPitch};
+        float[] fs = {1f, 1.04f, 1.14f, 1.2f};
+        for (int v = 0; v < 4; v++) {
+            int off = (int) (rnd.nextFloat() * 0.018f * RATE);
+            float f0 = f0s[v] * (1 + (rnd.nextFloat() - 0.5f) * 0.05f);
+            float h = 0.035f;
+            // the "h": breath alone for a moment, then the voice comes in and falls
+            float[] w = formant(n - off, f0, path, len * 0.85f, new float[]{0f, h, h + 0.05f, len},
+                    new float[]{1.06f, 1.06f, 1f, 0.8f}, 0.25f, fs[v], 0f,
+                    new float[]{0f, 0.01f, h, h + 0.02f, len * 0.6f, len + 0.05f}, new float[]{0f, 0.35f, 0.5f, 1f, 0.75f, 0f});
+            float[] asp = formant(n - off, f0, new float[][]{path[0]}, 1f, new float[]{0f}, new float[]{1f}, 1f, fs[v], 0f,
+                    new float[]{0f, 0.008f, h, h + 0.04f}, new float[]{0f, 0.7f, 0.6f, 0f});
+            for (int i = 0; i < w.length; i++) o[off + i] += (w[i] + asp[i]) * 0.3f;
+        }
+        for (int i = 0; i < n; i++) o[i] = (float) Math.tanh(o[i] * 1.5f) * vel * 0.85f;
+        return o;
+    }
+
+    /** Whistle lead: pure tone with a scoop into each note, a little breath and a lazy vibrato. */
+    private float[] whistle(float f, int gate, float vel) {
+        int n = gate + (int) (0.09f * RATE);
+        float[] o = new float[n];
+        float ph = 0;
+        Svf br = new Svf(); br.set(f, 7f);
+        for (int i = 0; i < n; i++) {
+            float t = i / (float) RATE;
+            float scoop = -0.045f * (float) Math.exp(-t * 28f);
+            float vib = Math.min(1f, Math.max(0f, (t - 0.15f) / 0.3f)) * 0.009f * sn(t * 6f);
+            float d = f * (1 + scoop + vib) / RATE;
+            float tone = sn(ph) + 0.06f * sn(2 * ph);
+            ph += d; if (ph >= 1) ph -= 1;
+            float breath = br.bp(rnd.nextFloat() * 2 - 1) * 0.35f;
+            float env = adsr(i, gate, 0.025f, 0.6f, 0.85f, 0.06f);
+            o[i] = (tone + breath) * env * vel * 0.17f;
+        }
+        return o;
+    }
+
+    /** 808 kick: a tuned sine boom with a pitch drop, driven a little so it reads on phone speakers. */
+    private float[] kick808(float vel, float f) {
+        int n = (int) (0.75f * RATE);
+        float[] o = new float[n];
+        float ph = 0;
+        for (int i = 0; i < n; i++) {
+            float t = i / (float) RATE;
+            ph += f * (1 + 1.6f * (float) Math.exp(-t * 32f)) / RATE;
+            float e = (float) Math.exp(-t * 3.6f) * Math.min(1f, t / 0.002f) * Math.min(1f, (0.75f - t) / 0.05f);
+            float click = (rnd.nextFloat() * 2 - 1) * (float) Math.exp(-t * 350f) * 0.25f;
+            o[i] = (float) Math.tanh((sn(ph) * e + click) * 2.0f) * vel * 0.62f;
+        }
+        return o;
+    }
+
+    /** DJ scratch: a vocal "ah" pushed back and forth under the hand; one stroke per ~0.11 s of gate. */
+    private float[] scratch(float vel, int gate) {
+        int n = gate;
+        int strokes = Math.max(2, Math.round(gate / (0.11f * RATE)));
+        float[] o = new float[n];
+        Svf b1 = new Svf(), b2 = new Svf();
+        float ph = 0;
+        for (int i = 0; i < n; i++) {
+            float x = i / (float) n;
+            float sp = (float) Math.sin(Math.PI * x * strokes);
+            float a = Math.abs(sp);
+            if ((i & 7) == 0) { b1.set(250f + 900f * a, 3f); b2.set(700f + 2200f * a, 4f); }
+            float d = (60f + 380f * a) / RATE;
+            ph += d; if (ph >= 1) ph -= 1;
+            float src = saw(ph, d) * 0.7f + (rnd.nextFloat() * 2 - 1) * 0.5f;
+            float y = b1.bp(src) * b1.k + b2.bp(src) * b2.k * 0.7f;
+            float edge = Math.min(1f, Math.min(i, n - i) / (0.004f * RATE));
+            o[i] = y * (float) Math.pow(a, 0.6f) * edge * vel * 0.9f;
         }
         return o;
     }
