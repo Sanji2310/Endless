@@ -45,7 +45,9 @@ public class ZoneSim {
                 RenderFrame g = new RenderFrame();
                 z.apply(g, 0, 1.5f, -d);
                 check(g.lamp[3] > 10f, "Hotaru Lamp on before the mouth (radius " + g.lamp[3] + ")");
-                check(g.shadeCol[0] < 0.25f, "shadow band dark in the tunnel (" + g.shadeCol[0] + ")");
+                float[] cs = Zones.PALETTE[Zones.CAVERN].shade;
+                check(Math.abs(g.shadeCol[0] - cs[0]) < 0.05f && Math.abs(g.shadeCol[2] - cs[2]) < 0.05f,
+                      "cave lavender shadow band in the tunnel (" + g.shadeCol[0] + ", " + g.shadeCol[2] + ")");
             }
         }
         check((seen & Zones.EV_APPROACH) != 0, "approach event");
@@ -79,6 +81,8 @@ public class ZoneSim {
         check(invul2, "invulnerable through the lining on the way out");
         check(z2.blend < 1e-4f, "cave palette gone outside");
         check(Zones.zoneAt(3 * Zones.ZONE_LEN + 1f) == Zones.CAVERN, "the cycle comes back to the cavern");
+        check(Zones.zoneAt(-5f) == Zones.CYCLE[0] && Zones.zoneAt(-Zones.ZONE_LEN - 5f) == Zones.CYCLE[0],
+                "behind the start (the menu camera looks back) is the first zone");
         // the city world and track hand over to the set pieces at segment seams
         check(Zones.cityWorldAt(b - 73f) && !Zones.cityWorldAt(b - 72f), "city scenery stops at the approach");
         check(Zones.cityTrackAt(b - 25f) && !Zones.cityTrackAt(b - 24f), "city track stops at the portal");
@@ -124,7 +128,6 @@ public class ZoneSim {
             int i0 = (int) (t * R);
             if ((ev & Zones.EV_PORTAL) != 0) {
                 add(mix, snd[CaveSounds.TUNNEL_WHOOSH], i0, 0.9f);
-                add(mix, snd[CaveSounds.STING], i0 + (int) (0.15f * R), 0.6f);
                 add(mix, snd[CaveSounds.LAMP_ON], i0 + (int) (0.4f * R), 0.5f);
             }
             if ((ev & Zones.EV_BOARD) != 0) { add(mix, snd[CaveSounds.CART_BOARD], i0, 0.9f); riding = t; nextJoint = d + 6f; }
