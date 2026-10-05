@@ -25,8 +25,10 @@ public class ZoneSim {
     }
 
     static void test() {
+        plan();
+        Zones.newRun(42L);
         Zones z = new Zones();
-        float b = Zones.ZONE_LEN;              // Sakura Line -> Crystal Cavern boundary (the tunnel mouth)
+        float b = Zones.boundary(1);           // Sakura Line -> Crystal Cavern boundary (the tunnel mouth)
         float dt = 1f / 60f, speed = 16f;
         int seen = 0;
         float portalT = -1, cardEnd = -1, lastBlend = 0;
@@ -62,7 +64,7 @@ public class ZoneSim {
         float cardDur = cardEnd - portalT;
         check(cardDur > 2.8f && cardDur < 3.2f, "title card shows for " + cardDur + " s");
         // the way out of the cavern: the same set piece turned round, back onto the Sakura Line
-        float b2 = 2 * Zones.ZONE_LEN;
+        float b2 = Zones.boundary(2);
         check(Zones.exitAt(b2) && !Zones.exitAt(b), "the second boundary leaves the cavern");
         Zones z2 = new Zones();
         int seen2 = 0;
@@ -80,8 +82,8 @@ public class ZoneSim {
         check(Math.abs(cardD - b2) < 1f && z2.zone == Zones.SAKURA, "Sakura Line card coming out of the portal");
         check(invul2, "invulnerable through the lining on the way out");
         check(z2.blend < 1e-4f, "cave palette gone outside");
-        check(Zones.zoneAt(3 * Zones.ZONE_LEN + 1f) == Zones.CAVERN, "the cycle comes back to the cavern");
-        check(Zones.zoneAt(-5f) == Zones.CYCLE[0] && Zones.zoneAt(-Zones.ZONE_LEN - 5f) == Zones.CYCLE[0],
+        check(Zones.zoneAt(Zones.boundary(3) + 1f) == Zones.CAVERN, "the run comes back to the cavern");
+        check(Zones.zoneAt(-5f) == Zones.SAKURA && Zones.zoneAt(-2000f) == Zones.SAKURA,
                 "behind the start (the menu camera looks back) is the first zone");
         // the city world and track hand over to the set pieces at segment seams
         check(Zones.cityWorldAt(b - 73f) && !Zones.cityWorldAt(b - 72f), "city scenery stops at the approach");
@@ -89,13 +91,72 @@ public class ZoneSim {
         check(!Zones.cityTrackAt(b2 - 1f) && Zones.cityTrackAt(b2), "city track resumes at the portal out");
         check(!Zones.cityWorldAt(b2 + 47f) && Zones.cityWorldAt(b2 + 48f), "city scenery resumes after the cutting");
         check(Zones.cityWorldAt(10f), "the run starts on the Sakura Line");
-        check(Zones.ZONE_LEN % Zones.SEG == 0, "zones are whole segments");
         check(Zones.skipSafe(b - 90f) == b - 90f && Zones.skipSafe(b - 50f) == Zones.safeTo(b)
                 && Zones.skipSafe(b2 + 10f) == Zones.safeTo(b2), "no obstacle patterns start in the set pieces");
         int[] kit = new int[3];
         Zones.caveKit(0, kit);
         check(kit[0] == 1, "first cave segment uses shell 1 (matches the tunnel mouth seam)");
         System.out.println("all zone checks passed");
+    }
+
+    /** Time to run from s0 to s1 under the game's speed law. */
+    static float runTime(float s0, float s1) {
+        float t = 0;
+        for (float s = s0; s < s1; s += 1f) t += 1f / Math.min(Zones.SPEED_MAX, Zones.SPEED_BASE + Zones.SPEED_GAIN * s);
+        return t;
+    }
+
+    /** The run's zone plan: random order, 1.5 to 3.5 minutes a zone with a cap, 3 or 4 power-ups each. */
+    static void plan() {
+        boolean order = true, segs = true, times = true, powers = true, clear = true, first = true;
+        float minT = 1e9f, maxT = 0, maxLen = 0;
+        int zones = 0, capped = 0;
+        java.util.Set<String> plans = new java.util.HashSet<String>();
+        for (long seed = 1; seed <= 60; seed++) {
+            Zones.newRun(seed);
+            first &= Zones.zoneOf(0) == Zones.SAKURA;
+            StringBuilder sig = new StringBuilder();
+            for (int i = 0; i < 40; i++) {
+                float a = Zones.boundary(i), e = Zones.boundary(i + 1);
+                if (i > 0) order &= Zones.zoneOf(i) != Zones.zoneOf(i - 1);
+                segs &= a % Zones.SEG == 0 && e % Zones.SEG == 0;
+                float len = e - a, t = runTime(a, e);
+                maxLen = Math.max(maxLen, len);
+                if (len >= Zones.MAX_LEN - Zones.SEG) capped++;
+                else { minT = Math.min(minT, t); maxT = Math.max(maxT, t); times &= t > Zones.MIN_TIME - 1f && t < Zones.MAX_TIME + 1f; }
+                zones++;
+                if (i < 4) sig.append((int) len).append(',');
+                // power-up spots in this zone
+                int n = 0;
+                for (float p = Zones.nextPowerUpAt(a); p < e; p = Zones.nextPowerUpAt(p + 1f)) {
+                    n++;
+                    clear &= p >= Zones.safeTo(a) && p < Zones.safeFrom(e);
+                }
+                powers &= n == Zones.powerUpsIn(i) && n >= Zones.POWERUPS_MIN && n <= Zones.POWERUPS_MAX;
+            }
+            plans.add(sig.toString());
+        }
+        check(first, "every run starts on the Sakura Line");
+        check(order, "no zone follows itself");
+        check(segs, "zones are whole segments");
+        check(times, String.format("zones last %.0f to %.0f s at run speed (%d zones, %d at the %.0f m cap)", minT, maxT, zones, capped, Zones.MAX_LEN));
+        check(maxLen <= Zones.MAX_LEN + Zones.SEG / 2, "no zone longer than the cap (" + maxLen + " m)");
+        check(plans.size() > 50, "different runs get different zone lengths (" + plans.size() + " of 60)");
+        Zones.newRun(7L);
+        float x1 = Zones.boundary(5);
+        Zones.newRun(7L);
+        check(Zones.boundary(5) == x1, "the same seed lays out the same run");
+        check(powers, "3 or 4 power-ups in every zone");
+        check(clear, "no power-up inside a set piece's safe stretch");
+        // a parting whose two segments would reach into the lining on the way out is left out
+        boolean forks = true;
+        for (int i = 0; i < 40; i++) {
+            if (Zones.zoneOf(i) != Zones.CAVERN) continue;
+            float a = Zones.boundary(i), e = Zones.boundary(i + 1);
+            for (float d = a; d < e; d += Zones.SEG) if (Zones.caveForkFits(d)) forks &= d + 2 * Zones.SEG <= Zones.portalAt(e);
+            forks &= !Zones.caveForkFits(Zones.portalAt(e) - Zones.SEG);
+        }
+        check(forks, "cave partings end before the lining out");
     }
 
     static void sfx(File dir) throws IOException {
