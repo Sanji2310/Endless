@@ -39,9 +39,9 @@ def mats():
     M("sk_glow_core", 0xFFF2C0, emis=2.0, rim=0.0, soft=0.05, outline=0.0)
     M("sk_cable", 0x3A3E4E, rim=0.1, soft=0.1, outline=0.0)
     M("sk_glass", 0xBFEAFF, spec=1.0, rim=0.5, soft=0.04, flags=E.F_GLASS, outline=0.5)
-    M("sk_rock", 0xEEDCC0, rim=0.3, soft=0.14, shadow=0xB0A2C4)
-    M("sk_rock_dark", 0xDCC6A6, rim=0.25, soft=0.14, shadow=0xA294BC)
-    M("sk_rock_band", 0xC8AE92, rim=0.2, soft=0.12, shadow=0x9284AC)
+    M("sk_rock", 0xF2DEB0, rim=0.3, soft=0.14, shadow=0xB8A6B0)
+    M("sk_rock_dark", 0xDFC59A, rim=0.25, soft=0.14, shadow=0xA898A8)
+    M("sk_rock_band", 0xC9AA80, rim=0.2, soft=0.12, shadow=0x96889C)
     M("sk_pine", 0x5E9A6A, rim=0.25, soft=0.2, flags=E.F_FOLIAGE, sway=0.2, shadow=0x5A6A9A)
     M("sk_bark", 0x6E4A3A, rim=0.2, soft=0.12)
     M("sk_red", 0xE8473C, rim=0.3, soft=0.1)
@@ -377,7 +377,7 @@ def sky_gorge(name="sky_gorge", L=40.0, seed=3):
                                   rnd, h=rnd.uniform(2.0, 3.2), r=rnd.uniform(0.8, 1.2))
             # ledge pines and moss clinging to the cliff face on the gorge side
             m.mat("sk_moss")
-            for j in range(3):                      # bushes rooted in cracks on the gorge face
+            for j in range(7):                      # bushes rooted in cracks on the gorge face
                 zz = rnd.uniform(FLOOR + 2, top_z - 0.5)
                 a = math.radians(rnd.uniform(-50, 50)) + (math.pi if sd > 0 else 0.0)
                 p = V((x + math.cos(a) * r * 1.0, y + r + math.sin(a) * r * 1.0, zz))

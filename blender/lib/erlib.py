@@ -642,29 +642,54 @@ class Mesher:
     # --- primitives
     def box(self, c=(0, 0, 0), s=(1, 1, 1), bevel=None, uv='box', smooth=True):
         M = self.M @ Matrix.Translation(c) @ Matrix.Diagonal((s[0], s[1], s[2], 1))
-        r = bmesh.ops.create_cube(self.bm, size=1.0, matrix=M)
-        return self._finish(r["verts"], bevel, uv, smooth)
+        vs = self._stamp(("box",), lambda tb: bmesh.ops.create_cube(tb, size=1.0), M)
+        return self._finish(vs, bevel, uv, smooth)
 
     def rbox(self, c=(0, 0, 0), s=(1, 1, 1), r=0.03, seg=3, uv='box'):
         """Box with rounded (bevelled) edges."""
         r = min(r, min(s) * 0.49)
         return self.box(c, s, bevel=(r, seg), uv=uv)
 
+    def _stamp(self, key, make, M):
+        """Copy a cached unit primitive into the mesh through matrix M. bmesh.ops.create_* touch every element of
+        the target mesh, so on a big kit mesh each call gets slower; stamping a template costs only its own size."""
+        t = _TEMPLATES.get(key)
+        if t is None:
+            tb = bmesh.new()
+            make(tb)
+            tb.verts.index_update()
+            t = ([v.co.copy() for v in tb.verts], [[v.index for v in f.verts] for f in tb.faces])
+            tb.free()
+            _TEMPLATES[key] = t
+        bm = self.bm
+        vs = [bm.verts.new(M @ co) for co in t[0]]
+        for f in t[1]:
+            bm.faces.new([vs[i] for i in f])
+        return vs
+
     def cyl(self, c=(0, 0, 0), r=0.5, h=1.0, seg=24, r2=None, caps=True, bevel=None, uv='box', smooth=True, axis='Z'):
         M = self.M @ Matrix.Translation(c) @ _axis_mat(axis)
-        res = bmesh.ops.create_cone(self.bm, cap_ends=caps, cap_tris=False, segments=seg,
-                                    radius1=r, radius2=r if r2 is None else r2, depth=h, matrix=M)
-        return self._finish(res["verts"], bevel, uv, smooth)
+        if r <= 1e-6 or h <= 1e-6:
+            res = bmesh.ops.create_cone(self.bm, cap_ends=caps, cap_tris=False, segments=seg,
+                                        radius1=r, radius2=r if r2 is None else r2, depth=h, matrix=M)
+            return self._finish(res["verts"], bevel, uv, smooth)
+        k = 1.0 if r2 is None else round(r2 / r, 4)
+        vs = self._stamp(("cyl", seg, bool(caps), k),
+                         lambda tb: bmesh.ops.create_cone(tb, cap_ends=caps, cap_tris=False, segments=seg, radius1=1.0,
+                                                          radius2=k, depth=1.0),
+                         M @ Matrix.Diagonal((r, r, h, 1)))
+        return self._finish(vs, bevel, uv, smooth)
 
     def sphere(self, c=(0, 0, 0), r=0.5, seg=24, rings=12, s=(1, 1, 1), uv='box'):
-        M = self.M @ Matrix.Translation(c) @ Matrix.Diagonal((s[0], s[1], s[2], 1))
-        res = bmesh.ops.create_uvsphere(self.bm, u_segments=seg, v_segments=rings, radius=r, matrix=M)
-        return self._finish(res["verts"], None, uv, True)
+        M = self.M @ Matrix.Translation(c) @ Matrix.Diagonal((s[0] * r, s[1] * r, s[2] * r, 1))
+        vs = self._stamp(("sphere", seg, rings), lambda tb: bmesh.ops.create_uvsphere(tb, u_segments=seg, v_segments=rings,
+                                                                                      radius=1.0), M)
+        return self._finish(vs, None, uv, True)
 
     def ico(self, c=(0, 0, 0), r=0.5, sub=2, s=(1, 1, 1), uv='box', smooth=True):
-        M = self.M @ Matrix.Translation(c) @ Matrix.Diagonal((s[0], s[1], s[2], 1))
-        res = bmesh.ops.create_icosphere(self.bm, subdivisions=sub, radius=r, matrix=M)
-        return self._finish(res["verts"], None, uv, smooth)
+        M = self.M @ Matrix.Translation(c) @ Matrix.Diagonal((s[0] * r, s[1] * r, s[2] * r, 1))
+        vs = self._stamp(("ico", sub), lambda tb: bmesh.ops.create_icosphere(tb, subdivisions=sub, radius=1.0), M)
+        return self._finish(vs, None, uv, smooth)
 
     def torus(self, c=(0, 0, 0), R=0.5, r=0.1, seg=32, sides=12, arc=360.0, uv='box', axis='Z'):
         rings = []
@@ -872,6 +897,9 @@ class Mesher:
         if outline:
             add_outline(ob, outline)
         return ob
+
+
+_TEMPLATES = {}
 
 
 def _axis_mat(axis):
