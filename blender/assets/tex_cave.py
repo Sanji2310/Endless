@@ -51,27 +51,27 @@ def cave_floor(n=256, seed=211):
 
 
 def timber(n=256, seed=221):
-    """Rough-hewn mine timber: grain along u (the length of a beam), adze facets across it, a knot or two,
-    darker end-checks. One tile = 1 m of beam at uvscale 1."""
+    """Mine timber, clean in the shared toon style: two or three flat tones along the beam, a few wavy grain lines
+    drawn thin like ink, and a knot or two as inked rings. No speckle: the outlines and shading carry the form.
+    One tile = 1 m of beam at uvscale 1."""
     ys, xs = np.mgrid[0:n, 0:n].astype(np.float64)
-    g = T.noise(n, 3, seed, 2)
-    grain = np.sin((ys / n * 9 + g * 1.6) * 2 * math.pi * 2)
-    lum = 0.84 + 0.07 * T.poster((grain + 1) / 2, 3, 0.8)
-    # adze facets: soft vertical bands of slightly different value
-    fac = np.floor(xs / n * 7 + (T.noise(n, 2, seed + 1) - 0.5) * 1.5)
-    lum *= 0.95 + ((fac * 5) % 3) * 0.035
-    # knots
+    lum = 0.93 + (T.poster(T.noise(n, 2, seed, 2), 3, 1.0) - 0.5) * 0.08          # broad flat tones
+    # grain: 4 wavy lines across the tile height, running along u
+    warp = (T.noise(n, 2, seed + 1, 2) - 0.5) * 0.9
+    v = ys / n * 4 + warp
+    fv = v % 1.0
+    line = 1 - T.smooth(np.abs(fv - 0.5), 0.0, 0.03)
+    gaps = T.noise(n, 3, seed + 2) > 0.38                                           # broken runs, not stripes
+    lum *= 1 - 0.22 * line * gaps
+    # knots: an inked ring with a darker heart
     rng = np.random.default_rng(seed)
-    for k in range(3):
+    for k in range(2):
         cx, cy = rng.random() * n, rng.random() * n
         dx = (xs - cx + n / 2) % n - n / 2
         dy = (ys - cy + n / 2) % n - n / 2
-        d = np.sqrt(dx * dx * 0.5 + dy * dy * 2.0)
-        lum *= 1 - 0.35 * (1 - T.smooth(d, 2.5, 5.0))
-        lum *= 1 - 0.08 * np.sin(np.clip(d, 0, 18) * 0.9) * (d < 18)
-    # long checks (dry cracks) along the grain
-    chk = T.noise(n, 40, seed + 2, m=n)
-    lum *= 1 - 0.3 * np.clip((chk - 0.78) * 8, 0, 1) * (T.noise(n, 3, seed + 3) > 0.55)
+        d = np.sqrt(dx * dx * 0.35 + dy * dy * 1.6)
+        lum *= 1 - 0.25 * (1 - T.smooth(np.abs(d - 6.0), 0.0, 1.2))
+        lum *= 1 - 0.12 * (1 - T.smooth(d, 2.0, 3.0))
     img = T.colorize(np.clip(lum, 0, 1), 0x000000, 0xFFFFFF) * T.rgb(0xFFF0E0)[None, None, :]
     T.write_png("t_timber", img)
 
@@ -145,8 +145,18 @@ def fx_sprites(n=64):
                 f.write(nm + "\n")
 
 
+def contact_sprite(n=64):
+    """s_contact: the cave obstacles' contact shadow (a decal under each one). A flat core that falls off over the
+    outer third, so it reads as a cel shadow with a soft edge rather than a fuzzy blob. White; the material tints it."""
+    ys, xs = np.mgrid[0:n, 0:n].astype(np.float64) + 0.5
+    r = np.sqrt(((xs - n / 2) / (n / 2)) ** 2 + ((ys - n / 2) / (n / 2)) ** 2)
+    img = np.ones((n, n, 4))
+    img[..., 3] = 0.62 * (1 - T.smooth(r, 0.62, 0.98))
+    T.write_png("s_contact", img)
+
+
 def build_all():
-    cave_rock(); cave_floor(); timber(); portal_stone(); fx_sprites()
+    cave_rock(); cave_floor(); timber(); portal_stone(); fx_sprites(); contact_sprite()
 
 
 def preview():
