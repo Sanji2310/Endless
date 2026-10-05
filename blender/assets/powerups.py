@@ -22,7 +22,7 @@ V = Vector
 
 def mats():
     M = E.mat
-    M("pu_gold", 0xFFC62E, spec=0.9, rim=0.45, emis=0.08, soft=0.08, shadow=0xC0601E)
+    M("pu_gold", 0xFFC62E, spec=0.6, rim=0.45, emis=0.08, soft=0.08, shadow=0xC0601E)
     M("pu_gold_deep", 0xE9A21C, spec=0.6, rim=0.3, emis=0.05, soft=0.08, shadow=0xA84A16)
     M("pu_white", 0xFBF8F1, spec=0.3, rim=0.4, soft=0.1, shadow=0xB8B2DA)
     M("pu_red", 0xE8473C, spec=0.5, rim=0.4, soft=0.08, shadow=0x9A2A5A)
@@ -77,13 +77,17 @@ def magnet(name="pu_magnet", etched=True):
     m.torus((0, -0.005, 0.06), R=0.19, r=0.025, seg=24, sides=8, axis='Z')        # collar
     m.mat("pu_gold_deep")
     m.sphere((0, -0.2, 0.02), 0.045, 12, 8)                                      # bell
-    # raised beckoning paw (right)
+    m.torus((0.03, 0.235, -0.2), R=0.065, r=0.028, seg=18, sides=8, arc=270, axis='Y')    # short curled tail on the back
+    m.sphere((0.095, 0.235, -0.2), 0.032, 10, 6)
+    # raised beckoning paw (right), clear of the head beside the cheek, pad to the front
     m.mat("pu_gold")
-    m.push(Matrix.Translation((0.2, -0.05, 0.12)) @ Matrix.Rotation(math.radians(-20), 4, 'Y'))
+    m.push(Matrix.Translation((0.2, -0.07, 0.1)) @ Matrix.Rotation(math.radians(26), 4, 'Y'))
     m.cyl((0, 0, 0.12), r=0.06, h=0.24, seg=14)
-    m.sphere((0, 0, 0.26), 0.075, 14, 8)
+    m.sphere((0, 0, 0.26), 0.078, 14, 8)
     m.mat("pu_pink")
-    m.sphere((0, -0.06, 0.26), 0.03, 10, 6)
+    m.sphere((0, -0.065, 0.26), 0.032, 10, 6, s=(1, 0.5, 1))
+    for k in (-1, 0, 1):
+        m.sphere((k * 0.03, -0.055, 0.315), 0.013, 8, 6, s=(1, 0.6, 1))              # toe beans
     m.pop()
     if not etched:
         # the first design: a little red horseshoe magnet held in the left paw, the koban on the belly
@@ -385,6 +389,10 @@ def design_maneki():
         E.add_outline(ob, 0.008)
         h = halo(); h.location = (0, 0, 0.04)
         studio.shoot(nm, target=(0, 0, 0.78), dist=1.9, yaw=-14, pitch=8, lens=50)
+        if et:
+            studio.shoot("maneki_three_quarter", target=(0, 0, 0.78), dist=1.9, yaw=-50, pitch=10, lens=50)
+            studio.shoot("maneki_side", target=(0, 0, 0.78), dist=1.9, yaw=-100, pitch=6, lens=50)
+            studio.shoot("maneki_back", target=(0, 0, 0.78), dist=1.9, yaw=160, pitch=10, lens=50)
 
 
 def export_powerups():

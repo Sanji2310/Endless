@@ -358,12 +358,14 @@ def kuro_body(name="kuro_body"):
     m.sphere((0.0, -0.36, 0.3), 0.04, 10, 6)
     m.sphere((0, -0.4, 0.03), 0.06, 10, 6, s=(1.3, 0.6, 1.0))                           # cream rump patch
     m.mat("ch_shiba_dark")
-    for k in range(6):
-        y = 0.3 - k * 0.09
+    for k in range(5):                                                                  # hackles up: swept fur tufts
+        y = 0.3 - k * 0.07
         z = 0.02 + 0.19 * 0.92 * math.sqrt(max(0.0, 1 - (y / (0.19 * 2.0)) ** 2))
-        m.push(Matrix.Translation((0, y, z - 0.02)) @ Matrix.Rotation(math.radians(-28), 4, 'X'))
-        m.cyl((0, 0, 0.04), r=0.045, h=0.1, r2=0.0, seg=5)                              # hackles up
-        m.pop()
+        for sx in (-1, 1):
+            m.push(Matrix.Translation((sx * 0.035, y - sx * 0.018, z - 0.03)) @ Matrix.Rotation(math.radians(-42), 4, 'X')
+                   @ Matrix.Rotation(math.radians(sx * 20), 4, 'Y') @ Matrix.Diagonal((1.4, 0.7, 1.0, 1.0)))
+            m.cyl((0, 0, 0.04), r=0.04, h=0.09 - k * 0.008, r2=0.0, seg=6)
+            m.pop()
     m.mat("ch_red")
     m.torus((0, 0.34, 0.08), R=0.11, r=0.025, seg=20, sides=6, axis='Y')
     m.mat("ch_brass")
@@ -441,19 +443,20 @@ def kuro_uleg(name="kuro_uleg"):
     m.sphere((0, 0, -0.01), 0.072, 12, 8, s=(1, 1.15, 1.2))
     m.cyl((0, 0, -KURO_ULEG / 2), r=0.06, h=KURO_ULEG, r2=0.048, seg=12)
     m.mat("ch_shiba")
-    m.cyl((0, -0.012, -0.1), r=0.05, h=0.12, r2=0.044, seg=12)                          # tan on the back of the leg
+    m.cyl((0, -0.022, -0.11), r=0.04, h=0.1, r2=0.036, seg=12)                          # tan stripe down the back
     return m.obj(name, smooth_angle=40)
 
 
 def kuro_lleg(name="kuro_lleg"):
-    """Elbow or hock pivot at the origin down to the paw sole at z -0.18: tan at the joint, cream socks and paw."""
+    """Elbow or hock pivot at the origin down to the paw sole at z -0.18: a tan leg with the cream (urajiro) down
+    its front and a cream paw, so it reads as shiba markings rather than socks."""
     chaser_mats()
     m = E.Mesher(name)
     m.mat("ch_shiba")
     m.sphere((0, 0, 0), 0.05, 10, 6)
-    m.cyl((0, -0.006, -0.04), r=0.046, h=0.08, r2=0.044, seg=12)
+    m.cyl((0, 0, -0.065), r=0.046, h=0.13, r2=0.04, seg=12)
     m.mat("ch_cream")
-    m.cyl((0, 0, -0.11), r=0.044, h=0.09, r2=0.04, seg=12)                              # white socks (urajiro)
+    m.cyl((0, 0.014, -0.085), r=0.036, h=0.1, r2=0.034, seg=12)                         # cream down the front
     m.sphere((0, 0.022, -0.155), 0.05, 12, 6, s=(1, 1.35, 0.55))                        # paw
     return m.obj(name, smooth_angle=40)
 
@@ -1056,7 +1059,7 @@ def greenbed(lod=0):
     m.mat("gb_edge")
     m.box((x1 + 0.07, seg / 2, g + 0.09), (0.14, seg, 0.18), bevel=(0.02, 1) if lod == 0 else None, smooth=False)
     if lod < 2:
-        G.meadow(m, x0 + 0.04, x1 - 0.04, 0.0, seg, z, rnd, density=16.0, bloom=0.5, lod=lod, light=0.4, h=0.3)
+        G.meadow(m, x0 + 0.04, x1 - 0.04, 0.0, seg, z, rnd, density=9.0, bloom=0.5, lod=lod, light=0.4, h=0.3)
     # shrubs in a staggered double row; some azaleas so covered in flowers that the green barely shows
     srnd = random.Random(71)
     y, row = srnd.uniform(0.0, 0.6), 0
@@ -1065,19 +1068,19 @@ def greenbed(lod=0):
         x = (7.0, 7.8)[row % 2] + srnd.uniform(-0.12, 0.12)
         kind = srnd.random()
         if kind < 0.4:
-            cl.lobes(m, "gr_leaf_dark", (x, y, z + r * 0.5), (r * 1.1, r, r * 0.68), (4, 2, 0)[lod], srnd, lod=lod)
+            cl.lobes(m, "gr_leaf_dark", (x, y, z + r * 0.5), (r * 1.1, r, r * 0.68), (3, 2, 0)[lod], srnd, lod=max(lod, 1))
             if lod < 2:
                 fl = "gr_azalea" if srnd.random() < 0.7 else "gr_azalea_w"
-                for k in range((7, 4)[lod]):
+                for k in range((5, 3)[lod]):
                     a = srnd.uniform(0, 2 * math.pi)
                     b = srnd.uniform(0.25, 1.1)
                     p = (x + math.cos(a) * math.cos(b) * r * 0.95, y + math.sin(a) * math.cos(b) * r * 0.85,
                          z + r * 0.5 + math.sin(b) * r * 0.62)
-                    cl.lobes(m, fl, p, (0.24, 0.22, 0.16), 2 if lod == 0 else 0, srnd, lod=max(lod, 1))
+                    cl.lobes(m, fl, p, (0.26, 0.24, 0.17), 1 if lod == 0 else 0, srnd, lod=max(lod, 1))
         elif kind < 0.65:
-            G.bush(m, cl, x, y, z, srnd, r=r, lod=lod, mat="gr_hydrangea")
+            G.bush(m, cl, x, y, z, srnd, r=r, lod=max(lod, 1), mat="gr_hydrangea")
         else:
-            G.bush(m, cl, x, y, z, srnd, r=r, lod=lod, mat=srnd.choice(("gr_leaf", "gr_leaf_light", "gr_hedge")))
+            G.bush(m, cl, x, y, z, srnd, r=r, lod=max(lod, 1), mat=srnd.choice(("gr_leaf", "gr_leaf_light", "gr_hedge")))
         y += r * 1.25 + srnd.uniform(0.1, 0.7)
         row += 1
     if lod == 0:
@@ -1180,6 +1183,13 @@ def export_density():
     E.reset()
     E.export_erm(hills(), "sl_hills")
     export_greens()
+
+
+def export_greenbed():
+    """Only the garden beds (quick to re-export while tuning them)."""
+    for lv in (0, 1, 2):
+        E.reset(); city.city_mats()
+        E.export_erm(greenbed(lv), "sl_greenbed" + GL.sfx(lv))
 
 
 def export_greens():

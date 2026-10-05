@@ -389,20 +389,28 @@ def _express_nose(m, band):
         m.mat("tr_tail")
         m.box((sx * 0.03, 0.24, 0.0), (0.08, 0.1, 0.07), smooth=False)
         m.pop()
-    # cab windscreen on the crown of the nose: a band of dark glass following the crown
+    # cab windscreen on the crown of the nose: a band of dark glass laid over every point of the body profile (so
+    # the white crown never shows through it), with two anime glints across it
     m.mat("tr_mask")
+    crown = [(-1.07, 2.96), (-0.93, 3.12), (-0.6, 3.24), (0.0, ROOF - 0.02), (0.6, 3.24), (0.93, 3.12), (1.07, 2.96)]
     rows = []
     for t in (0.36, 0.46, 0.56, 0.66, 0.74):
         y, sx, zs = _nose(t)
-        row = []
-        for (px, pz) in ((-1.07, 2.96), (-0.6, 3.24), (0.0, ROOF - 0.02), (0.6, 3.24), (1.07, 2.96)):
-            row.append((px * sx * 1.02, y, FLOOR + (pz - FLOOR) * zs + 0.045))
-        rows.append(row)
+        rows.append([(px * sx * 1.025, y, FLOOR + (pz - FLOOR) * zs + 0.05) for (px, pz) in crown])
     for a, b in zip(rows[:-1], rows[1:]):
-        for k in range(4):
+        for k in range(len(crown) - 1):
             q = [a[k], a[k + 1], b[k + 1], b[k]]
             m.poly(q)
             m.poly(q[::-1])
+    m.mat("tr_text_white", tint=0xCFE4FF)
+    for (t0, t1, w) in ((0.44, 0.5, 0.05), (0.53, 0.55, 0.025)):
+        pts = []
+        for t, px in ((t0, -0.75), (t1, 0.35)):
+            y, sx, zs = _nose(t)
+            cz = next(za + (zb - za) * (px - xa) / (xb - xa)
+                      for (xa, za), (xb, zb) in zip(crown, crown[1:]) if xa <= px <= xb)
+            pts.append(V((px * sx * 1.03, y, FLOOR + (cz - FLOOR) * zs + 0.07)))
+        m.tube(pts, r=w * 0.5, seg=4)
     # name badge and tip coupler cover
     m.mat("tr_band_" + band)
     m.sphere((0, 0.02, FLOOR + 0.22), 0.2, 16, 8, s=(1.2, 0.4, 0.6))

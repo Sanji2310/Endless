@@ -396,11 +396,11 @@ public final class SakuraWorld {
             Mat4.translate(m, p.x, y, -p.s);
             Mat4.rotY(m, spin);
             Mat4.scale(m, sc, sc, sc);
-            // a soft glow behind it and a turning halo underneath, so power-ups read from far away
+            // a soft glow behind it and a faint turning ring on the ground under it, so power-ups read from far away
             f.quad(true, p.x, y, -p.s + 0.3f, 0.75f, 0.75f, 0, uvGlow, 1f, 0.92f, 0.7f, 0.55f);
             if (halo >= 0) {
-                float[] h = f.draw(halo, RenderFrame.D_NO_SHADOW | RenderFrame.D_NO_OUTLINE, 1, 1, 1, 1, 0.6f);
-                Mat4.translate(h, p.x, y - 0.75f, -p.s);
+                float[] h = f.draw(halo, RenderFrame.D_NO_SHADOW | RenderFrame.D_NO_OUTLINE | RenderFrame.D_BLEND, 1, 1, 1, 0.45f, 0.6f);
+                Mat4.translate(h, p.x, (p.y > 2f ? p.y - 1f : 0f) + 0.12f, -p.s);       // just above the sleepers
                 Mat4.rotY(h, -time * 60);
             }
             if (((int) (time * 4 + p.s)) % 3 == 0)

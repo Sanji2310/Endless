@@ -112,6 +112,24 @@ public class SakuraPreview {
         hold(1);
         shot("sakura_10_chase");
 
+        // -Dsakura.clip=true: two seconds of the chase as the player sees it (clip_chase_00..59, 30 fps)
+        if (Boolean.getBoolean("sakura.clip")) {
+            for (int i = 0; i < 60; i++) {
+                for (int k = 0; k < 2; k++) {
+                    game.obstacles.clear();
+                    game.invulnT = 1f;
+                    game.chaseT = 3f;
+                    game.guardGap = 2.4f;
+                    game.update(DT);
+                    if (k == 0) {
+                        GLES20.drawing = false;
+                        renderer.drawFrame(DT);
+                    }
+                }
+                shot(String.format("clip_chase_%02d", i));
+            }
+        }
+
         try (OutputStream os = new BufferedOutputStream(new FileOutputStream(a[0]))) { GLES20.save(os); }
         System.out.println("recorded " + new File(a[0]).length() / 1024 + " KB of GL commands");
     }
