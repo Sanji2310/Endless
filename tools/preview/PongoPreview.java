@@ -69,8 +69,8 @@ public class PongoPreview {
     /** Sakura Line -> tunnel -> Crystal Cavern -> back out. Obstacles are cleared every frame: the cave's own
      *  obstacles belong to the vehicle side, and these shots are about the set piece and the cavern. */
     static void zones() {
-        float b = com.pongo.core.Zones.ZONE_LEN;
-        game.start();
+        game.start();                                   // lays out this run's zones: Sakura Line, then the cavern
+        float b = com.pongo.core.Zones.boundary(1), b2 = com.pongo.core.Zones.boundary(2);
         game.s = b - 110;
         runTo(b - 80); shot("zone_01_approach");
         runTo(b - 36); shot("zone_02_portal");
@@ -79,9 +79,9 @@ public class PongoPreview {
         runTo(b + 30); shot("zone_05_cavern");
         runTo(b + 54); shot("zone_06_parting");
         runTo(b + 400); shot("zone_07_deep");
-        game.s = 2 * b - 90;
-        runTo(2 * b - 32); shot("zone_08_way_out");
-        runTo(2 * b + 6); shot("zone_09_daylight");
+        game.s = b2 - 90;
+        runTo(b2 - 32); shot("zone_08_way_out");
+        runTo(b2 + 6); shot("zone_09_daylight");
     }
 
     /** Runs (no obstacles, invulnerable) until distance s; the last SETTLE frames are drawn muted. */
