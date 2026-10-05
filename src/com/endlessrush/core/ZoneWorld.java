@@ -78,8 +78,8 @@ public final class ZoneWorld {
         Zones z = g.zones;
 
         // set pieces whose stretch [approach, boundary + approach] overlaps the view
-        float b = Zones.nextBoundary(from - Zones.APPROACH) ;
-        for (; b - Zones.LINED - Zones.APPROACH < to; b += Zones.ZONE_LEN) {
+        float b = Zones.nextBoundary(from - Zones.APPROACH);
+        for (; b - Zones.LINED - Zones.APPROACH < to; b = Zones.nextBoundary(b)) {
             if (b + Zones.APPROACH < from) continue;
             if (Zones.exitAt(b)) setPiece(f, b, true);
             else if (Zones.zoneAt(b) == Zones.CAVERN) setPiece(f, b, false);
@@ -89,9 +89,9 @@ public final class ZoneWorld {
         for (int k = k0; k <= k1; k++) {
             float d = k * Zones.SEG;
             if (Zones.zoneAt(d) != Zones.CAVERN) continue;
-            float caveStart = Zones.nextBoundary(d) - Zones.ZONE_LEN;
+            float caveStart = Zones.zoneStart(d);
             int i = Math.round((d - caveStart) / Zones.SEG);
-            if (d >= Zones.portalAt(caveStart + Zones.ZONE_LEN)) continue;      // the lining on the way out
+            if (d >= Zones.portalAt(Zones.nextBoundary(d))) continue;           // the lining on the way out
             caveSegment(f, d, i);
         }
 
@@ -156,11 +156,11 @@ public final class ZoneWorld {
         piece(f, deco[sd], ident, 0, 0, d);
         piece(f, props[kit[1] - 1], ident, 0, 0, d);
         piece(f, cavePipe, ident, 0, 0, d);
-        boolean forkHere = kit[2] == 1 && caveFork[0] >= 0;
+        boolean forkHere = kit[2] == 1 && caveFork[0] >= 0 && Zones.caveForkFits(d);
         boolean forkPrev = false;
         if (i > 0) {
             Zones.caveKit(i - 1, kitPrev);
-            forkPrev = kitPrev[2] == 1 && caveFork[0] >= 0;
+            forkPrev = kitPrev[2] == 1 && caveFork[0] >= 0 && Zones.caveForkFits(d - Zones.SEG);
         }
         if (forkHere) piece(f, caveFork, ident, 0, 0, d);
         else if (!forkPrev) piece(f, caveTrack, ident, 0, 0, d);
