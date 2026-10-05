@@ -18,6 +18,7 @@ public final class MusicSim {
         java.util.List<Integer> ids = new java.util.ArrayList<>();
         for (int i = 1; i < a.length; i++) {
             if (a[i].equals("loop2")) { twice = true; continue; }
+            if (a[i].equals("rush")) { ids.add(-2); continue; }
             if (a[i].startsWith("solo=")) { MusicSynth.solo = Integer.parseInt(a[i].substring(5)); continue; }
             int id = -1;
             for (int k = 0; k < Soundtrack.COUNT; k++) if (Soundtrack.NAME[k].startsWith(a[i])) id = k;
@@ -27,14 +28,24 @@ public final class MusicSim {
         if (ids.isEmpty()) for (int k = 0; k < Soundtrack.COUNT; k++) ids.add(k);
         for (int id : ids) {
             long t0 = System.nanoTime();
-            short[] pcm = Soundtrack.render(id);
+            short[] pcm;
+            String name;
+            if (id == -2) {   // the optional Rooftop Rush "rush mix"
+                MusicSynth r = Soundtrack.rooftops(true);
+                pcm = r.render();
+                Soundtrack.lastSynth = r;
+                name = "rooftops_rush_mix";
+            } else {
+                pcm = Soundtrack.render(id);
+                name = Soundtrack.NAME[id];
+            }
             long ms = (System.nanoTime() - t0) / 1000000;
             int frames = pcm.length / 2;
             int peak = 0; double ss = 0;
             for (short v : pcm) { peak = Math.max(peak, Math.abs(v)); ss += v * (double) v; }
             System.out.printf("%-24s %6.1f s  rendered in %5d ms  peak %5.1f dBFS  rms %5.1f dBFS  handoff %.2f s%n",
-                    Soundtrack.NAME[id], frames / (float) MusicSynth.RATE, ms, 20 * Math.log10(peak / 32768.0),
-                    10 * Math.log10(ss / pcm.length / (32768.0 * 32768.0)), Soundtrack.handoff(id));
+                    name, frames / (float) MusicSynth.RATE, ms, 20 * Math.log10(peak / 32768.0),
+                    10 * Math.log10(ss / pcm.length / (32768.0 * 32768.0)), id < 0 ? 0f : Soundtrack.handoff(id));
             MusicSynth sy = Soundtrack.lastSynth;
             double tot = 0;
             for (double e : sy.energy) tot += e;
@@ -43,19 +54,19 @@ public final class MusicSim {
             System.out.println(sb);
             int clicks = 0;
             for (int i = 2; i < pcm.length; i += 2) if (Math.abs(pcm[i] - pcm[i - 2]) > 12000) clicks++;
-            if (Soundtrack.isLoop(id)) {
+            if (id < 0 || Soundtrack.isLoop(id)) {
                 int n = pcm.length;
                 System.out.printf("    seam jump L %d R %d   clicks %d%n", Math.abs(pcm[0] - pcm[n - 2]), Math.abs(pcm[1] - pcm[n - 1]), clicks);
             }
             clashes(sy);
             quality(pcm);
             short[] out = pcm;
-            if (twice && Soundtrack.isLoop(id)) {
+            if (twice && (id < 0 || Soundtrack.isLoop(id))) {
                 out = new short[pcm.length * 2];
                 System.arraycopy(pcm, 0, out, 0, pcm.length);
                 System.arraycopy(pcm, 0, out, pcm.length, pcm.length);
             }
-            wav(dir + "/" + Soundtrack.NAME[id] + ".wav", out, 2);
+            wav(dir + "/" + name + ".wav", out, 2);
         }
     }
 

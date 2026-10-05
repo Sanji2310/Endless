@@ -253,9 +253,9 @@ public final class MusicSynth {
             case SNAP: return snap(vel);
             case REVCYM: return revcym(vel, gate);
             case SWELL: return swell(vel, gate);
-            case VOX_AH: return chop(f, gate, vel, V_AH, V_AH, 0.55f);
-            case VOX_OO: return chop(f, gate, vel, V_OO, V_OH, 0.55f);
-            case VOX_EE: return chop(f, gate, vel, V_EE, V_I, 0.7f);
+            case VOX_AH: return chop(f, gate, vel, V_AH, V_AH, 1.6f);
+            case VOX_OO: return chop(f, gate, vel, V_OO, V_OH, 1.6f);
+            case VOX_EE: return chop(f, gate, vel, V_EE, V_I, 1.2f);
             case WHISTLE: return whistle(f, gate, vel);
             case KICK808: return kick808(vel, midi > 0 ? f : 50f);
             case HEY: return shout(vel, new float[][]{V_E, V_E, V_I}, 0.30f, 1.00f, 0.80f);
@@ -906,7 +906,7 @@ public final class MusicSynth {
                     new float[]{0f, 0.008f, h, h + 0.04f}, new float[]{0f, 0.7f, 0.6f, 0f});
             for (int i = 0; i < w.length; i++) o[off + i] += (w[i] + asp[i]) * 0.3f;
         }
-        for (int i = 0; i < n; i++) o[i] = (float) Math.tanh(o[i] * 1.5f) * vel * 0.85f;
+        for (int i = 0; i < n; i++) o[i] = (float) Math.tanh(o[i] * 1.5f) * vel * 2.2f;
         return o;
     }
 
@@ -962,7 +962,7 @@ public final class MusicSynth {
             float src = saw(ph, d) * 0.7f + (rnd.nextFloat() * 2 - 1) * 0.5f;
             float y = b1.bp(src) * b1.k + b2.bp(src) * b2.k * 0.7f;
             float edge = Math.min(1f, Math.min(i, n - i) / (0.004f * RATE));
-            o[i] = y * (float) Math.pow(a, 0.6f) * edge * vel * 0.9f;
+            o[i] = y * (float) Math.pow(a, 0.6f) * edge * vel * 1.6f;
         }
         return o;
     }

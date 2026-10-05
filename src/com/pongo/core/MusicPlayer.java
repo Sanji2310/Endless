@@ -22,7 +22,7 @@ import java.nio.channels.FileChannel;
 public final class MusicPlayer {
     public static final int RATE = MusicSynth.RATE;
     /** Bump when the music changes so stale disk caches are re-rendered. */
-    public static final int VERSION = 2;
+    public static final int VERSION = 3;
     private static final int MAX_LOOPS_IN_RAM = 3;
 
     private final File cacheDir;

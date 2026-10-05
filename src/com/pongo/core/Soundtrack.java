@@ -58,7 +58,7 @@ public final class Soundtrack {
             case CAVERN: s = cavern(); break;
             case RIVER: s = river(); break;
             case SKY: s = sky(); break;
-            case ROOFTOPS: s = rooftops(); break;
+            case ROOFTOPS: s = rooftops(false); break;
             case ST_SAKURA: s = stSakura(); break;
             case ST_CAVERN: s = stCavern(); break;
             case ST_RIVER: s = stRiver(); break;
@@ -82,7 +82,9 @@ public final class Soundtrack {
             OHAT = MusicSynth.OHAT, SHK = MusicSynth.SHAKER, RIDE = MusicSynth.RIDE, CRASH = MusicSynth.CRASH,
             TAIKO = MusicSynth.TAIKO, TOM = MusicSynth.TOM, WOOD = MusicSynth.WOOD, RIM = MusicSynth.RIM,
             CHIME = MusicSynth.CHIMES, TRI = MusicSynth.TRIANGLE, SNAP = MusicSynth.SNAP, KAKKO = MusicSynth.KAKKO,
-            REV = MusicSynth.REVCYM, SWELL = MusicSynth.SWELL;
+            REV = MusicSynth.REVCYM, SWELL = MusicSynth.SWELL, BR = MusicSynth.BRASS, WH = MusicSynth.WHISTLE,
+            AH = MusicSynth.VOX_AH, OO = MusicSynth.VOX_OO, EE = MusicSynth.VOX_EE, K808 = MusicSynth.KICK808,
+            HEY = MusicSynth.HEY, HO = MusicSynth.HO, YEAH = MusicSynth.YEAH, SCR = MusicSynth.SCRATCH;
 
     private static String[] bars(String s) { return s.trim().split("\\s+"); }
 
@@ -235,6 +237,57 @@ public final class Soundtrack {
         for (int b : strong) s.note(CRASH, b * 4, 4, 60, 0.85f, 0.3f, 0.25f);
     }
 
+    // ================================================================== rush layer (runner-game hype on the band)
+
+    /**
+     * Rush verse: the band drops to a half-time trap groove. Guitar stabs, a tuned 808 on the chord root, clap and snare
+     * on beat 3, 16th hats with a 32nd roll every other bar, brass stabs and a vocal-chop hook (vox: VOX_AH / OO / EE).
+     */
+    private static void rush(MusicSynth s, int bar0, String[] prog, float gtVel, int vox, float voxVel, boolean fill) {
+        int n = prog.length, last = fill ? n - 1 : n;
+        powerChords(s, bar0, prog, "x-----o---o-----", gtVel);
+        line(s, SB, bar0, prog, 35, 0, "r-----r---r---o-", 0.5f, 0f, 0f, 0.6f);
+        s.role = MusicSynth.FREE;
+        for (int b = 0; b < n; b++) {
+            float at = (bar0 + b) * 4;
+            String c = chordAt(prog, b, 0, 4);
+            if (c.indexOf('/') > 0) c = c.substring(0, c.indexOf('/'));
+            int root = MusicSynth.bassOf(c, 28);
+            s.note(K808, at, 1, root, 0.9f, 0f, 0f);
+            s.note(K808, at + 1.5f, 1, root, 0.7f, 0f, 0f);
+            s.note(K808, at + 2.5f, 1, MusicSynth.bassOf(chordAt(prog, b, 2.5f, 4), 28), 0.78f, 0f, 0f);
+        }
+        drums(s, KICK, bar0, n, "x-----x---x-----", 0.75f, 0f, 0f, 0);
+        drums(s, SNR, bar0, last, "--------x-------", 0.75f, 0f, 0.25f, 0);
+        drums(s, CLAP, bar0, last, "--------x-------", 0.5f, 0.1f, 0.3f, 0);
+        drums(s, SNAP, bar0, n, "----x-------x---", 0.35f, -0.3f, 0.2f, 0);
+        for (int b = 0; b < n; b++)
+            drums(s, HAT, bar0 + b, 1, b % 2 == 0 ? "x.o.x.o.x.o.x.o." : "x-o-x-o-x-o-x-o-x-o-x-o-xoxoxoxo", 0.4f, 0.3f, 0.1f, 0);
+        line(s, BR, bar0, prog, 35, 62, "------c-----c---", 0.32f, -0.15f, 0.25f, 0.5f);
+        arp(s, vox, bar0, prog, 65, 40, "0-12-02-", 0.5f, voxVel, 2f, 0.25f, 0.2f);
+        if (fill) fill(s, bar0 + n - 1);
+        s.note(SCR, (bar0 + n - 1) * 4 + 1f, 1f, 0, 0.45f, 0.2f, 0.1f);
+    }
+
+    /** Chorus hype: claps on 2 and 4, a gang "Ho!" opening each 8 bars and "Hey!" answering at the end of every
+     *  second bar. */
+    private static void hype(MusicSynth s, int bar0, int n, float vel) {
+        drums(s, CLAP, bar0, n - 1, "----x-------x---", 0.45f, 0.1f, 0.3f, 0);
+        s.role = MusicSynth.FREE;
+        for (int b = 0; b < n; b++) {
+            float at = (bar0 + b) * 4;
+            if (b % 8 == 0) s.note(HO, at, 1, 0, vel, 0f, 0.2f);
+            if (b % 2 == 1 && b != n - 1) s.note(HEY, at + 3f, 1, 0, vel * 0.9f, 0f, 0.2f);
+        }
+    }
+
+    /** Loop-top "Yeah!" with a scratch pickup at the end of the intro (the moment the loop comes round). */
+    private static void yeah(MusicSynth s, int bar0, int introBars, float vel) {
+        s.role = MusicSynth.FREE;
+        s.note(YEAH, bar0 * 4, 1, 0, vel, 0f, 0.25f);
+        s.note(SCR, (bar0 + introBars - 1) * 4 + 3f, 1f, 0, 0.4f, -0.2f, 0.1f);
+    }
+
     // ================================================================== MENU: "Hanami Platform"
 
     private static MusicSynth menu() {
@@ -252,7 +305,12 @@ public final class Soundtrack {
         hold(s, SAW, 0, intro, 64, 0.16f, 0f, 0.35f);
         hold(s, SAW, 4, prog, 64, 0.18f, 0f, 0.35f);
         hold(s, SAW, 12, prog, 64, 0.22f, 0f, 0.35f);
-        mel(s, LD, 4, m, 0.55f, 0f, 0.3f, 0.2f, -12);
+        mel(s, WH, 4, m, 0.6f, 0.1f, 0.3f, 0.25f, 0);
+        // boom-bap lift under the second pass: 808, "ah" chops answering the lead, a "Yeah!" to open it
+        arp(s, AH, 12, prog, 64, 40, "--0-1---2-1-0---", 0.25f, 0.35f, 2f, 0.3f, 0.25f);
+        for (int b = 12; b < 20; b++) s.note(K808, b * 4, 1, MusicSynth.bassOf(chordAt(prog, b - 12, 0, 4), 28), 0.7f, 0f, 0f);
+        s.note(YEAH, 12 * 4, 1, 0, 0.5f, 0f, 0.3f);
+        s.note(SCR, 11 * 4 + 3f, 1f, 0, 0.35f, -0.2f, 0.1f);
         mel(s, LD, 12, m, 0.65f, 0f, 0.3f, 0.2f, 0);
         mel(s, GL, 12, m, 0.22f, 0.3f, 0.3f, 0.1f, 0);
         s.note(CRASH, 4 * 4, 4, 60, 0.45f, -0.3f, 0.25f);
@@ -280,8 +338,10 @@ public final class Soundtrack {
         String mC = k1 + " A5/1.5 B5/.5 C#6/1 E6/1 | _F#6/1.5 E6/.5 D#6/1 B5/1 | G#5/1.5 F#5/.5 E5/1 B5/1 | _E6/3 r/1 |"
                 + k1 + " A5/1 C#6/1 F#6/1 E6/1 | D#6/1.5 E6/.5 F#6/2 | _G#6/2 F#6/1 E6/1 | B5/2 r/2";
         band(s, I, intro, INTRO, 0.65f, true);
-        band(s, V, verse, VERSE, 0.58f, true);
+        rush(s, V, verse, 0.58f, AH, 0.4f, true);
         band(s, C, chorus, CHORUS, 0.72f, true);
+        hype(s, C, chorus.length, 0.6f);
+        yeah(s, I, intro.length, 0.6f);
         mel(s, LD, I, hook, 0.7f, 0f, 0.25f, 0.2f, 0);
         mel(s, GL, I, hook, 0.22f, 0.3f, 0.3f, 0.1f, 12);
         mel(s, LD, V, mV, 0.6f, 0f, 0.25f, 0.18f, 0);
@@ -313,8 +373,10 @@ public final class Soundtrack {
         String mC = k1 + " Bb5/1.5 A5/.5 G5/1 D6/1 | C6/1.5 A5/.5 E5/1 E6/1 | F6/1.5 E6/.5 D6/1 C6/1 | _E6/3 r/1 |"
                 + k1 + " Bb5/1 D6/1 G6/1 F6/1 | E6/1.5 F6/.5 G6/2 | _A6/2 G6/1 F6/1 | E6/2 C#6/1 E6/1";
         band(s, I, intro, INTRO, 0.62f, true);
-        band(s, V, verse, VERSE, 0.58f, true);
+        rush(s, V, verse, 0.58f, OO, 0.42f, true);
         band(s, C, chorus, CHORUS, 0.7f, true);
+        hype(s, C, chorus.length, 0.55f);
+        yeah(s, I, intro.length, 0.55f);
         mel(s, LD, I, hook, 0.7f, 0f, 0.28f, 0.22f, 0);
         mel(s, CE, I, hook, 0.25f, 0.3f, 0.4f, 0.15f, 12);
         mel(s, LD, V, mV, 0.6f, 0f, 0.28f, 0.2f, 0);
@@ -350,8 +412,12 @@ public final class Soundtrack {
         String mC = k1 + " D6/1.5 B5/.5 D6/1 E6/1 | E6/1.5 D6/.5 C#6/1 A5/1 | B5/1.5 A5/.5 F#5/1 E5/1 | _F#5/3 r/1 |"
                 + k1 + " G5/1 B5/1 E6/1 D6/1 | C#6/1.5 A#5/.5 C#6/1 E6/1 | _F#6/2 E6/1 D6/1 | B5/2 r/2";
         band(s, I, intro, INTRO, 0.6f, true);
-        band(s, V, verse, VERSE, 0.55f, true);
+        rush(s, V, verse, 0.55f, EE, 0.4f, true);
         band(s, C, chorus, CHORUS, 0.68f, true);
+        hype(s, C, chorus.length, 0.6f);
+        yeah(s, I, intro.length, 0.55f);
+        // kakegoe: the chorus "Ho!" lands on the taiko hits; the whistle doubling the riff an octave up like a shinobue
+        mel(s, WH, I, riff, 0.5f, 0.35f, 0.3f, 0.15f, 12);
         // the riff on shamisen and lead together; shamisen answers in the verse; koto runs through the chorus
         mel(s, SH, I, riff, 1.1f, -0.35f, 0.25f, 0f, 0);
         mel(s, LD, I, riff, 0.55f, 0.1f, 0.25f, 0.15f, 0);
@@ -388,8 +454,11 @@ public final class Soundtrack {
         String mC = k1 + " B5/1.5 A5/.5 G5/1 D6/1 | _F#6/1.5 E6/.5 D6/1 A5/1 | G5/1 B5/1 D6/1 E6/1 | _E6/3 r/1 |"
                 + k1 + " G5/1 B5/1 E6/1 D6/1 | C#6/1.5 D6/.5 E6/2 | _F#6/2 E6/1 D6/1 | D6/2 r/2";
         band(s, I, intro, INTRO, 0.6f, true);
-        band(s, V, verse, VERSE, 0.55f, true);
+        rush(s, V, verse, 0.55f, AH, 0.4f, true);
         band(s, C, chorus, CHORUS, 0.7f, true);
+        hype(s, C, chorus.length, 0.55f);
+        yeah(s, I, intro.length, 0.55f);
+        mel(s, WH, C, mC, 0.35f, -0.3f, 0.3f, 0.2f, 0);
         mel(s, LD, I, hook, 0.7f, 0f, 0.3f, 0.22f, 0);
         mel(s, GL, I, hook, 0.22f, 0.3f, 0.35f, 0.1f, 12);
         mel(s, LD, V, mV, 0.6f, 0f, 0.3f, 0.2f, 0);
@@ -407,7 +476,8 @@ public final class Soundtrack {
 
     // ================================================================== EXPRESS ROOFTOPS: "Rooftop Rush"
 
-    private static MusicSynth rooftops() {
+    /** rush: the optional "rush mix" (half-time trap verse, shouts, chops); the game plays the original. */
+    public static MusicSynth rooftops(boolean rush) {
         MusicSynth s = new MusicSynth(160, 4, 28, 606);
         s.revSize = 0.7f; s.revWet = 0.7f; s.dlyBeats = 0.75f; s.dlyFb = 0.3f;
         String[] intro = bars("Bm G D A");
@@ -426,10 +496,11 @@ public final class Soundtrack {
                 + k1 + " G5/1 B5/1 E6/1 D6/1 | C#6/1.5 D6/.5 E6/2 | _F#6/2 E6/1 D6/1 | C#6/2 A#5/1 C#6/1";
         // guitars: chugging power chords, wide L/R double-track
         powerChords(s, I, intro, "x-o-o-x-o-o-x-o-", 0.7f);
-        powerChords(s, V, verse, "x-o-o-o-x-o-o-o-", 0.6f);
+        if (rush) rush(s, V, verse, 0.6f, AH, 0.4f, false);
+        else powerChords(s, V, verse, "x-o-o-o-x-o-o-o-", 0.6f);
         powerChords(s, C, chorus, "x-----o-x-o-x-o-", 0.75f);
         line(s, SB, I, intro, 35, 0, "r-r-r-r-r-r-r-r-", 0.7f, 0f, 0f, 0.7f);
-        line(s, SB, V, verse, 35, 0, "r-r-r-r-r-r-r-r-", 0.7f, 0f, 0f, 0.7f);
+        if (!rush) line(s, SB, V, verse, 35, 0, "r-r-r-r-r-r-r-r-", 0.7f, 0f, 0f, 0.7f);
         line(s, SB, C, chorus, 35, 0, "r-r-o-r-r-r-o-r-", 0.75f, 0f, 0f, 0.7f);
         // melody: hook on lead, verse on lead, chorus doubled with glockenspiel and a supersaw bed
         mel(s, LD, I, hook, 0.7f, 0f, 0.25f, 0.2f, 0);
@@ -442,9 +513,14 @@ public final class Soundtrack {
         drums(s, KICK, I, 4, "x-----x-x-------", 1f, 0f, 0f, 0);
         drums(s, SNR, I, 3, "----x-------x---", 0.8f, 0f, 0.2f, 0);
         drums(s, HAT, I, 4, "x-o-x-o-x-o-x-o-", 0.45f, 0.25f, 0.1f, 0);
-        drums(s, KICK, V, 8, "x-----x-x-----x-", 1f, 0f, 0f, 0);
-        drums(s, SNR, V, 7, "----x-------x---", 0.8f, 0f, 0.2f, 0);
-        drums(s, HAT, V, 8, "x.o.x.o.x.o.x.o.", 0.42f, 0.25f, 0.1f, 0);
+        if (!rush) {
+            drums(s, KICK, V, 8, "x-----x-x-----x-", 1f, 0f, 0f, 0);
+            drums(s, SNR, V, 7, "----x-------x---", 0.8f, 0f, 0.2f, 0);
+            drums(s, HAT, V, 8, "x.o.x.o.x.o.x.o.", 0.42f, 0.25f, 0.1f, 0);
+        } else {
+            hype(s, C, chorus.length, 0.6f);
+            yeah(s, I, intro.length, 0.6f);
+        }
         drums(s, KICK, C, 16, "x-----x-x-x---x-", 1f, 0f, 0f, 0);
         drums(s, SNR, C, 15, "----x-------x---", 0.85f, 0f, 0.2f, 0);
         drums(s, RIDE, C, 16, "x-o-x-o-x-o-x-o-", 0.38f, -0.25f, 0.2f, 0);
