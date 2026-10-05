@@ -6,19 +6,28 @@ import android.media.AudioTrack;
 
 import com.endlessrush.core.Game;
 import com.pongo.core.CaveSounds;
+import com.pongo.core.MusicPlayer;
+import com.pongo.core.Soundtrack;
+import com.pongo.core.Zones;
+
+import java.io.File;
 
 import java.util.ArrayList;
 import java.util.Random;
 
-/** Software mixer: procedurally synthesised sound effects plus a looping soundtrack, and the zone sounds
- *  (com.pongo.core.CaveSounds: one-shots as Game.SND_ZONE + id, and the cave ambience loop at `ambience`). */
+/** Software stereo mixer: procedurally synthesised sound effects, the zone sounds (com.pongo.core.CaveSounds:
+ *  one-shots as Game.SND_ZONE + id, and the cave ambience loop at `ambience`) and the soundtrack
+ *  (com.pongo.core.MusicPlayer, cued from the game state by cue()). */
 public final class AudioEngine implements Runnable {
     private static final int RATE = 22050;
     private static final int BUF = 1024;
 
     private final short[][] sfx = new short[Game.SOUND_COUNT][];
-    private short[] music;
-    private int musicPos;
+    /** Music sits this far under full scale so the sound effects stay on top. */
+    private static final float MUSIC_GAIN = 0.5f;
+    private MusicPlayer music;
+    private File cacheDir;
+    private int lastState = -1, lastZone = -1;
     private short[][] zone;
     private short[] enterTunnel, caveLoop;
     private int caveLoopPos;
@@ -32,8 +41,12 @@ public final class AudioEngine implements Runnable {
     private AudioTrack track;
     private final Object lock = new Object();
 
+    /** Where rendered music is cached (Context.getCacheDir()); call before start(). */
+    public void setCacheDir(File dir) { cacheDir = dir; }
+
     public void start() {
         if (running) return;
+        if (music == null) { music = new MusicPlayer(cacheDir); music.start(); }
         running = true;
         thread = new Thread(this, "audio");
         thread.start();
@@ -41,6 +54,7 @@ public final class AudioEngine implements Runnable {
 
     public void stop() {
         running = false;
+        if (music != null) { music.stop(); music = null; }
         synchronized (lock) { lock.notifyAll(); }
     }
 
@@ -65,17 +79,17 @@ public final class AudioEngine implements Runnable {
     @Override
     public void run() {
         synth();
-        int min = AudioTrack.getMinBufferSize(RATE, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT);
+        int min = AudioTrack.getMinBufferSize(RATE, AudioFormat.CHANNEL_OUT_STEREO, AudioFormat.ENCODING_PCM_16BIT);
         try {
-            track = new AudioTrack(AudioManager.STREAM_MUSIC, RATE, AudioFormat.CHANNEL_OUT_MONO,
-                    AudioFormat.ENCODING_PCM_16BIT, Math.max(min, BUF * 4), AudioTrack.MODE_STREAM);
+            track = new AudioTrack(AudioManager.STREAM_MUSIC, RATE, AudioFormat.CHANNEL_OUT_STEREO,
+                    AudioFormat.ENCODING_PCM_16BIT, Math.max(min, BUF * 8), AudioTrack.MODE_STREAM);
             track.play();
         } catch (Exception e) {
             running = false;
             return;
         }
-        short[] out = new short[BUF];
-        float[] mix = new float[BUF];
+        short[] out = new short[BUF * 2];
+        float[] mix = new float[BUF], ml = new float[BUF], mr = new float[BUF];
         boolean trackPaused = false;
         while (running) {
             if (paused) {
@@ -86,40 +100,80 @@ public final class AudioEngine implements Runnable {
                 continue;
             }
             if (trackPaused) { track.play(); trackPaused = false; }
-            for (int i = 0; i < BUF; i++) mix[i] = 0;
+            for (int i = 0; i < BUF; i++) { mix[i] = 0; ml[i] = 0; mr[i] = 0; }
             float a0 = ambGain, a1 = ambGain + (ambience - ambGain) * 0.08f;   // eased per buffer, no clicks
             ambGain = a1;
-            if (musicOn && music != null) {
-                for (int i = 0; i < BUF; i++) {
-                    float a = a0 + (a1 - a0) * i / BUF;
-                    mix[i] += music[musicPos] * 0.55f * (1f - 0.55f * a);
-                    if (++musicPos >= music.length) musicPos = 0;
-                }
-            }
             if (soundOn && caveLoop != null && (a0 > 0.001f || a1 > 0.001f)) {
                 for (int i = 0; i < BUF; i++) {
                     mix[i] += caveLoop[caveLoopPos] * 0.6f * (a0 + (a1 - a0) * i / BUF);
                     if (++caveLoopPos >= caveLoop.length) caveLoopPos = 0;
                 }
             }
+            double sfxEnergy = 0;
             synchronized (voices) {
                 for (int v = voices.size() - 1; v >= 0; v--) {
                     int[] vc = voices.get(v);
                     short[] s = sound(vc[0]);
                     int n = Math.min(BUF, s.length - vc[1]);
-                    for (int i = 0; i < n; i++) mix[i] += s[vc[1] + i];
+                    for (int i = 0; i < n; i++) { float x = s[vc[1] + i]; mix[i] += x; sfxEnergy += x * x; }
                     vc[1] += n;
                     if (vc[1] >= s.length) voices.remove(v);
                 }
             }
-            for (int i = 0; i < BUF; i++) {
-                float x = mix[i] / 32768f;
-                x = x / (1 + Math.abs(x) * 0.6f); // soft clip
-                out[i] = (short) (x * 32000);
+            MusicPlayer mp = music;
+            if (musicOn && mp != null) {
+                // the music dips under the sound effects and under the cave ambience
+                float sfx = (float) Math.sqrt(sfxEnergy / BUF) / 32768f * 5f;
+                mp.mix(ml, mr, BUF, sfx);
+                for (int i = 0; i < BUF; i++) {
+                    float g = MUSIC_GAIN * (1f - 0.45f * (a0 + (a1 - a0) * i / BUF));
+                    ml[i] *= g; mr[i] *= g;
+                }
             }
-            track.write(out, 0, BUF);
+            for (int i = 0; i < BUF; i++) {
+                out[2 * i] = clip(mix[i] + ml[i]);
+                out[2 * i + 1] = clip(mix[i] + mr[i]);
+            }
+            track.write(out, 0, BUF * 2);
         }
         try { track.stop(); track.release(); } catch (Exception ignored) { }
+    }
+
+    private static short clip(float v) {
+        float x = v / 32768f;
+        x = x / (1 + Math.abs(x) * 0.6f); // soft clip
+        return (short) (x * 32000);
+    }
+
+    /**
+     * Picks the music for the game's state; call every frame (any thread). Menu theme on the menu; on a run, each
+     * zone's stinger as its title card shows (or as the zone starts, for zones without a card) handing over to the
+     * zone's theme; the game-over stinger at the end of a run, then the menu theme; quieter while paused or dying.
+     */
+    public void cue(Game g) {
+        MusicPlayer mp = music;
+        if (mp == null) return;
+        int st = g.state;
+        if (st == Game.MENU) {
+            mp.theme(Soundtrack.MENU);
+            mp.setLevel(1f);
+            lastZone = -1;
+        } else if (st == Game.GAME_OVER) {
+            if (lastState != Game.GAME_OVER) mp.stinger(Soundtrack.ST_GAMEOVER, Soundtrack.MENU);
+            mp.setLevel(0.8f);
+            lastZone = -1;
+        } else {
+            Zones z = g.zones;
+            int zone = z.cardZone >= 0 ? z.cardZone : z.zone;
+            if (zone != lastZone) {
+                mp.stinger(Soundtrack.stingerFor(zone), Soundtrack.themeFor(zone));
+                lastZone = zone;
+            }
+            // load the next zone's theme well before its tunnel
+            mp.prefetch(Soundtrack.themeFor(Zones.zoneAt(Zones.nextBoundary(g.s))));
+            mp.setLevel(st == Game.PAUSED ? 0.45f : st == Game.DYING || st == Game.SAVE_ME ? 0.35f : 1f);
+        }
+        lastState = st;
     }
 
     private short[] sound(int id) {
@@ -209,38 +263,8 @@ public final class AudioEngine implements Runnable {
         b = buf(1.0f); tone(b, 0, 0.3f, 392, 370, 0.3f, 1, 1); tone(b, 0.3f, 0.3f, 370, 349, 0.3f, 1, 1);
         tone(b, 0.6f, 0.4f, 349, 300, 0.3f, 1, 2);
         sfx[Game.SND_CAUGHT] = pcm(b, 0.6f);
-        music = makeMusic();
         zone = CaveSounds.buildAll();
         enterTunnel = CaveSounds.enterTunnel(zone);
         caveLoop = zone[CaveSounds.AMBIENCE];
-    }
-
-    /** 8-bar hip-hop-ish loop: kick, snare, hats, bass line and a plucked lead. */
-    private static short[] makeMusic() {
-        float bpm = 112;
-        float beat = 60f / bpm;
-        int bars = 8;
-        float[] b = buf(bars * 4 * beat);
-        float[][] chords = {{220, 261.6f, 329.6f}, {174.6f, 220, 261.6f}, {130.8f, 164.8f, 196}, {196, 246.9f, 293.7f}};
-        float[] bassRoots = {110, 87.3f, 130.8f, 98};
-        int[] bassPat = {1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 0};
-        int[] leadPat = {0, 2, 1, 2, 0, 2, 1, 2, 0, 1, 2, 1, 2, 1, 0, 2};
-        for (int bar = 0; bar < bars; bar++) {
-            float bs = bar * 4 * beat;
-            int ci = bar % 4;
-            for (int st = 0; st < 16; st++) {
-                float ts = bs + st * beat / 4;
-                if (st % 8 == 0 || st == 10) { tone(b, ts, 0.25f, 150, 45, 0.9f, 0, 7); }
-                if (st == 4 || st == 12) { noise(b, ts, 0.2f, 0.55f, 9, 0.7f, 0.5f); tone(b, ts, 0.1f, 220, 180, 0.2f, 0, 10); }
-                if (st % 2 == 0) noise(b, ts, 0.04f, st % 4 == 2 ? 0.16f : 0.09f, 12, 0.95f, 0.95f);
-                if (bassPat[st] == 1) tone(b, ts, beat * 0.45f, bassRoots[ci], bassRoots[ci], 0.45f, 3, 3);
-                if (bar >= 2 && st % 2 == 0) {
-                    float f = chords[ci][leadPat[st]] * 2;
-                    tone(b, ts, beat * 0.4f, f, f, 0.09f, 1, 7);
-                }
-            }
-            for (int k = 0; k < 3; k++) tone(b, bs, 4 * beat, chords[ci][k], chords[ci][k], 0.035f, 2, 0.8f);
-        }
-        return pcm(b, 0.5f);
     }
 }

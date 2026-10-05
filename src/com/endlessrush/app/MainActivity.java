@@ -91,6 +91,7 @@ public final class MainActivity extends Activity implements Game.Listener, GameR
         });
         audio.soundOn = profile.soundOn == 1;
         audio.musicOn = profile.musicOn == 1;
+        audio.setCacheDir(getCacheDir());
         game = new Game(profile, this);
         scene = new Scene();
         renderer = new GameRenderer(game, scene, this, getAssets());
@@ -296,6 +297,7 @@ public final class MainActivity extends Activity implements Game.Listener, GameR
     @Override
     public void onFrame(Game g) {
         audio.ambience = g.caveAmbience();
+        audio.cue(g);
         hScore = g.score();
         hCoins = g.coinsRun;
         hMult = g.multiplier();
