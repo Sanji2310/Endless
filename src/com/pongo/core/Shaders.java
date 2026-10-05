@@ -322,7 +322,9 @@ public final class Shaders {
             "  vec2 d = (c2.xy / c2.w - c.xy / c.w) * uScreen;\n" +
             "  float l = length(d);\n" +
             "  vec2 dir = l > 1e-5 ? d / l : vec2(0.0);\n" +
-            "  float px = uOutline * aNrm.w * clamp(9.0 / max(c.w, 0.1), 0.3, 1.0);\n" +
+            // a vertex behind the camera (w <= 0) has no screen position: pushing it out flips the hull into
+            // wedges that cover the screen (seen under the overhead wires), so it is not pushed
+            "  float px = (c.w > 0.05 && c2.w > 0.05) ? uOutline * aNrm.w * clamp(9.0 / c.w, 0.3, 1.0) : 0.0;\n" +
             "  c.xy += dir * px * 2.0 / uScreen * c.w;\n" +
             "  vCol = aCol;\n" +
             "  vW = gPos;\n" +
