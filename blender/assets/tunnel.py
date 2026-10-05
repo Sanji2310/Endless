@@ -552,8 +552,9 @@ def transition_scene(cave_segments=3, outlines=True, approach_segments=4, sakura
     cart = VH.ore_cart(); cart.location = (0, LINED - BOARD, 0); obs.append(cart)
     # the cavern beyond
     obs += cave.cave_run(cave_segments, y0=LINED, seeds=(1, 2, 3), outlines=False)
-    # render-only: a dark curtain where the built cave ends, so the sky does not show through
-    end = E.Mesher("cave_end").mat("niche")
+    # render-only: a curtain in the cave's distance violet where the built cave ends, so the sky does not show through
+    E.mat("cave_far", 0x3E3570, emis=1.0, rim=0.0, soft=0.0, outline=0, flags=E.F_NOCAST)
+    end = E.Mesher("cave_end").mat("cave_far")
     ye = LINED + cave_segments * SEG
     end.poly([(-9, ye, -1), (9, ye, -1), (9, ye, 10), (-9, ye, 10)][::-1])
     end.obj()
