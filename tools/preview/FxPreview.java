@@ -45,12 +45,16 @@ public class FxPreview {
             reset();
             suffix = "";
             renderer.cameraHook = null;
+            hideWorld = s.startsWith("river") || s.startsWith("sky");
+            if (hideWorld) renderer.cameraHook = (dl, g) -> dl.count = 0;   // staged zones: no Sakura Line world
             if (s.endsWith("_side")) {
                 // a three-quarter view from beside and a little ahead of her, close in
                 s = s.substring(0, s.length() - 5);
                 suffix = "_side";
                 final float aspect = w / (float) h;
+                final boolean hw = hideWorld;
                 renderer.cameraHook = (dl, g) -> {
+                    if (hw) dl.count = 0;
                     float tx = g.x, ty = g.y + 1.0f, tz = -g.s - 0.6f;
                     float ex = tx + 3.8f, ey = ty + 0.9f, ez = tz - 3.2f;
                     com.endlessrush.core.Mat4.lookAt(dl.view, ex, ey, ez, tx, ty, tz + 0.8f, 0, 1, 0);
@@ -86,6 +90,9 @@ public class FxPreview {
         fxl.night = 0;
         fxl.fx().clear();
         game.start();
+        // a fixed zone plan so every render lands in the same zones (the first zone is always the Sakura Line)
+        Zones.newRun(42L);
+        game.zones.reset();
         game.guardGap = 30;   // the chaser starts on her heels; these clips are about the effects
     }
 
@@ -97,9 +104,11 @@ public class FxPreview {
             if (each != null) each.run();
             game.update(DT);
             boolean rec = clip != null && (i % 2 == 0);
-            GLES20.drawing = rec;
+            boolean keep = rec && inPart(frame);
+            GLES20.drawing = keep;
             renderer.drawFrame(DT);
-            if (rec) GLES20.present(String.format("%s_%03d", clip, frame++));
+            if (keep) GLES20.present(String.format("%s_%03d", clip, frame));
+            if (rec) frame++;
         }
     }
 
@@ -107,6 +116,12 @@ public class FxPreview {
     static void noChaser() { game.chaseT = 0; game.guardGap = 30; }
 
     static String suffix = "";
+    /** -Dfx.part=k records only clip frames [k*PART, (k+1)*PART): a whole clip in one stream can be too much for
+     *  one headless page. -1 = all. */
+    static final int PART = 36, part = Integer.getInteger("fx.part", -1);
+
+    static boolean inPart(int fr) { return part < 0 || (fr >= part * PART && fr < (part + 1) * PART); }
+    static boolean hideWorld;
 
     static void clip(String name, int n, Runnable each) { frame = 0; step(n, name + suffix, each); }
 
@@ -168,7 +183,7 @@ public class FxPreview {
 
     /** Tobi Boots: wind rings at take-off, heel sparkles. */
     static void boots() {
-        game.s = 1100; game.pickups.clear(); warm(30);
+        game.s = 300; game.pickups.clear(); warm(30);
         pickup(Game.SNEAKERS, 5);
         final int[] t = {0};
         clip("boots", 140, () -> { int k = t[0]++; if (k == 30 || k == 100) game.jump(); });
@@ -176,14 +191,14 @@ public class FxPreview {
 
     /** Hayate Rocket: ignition burst, wind-swirl flames, smoke and flame ribbons, speed lines. */
     static void rocket() {
-        game.s = 1300 - Zones.ZONE_LEN * 0; game.pickups.clear(); warm(30);
+        game.s = 500; game.pickups.clear(); warm(30);
         pickup(Game.JETPACK, 5);
         clip("rocket", 140, null);
     }
 
     /** Kaze Board: summon burst, hover glows and ribbons, then the board breaks on a crash. */
     static void board() {
-        game.s = 2950; game.pickups.clear(); warm(30);
+        game.s = 700; game.pickups.clear(); warm(30);
         game.hoverboard();
         final int[] t = {0};
         clip("board", 130, () -> {
@@ -200,7 +215,7 @@ public class FxPreview {
 
     /** Crash: impact frame, debris, dizzy stars. */
     static void crash() {
-        game.s = 3100; game.pickups.clear(); warm(40);
+        game.s = 900; game.pickups.clear(); warm(40);
         final int[] t = {0};
         frame = 0;
         for (int i = 0; i < 130; i++) {
@@ -214,15 +229,19 @@ public class FxPreview {
             }
             game.update(DT);
             boolean rec = i % 2 == 0;
-            GLES20.drawing = rec;
+            boolean keep = rec && inPart(frame);
+            GLES20.drawing = keep;
             renderer.drawFrame(DT);
-            if (rec) GLES20.present(String.format("crash%s_%03d", suffix, frame++));
+            if (keep) GLES20.present(String.format("crash%s_%03d", suffix, frame));
+            if (rec) frame++;
         }
     }
 
     /** Crystal Cavern: rock dust trickles, crystal chimes, cart wheel sparks on a switch, a landing in cave dust. */
     static void cave() {
-        float b = Zones.ZONE_LEN;
+        int zi = 1;
+        while (Zones.zoneOf(zi) != Zones.CAVERN) zi++;
+        float b = Zones.boundary(zi);
         game.s = b + 40; warm(90);
         final int[] t = {0};
         fxl.stage = (fx, f, dt) -> {
@@ -236,7 +255,7 @@ public class FxPreview {
     /** Bamboo River (staged on a water sheet): bow spray, foam wake, paddle splashes, a croc's snap, a koi, ripples,
      *  drifting bamboo leaves and low mist. */
     static void river() {
-        game.s = 4100; game.pickups.clear(); warm(30);
+        game.s = 300; game.pickups.clear(); warm(30);
         fxl.zoneOverride = Zones.RIVER;
         final int[] t = {0};
         final float wy = 0.22f;
@@ -269,7 +288,7 @@ public class FxPreview {
     /** Sky Glide (staged): Pongo on the rocket high above, wisps and wind streaks rushing past, a gust, a crow's
      *  feathers, a thermal column and wingtip ribbons. */
     static void sky() {
-        game.s = 5100; game.pickups.clear(); warm(10);
+        game.s = 300; game.pickups.clear(); warm(10);
         pickup(Game.JETPACK, 3);
         warm(120);
         fxl.zoneOverride = Zones.SKY;
@@ -293,7 +312,7 @@ public class FxPreview {
 
     /** Express Rooftops (staged over the Sakura Line): wind streaks, pantograph sparks, maple leaves. */
     static void rooftops() {
-        game.s = 6100; game.pickups.clear(); warm(30);
+        game.s = 300; game.pickups.clear(); warm(30);
         fxl.zoneOverride = Zones.ROOFTOPS;
         final int[] t = {0};
         clip("rooftops", 120, () -> { int k = t[0]++; if (k == 50) game.jump(); });

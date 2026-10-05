@@ -14,10 +14,11 @@ javac -nowarn -d build/preview-fx $(find src/com/endlessrush/core src/com/pongo/
 [ "$SCENES" = all ] && SCENES=run,coins,magnet,fever,boots,rocket,board,crash,cave,river,sky,rooftops
 # one recording per scene (a long stream of frames is too much for one headless page), JOBS at a time
 export ASSETS W H
-echo "${SCENES//,/ }" | tr ' ' '\n' | xargs -P "${JOBS:-3}" -I{} sh -c '
-  java -Dpongo.assets="$ASSETS" -cp build/preview-fx FxPreview build/preview-fx/{}.bin "$W" "$H" {} > /dev/null &&
-  node tools/web/replay.mjs build/preview-fx/{}.bin build/preview-fx/frames "$W" "$H" > /dev/null &&
-  rm -f build/preview-fx/{}.bin && echo "rendered {}"'
+# each scene in parts of 36 frames (FxPreview -Dfx.part), up to 3 parts
+for s in ${SCENES//,/ }; do for p in 0 1 2; do echo "$s $p"; done; done | xargs -P "${JOBS:-3}" -L1 sh -c '
+  java -Dpongo.assets="$ASSETS" -Dfx.part=$1 -cp build/preview-fx FxPreview build/preview-fx/$0_$1.bin "$W" "$H" $0 > /dev/null &&
+  node tools/web/replay.mjs build/preview-fx/$0_$1.bin build/preview-fx/frames "$W" "$H" > /dev/null &&
+  rm -f build/preview-fx/$0_$1.bin && echo "rendered $0 part $1"'
 for first in build/preview-fx/frames/*_000.png; do
   name="$(basename "$first" _000.png)"
   ffmpeg -loglevel error -y -framerate 30 -i "build/preview-fx/frames/${name}_%03d.png" \

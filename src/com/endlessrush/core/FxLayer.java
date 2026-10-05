@@ -49,8 +49,10 @@ public final class FxLayer {
 
     public FxLayer(PongoAssets assets) {
         fx = new Fx(assets);
-        podL = new Fx.Trail(24, 0.07f, 0.35f).color(Fx.CYAN, 0.85f);
-        podR = new Fx.Trail(24, 0.07f, 0.35f).color(Fx.CYAN, 0.85f);
+        // alpha blended: additive ribbons wash out to white over the pale ballast in daylight
+        podL = new Fx.Trail(24, 0.11f, 0.35f).color(new float[]{0.35f, 0.85f, 1f}, 0.9f);
+        podR = new Fx.Trail(24, 0.11f, 0.35f).color(new float[]{0.35f, 0.85f, 1f}, 0.9f);
+        podL.additive = podR.additive = false;
         jetL = new Fx.Trail(20, 0.1f, 0.25f).color(Fx.ORANGE, 0.7f);
         jetR = new Fx.Trail(20, 0.1f, 0.25f).color(Fx.ORANGE, 0.7f);
     }
@@ -201,8 +203,8 @@ public final class FxLayer {
             // thrusters sit on her back, about at the shoulder blades
             float ty = py + 1.0f * k, tz = pz + 0.36f * k;
             fx.rocketThrust(f, px, ty, tz, vz, dt);
-            jetL.push(px - 0.16f, ty - 0.55f, tz, fx.time);
-            jetR.push(px + 0.16f, ty - 0.55f, tz, fx.time);
+            jetL.push(px - 0.16f, ty - 0.2f, tz + 0.5f, fx.time);
+            jetR.push(px + 0.16f, ty - 0.2f, tz + 0.5f, fx.time);
         } else { jetL.reset(); jetR.reset(); }
         if (g.sneakT > 0 && g.jetT <= 0) fx.bootsTrail(px, py, pz, dt);
         if (g.x2T > 0) fx.feverAura(f, px, py, pz, dt, Math.min(1f, g.x2T / 0.6f) * k);
@@ -235,9 +237,9 @@ public final class FxLayer {
         switch (zone) {
             case Zones.SAKURA: {
                 // petals drifting down from the trees on both sides, carried across the tracks by the breeze
-                for (int n = 0; n < count(dt * 16); n++) {
+                for (int n = 0; n < count(dt * 40); n++) {
                     float side = fx.rnd() < 0.5f ? -1 : 1;
-                    fx.drifter(Fx.PETAL, side * fx.rnd(2.5f, 10f), fx.rnd(2f, 8f), -(ps + fx.rnd(menu ? -4 : 6, 70)), 0.15f, Fx.WARM_WHITE);
+                    fx.drifter(Fx.PETAL, side * fx.rnd(1.2f, 8f), fx.rnd(1.5f, 6.5f), -(ps + fx.rnd(menu ? -4 : 4, 45)), 0.2f, Fx.WARM_WHITE);
                 }
                 airFill(g, dt, menu, Fx.WARM_WHITE, 1f);
                 if (night > 0.35f) fireflies(g, dt, 4f);

@@ -286,6 +286,13 @@ public final class Fx {
         f.quad(ad, px, py, pz, hw, hh, rotation, uv[sprite], r, g, b, a);
     }
 
+    /** One-frame sprite forced to alpha blending (light sprites that must read over pale daylight ground). */
+    public void nowAlpha(RenderFrame f, int sprite, float px, float py, float pz, float hw, float hh,
+                         float r, float g, float b, float a) {
+        if (!has[sprite] || a <= 0.004f) return;
+        f.quad(false, px, py, pz, hw, hh, 0, uv[sprite], r, g, b, a);
+    }
+
     /** One-frame sprite lying flat at height py. */
     public void nowFlat(RenderFrame f, int sprite, float px, float py, float pz, float hw, float hh, float rotation,
                         float r, float g, float b, float a) {
@@ -482,7 +489,7 @@ public final class Fx {
         fade(i, 0);
         i = spawn(RING, BILL, px, py, pz, 0, 0, vzRun, 0.35f, 0.3f, 4.5f, 1f, 1f, 1f, 0.9f);
         fade(i, 0);
-        i = spawn(GLOW, BILL, px, py, pz, 0, 0, vzRun, 0.35f, 0.8f, 1.6f, c[0], c[1], c[2], 0.9f);
+        i = spawn(GLOW, BILL, px, py, pz, 0, 0, vzRun, 0.3f, 0.5f, 1.5f, c[0], c[1], c[2], 0.8f);
         fade(i, 0);
         for (int k = 0; k < count(10); k++) {
             float ang = rnd() * 6.2832f;
@@ -568,26 +575,48 @@ public final class Fx {
 
     // ================================================================== presets: power-ups (held)
 
-    /** Hayate Rocket: wind-swirl flames and smoke puffs from two thrusters at (tx +- 0.16, ty, tz). Call each
-     *  frame; vzRun is her velocity along z so the flame sits on the nozzle. */
+    /** Hayate Rocket: wind-swirl flames, smoke puffs and sparks from two nozzles at (tx +- 0.16, ty, tz). She flies
+     *  face down with the pack on her back, so the thrust leaves the nozzles backward and a little down. Call each
+     *  frame; vzRun is her velocity along z. */
     public void rocketThrust(RenderFrame f, float tx, float ty, float tz, float vzRun, float dt) {
+        // thrust direction: backward (+z) and slightly down
+        float dx = 0, dy = -0.38f, dz = 0.92f;
         for (int s = -1; s <= 1; s += 2) {
-            float fl = 0.8f + 0.3f * (float) Math.sin(time * 47f + s * 1.7f);
-            // the flame sprite points down -v: lay it vertically under the nozzle
-            now(f, FLAME, tx + s * 0.16f, ty - 0.32f * fl, tz, 0.17f, 0.36f * fl, 0, 1, 1, 1, 1f);
-            now(f, GLOW, tx + s * 0.16f, ty - 0.2f, tz, 0.35f, 0.35f, 0, 1f, 0.62f, 0.3f, 0.75f);
+            float nx = tx + s * 0.16f;
+            float fl = 0.85f + 0.25f * (float) Math.sin(time * 47f + s * 1.7f);
+            beam(f, FLAME, nx, ty, tz, dx, dy, dz, 0.62f * fl, 0.17f, 1, 1, 1, 1f, false);
+            nowAlpha(f, GLOW, nx + dx * 0.12f, ty + dy * 0.12f, tz + dz * 0.12f, 0.22f, 0.22f, 1f, 0.75f, 0.45f, 0.45f);
             for (int k = 0; k < count(dt * 18); k++) {
-                int i = spawn(PUFF + k % 3, BILL, tx + s * 0.16f + rnd(-0.05f, 0.05f), ty - 0.6f, tz,
-                        rnd(-0.6f, 0.6f), rnd(-4f, -2.5f), vzRun * 0.55f + rnd(0.5f, 2f), rnd(0.35f, 0.55f), rnd(0.14f, 0.2f), 2.4f,
+                float back = rnd(0.55f, 0.75f);
+                int i = spawn(PUFF + k % 3, BILL, nx + dx * back, ty + dy * back, tz + dz * back,
+                        rnd(-0.5f, 0.5f), rnd(-1.6f, -0.6f), vzRun * 0.45f + rnd(1f, 2.5f), rnd(0.35f, 0.55f), rnd(0.12f, 0.17f), 2.4f,
                         1f, 0.96f, 0.92f, 0.95f);
                 phys(i, 0, 2f, 0).pop(i);
             }
             if (rnd() < dt * 20) {
-                int i = spawn(SPARK, VEL, tx + s * 0.16f, ty - 0.45f, tz, rnd(-1.5f, 1.5f), rnd(-6f, -3f), vzRun * 0.6f,
+                int i = spawn(SPARK, VEL, nx + dz * 0f, ty + dy * 0.5f, tz + dz * 0.5f, rnd(-1.5f, 1.5f), rnd(-3f, -1f), vzRun * 0.5f + rnd(3f, 6f),
                         0.25f, 0.04f, 0.5f, 1f, 0.75f, 0.4f, 1f);
                 phys(i, 6f, 1f, 0).shape(i, 0.4f, 0.04f);
             }
         }
+    }
+
+    /** A one-frame sprite laid along direction (dx, dy, dz) from its root at (px, py, pz), facing the camera across
+     *  its width: the sprite's top edge (v0) sits at the root, its bottom edge at the far end. len and halfW in m. */
+    public void beam(RenderFrame f, int sprite, float px, float py, float pz, float dx, float dy, float dz,
+                     float len, float halfW, float r, float g, float b, float a, boolean additive) {
+        if (!has[sprite] || a <= 0.004f) return;
+        float tx = f.camPos[0] - px, ty = f.camPos[1] - py, tz = f.camPos[2] - pz;
+        float sx = dy * tz - dz * ty, sy = dz * tx - dx * tz, sz = dx * ty - dy * tx;
+        float sl = (float) Math.sqrt(sx * sx + sy * sy + sz * sz);
+        if (sl < 1e-5f) return;
+        sx = sx / sl * halfW; sy = sy / sl * halfW; sz = sz / sl * halfW;
+        float ex = px + dx * len, ey = py + dy * len, ez = pz + dz * len;
+        if (!additive) { r *= ambient[0]; g *= ambient[1]; b *= ambient[2]; }
+        int col = RenderFrame.packColor(r, g, b, a);
+        // quadPts: p0/p1 take uv v1 (bottom), p2/p3 take v0 (top) -> p2/p3 at the root
+        f.quadPts(additive, ex - sx, ey - sy, ez - sz, ex + sx, ey + sy, ez + sz, px + sx, py + sy, pz + sz, px - sx, py - sy, pz - sz,
+                uv[sprite], col, col);
     }
 
     /** Maneki Magnet: a gold pull swirl turning on the ground around her and a soft glow. Call each frame. */
@@ -643,7 +672,8 @@ public final class Fx {
     public void boardHover(RenderFrame f, float px, float py, float pz) {
         for (int s = -1; s <= 1; s += 2) {
             float fl = 0.85f + 0.15f * (float) Math.sin(time * 30f + s);
-            now(f, GLOW, px, py - 0.02f, pz + s * 0.45f, 0.4f * fl, 0.28f * fl, 0, CYAN[0], CYAN[1], CYAN[2], 0.75f);
+            now(f, GLOW, px, py - 0.02f, pz + s * 0.45f, 0.45f * fl, 0.32f * fl, 0, CYAN[0], CYAN[1], CYAN[2], 0.8f);
+            nowAlpha(f, GLOW, px, py - 0.05f, pz + s * 0.45f, 0.3f * fl, 0.22f * fl, 0.35f, 0.85f, 1f, 0.55f);
         }
         nowFlat(f, RIPPLE, px, py - 0.35f, pz, 0.6f + 0.1f * (float) Math.sin(time * 12f), 0.9f, 0, CYAN[0], CYAN[1], CYAN[2], 0.35f);
     }
