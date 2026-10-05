@@ -1,15 +1,19 @@
 package com.pongo.core;
 
 /**
- * The zone cycle along a run (docs/PONGO_DESIGN.md §4) and the set-piece transitions between zones.
+ * The zones along a run (docs/PONGO_DESIGN.md §4) and the set-piece transitions between zones.
  *
- * Distances are metres along the run (Blender +Y in the asset scripts, game -Z). Each zone lasts ZONE_LEN (a whole
- * number of 12 m track segments, so every set-piece edge falls on a segment seam). The transition into a zone is laid
- * out so its "mouth" (where the new zone's kit starts) sits exactly on the zone boundary b. For Sakura Line -> Crystal
- * Cavern that layout is blender/assets/tunnel.py:
+ * Distances are metres along the run (Blender +Y in the asset scripts, game -Z). Each run lays out its own plan
+ * (newRun): it starts on the Sakura Line, then every zone after that is picked at random from the zones in play
+ * (never the one just left), and each zone lasts a random 1.5 to 3.5 minutes at the run speed where it starts,
+ * rounded to whole 12 m track segments (so every set-piece edge falls on a segment seam) and capped at MAX_LEN. Each
+ * zone also gets 3 or 4 power-ups, spread through it away from the set pieces (nextPowerUpAt).
+ *
+ * The transition into a zone is laid out so its "mouth" (where the new zone's kit starts) sits exactly on the zone
+ * boundary b. For Sakura Line -> Crystal Cavern that layout is blender/assets/tunnel.py:
  *
  *   b - 72  approach   cutting with retaining walls, hill rises         (tunnel_hill, cutting_l/r)
- *   b - 24  portal     tunnel mouth: title card, sting, whoosh          (tunnel_portal)
+ *   b - 24  portal     tunnel mouth: title card, whoosh, the music's zone stinger (tunnel_portal)
  *   b - 24  lined A    concrete-lined tunnel, Sakura Line track         (tunnel_lined_0 + city_track)
  *   b - 12  lined B    track turns into mine track at b - 6             (tunnel_lined_1 + track_change)
  *   b - 4   board      Pongo boards the ore cart waiting on the centre track
@@ -33,11 +37,19 @@ public final class Zones {
     /** Title card tiles painted by tunnel.title_cards() (null: not painted yet). */
     public static final String[] CARD = {"ui_zone_sakura", "ui_zone_cavern", null, null, null};
 
-    /** About 1,400 m per zone (design §4), rounded to 120 track segments of 12 m. */
-    public static final float ZONE_LEN = 1440f, SEG = 12f;
-    /** The zones that have a kit, in run order; the run cycles through these. Bamboo River, Sky Glide and Express
-     *  Rooftops join the cycle (in that order, after the cavern) when their kits and transitions exist. */
-    public static final int[] CYCLE = {SAKURA, CAVERN};
+    public static final float SEG = 12f;
+    /** The zones in play: the ones with a kit and transitions in the game. A run starts on the first; after that the
+     *  next zone is drawn at random from the others. Bamboo River, Sky Glide and Express Rooftops join this list when
+     *  their kits and transitions are in. */
+    public static final int[] IN_PLAY = {SAKURA, CAVERN};
+    /** How long a zone lasts: a random MIN_TIME..MAX_TIME seconds at the run speed where it starts (the speed law
+     *  below), rounded to whole segments and kept within MIN_LEN..MAX_LEN metres. */
+    public static final float MIN_TIME = 90f, MAX_TIME = 210f, MIN_LEN = 600f, MAX_LEN = 6000f;
+    /** Power-ups per zone: POWERUPS_MIN or POWERUPS_MAX, picked per zone. */
+    public static final int POWERUPS_MIN = 3, POWERUPS_MAX = 4;
+    /** The run speed law the zone lengths are timed against (Game: min(MAX_SPEED, BASE_SPEED + s * gain)). Game
+     *  passes its own numbers to newRun; these are the defaults for tools and previews. */
+    public static final float SPEED_BASE = 17f, SPEED_GAIN = 0.0028f, SPEED_MAX = 31f;
     // Sakura Line -> Crystal Cavern set piece (tunnel.py: APPROACH, LINED)
     public static final float APPROACH = 48f, LINED = 24f, TRACK_CHANGE = 6f, BOARD = 4f;
     public static final float BLEND_LEAD = 6f;
@@ -96,15 +108,118 @@ public final class Zones {
     public int cardZone = -1;
     private float lastDist = -1f;
 
-    /** Zone of a distance (the run repeats CYCLE). */
-    public static int zoneAt(float d) {
-        int k = (int) Math.floor(d / ZONE_LEN), n = CYCLE.length;
-        return CYCLE[((k % n) + n) % n];
+    // ------------------------------------------------------------------ the run's plan
+
+    /** One run's zones: zone i covers start[i] .. start[i + 1]. Immutable once made, so the render thread can read
+     *  the plan while the game thread swaps in a new one. Past its end the plan repeats (hundreds of km away). */
+    static final class Plan {
+        static final int N = 400;
+        final float[] start = new float[N + 1];
+        final int[] zone = new int[N];
+        final float[][] power = new float[N][];
+
+        Plan(long seed, float base, float gain, float max) {
+            java.util.Random r = new java.util.Random(seed);
+            int[] play = IN_PLAY;
+            for (int i = 0; i < N; i++) {
+                if (i == 0) zone[i] = play[0];
+                else zone[i] = pick(r, play, zone[i - 1], i >= 2 ? zone[i - 2] : -1, i == N - 1 ? zone[0] : -1);
+                float s0 = start[i];
+                float t = MIN_TIME + r.nextFloat() * (MAX_TIME - MIN_TIME);
+                float len = Math.max(MIN_LEN, Math.min(MAX_LEN, distanceIn(s0, t, base, gain, max)));
+                start[i + 1] = s0 + Math.round(len / SEG) * SEG;
+                // power-ups: 3 or 4, evenly through the zone with a little jitter, clear of both set pieces
+                int n = POWERUPS_MIN + r.nextInt(POWERUPS_MAX - POWERUPS_MIN + 1);
+                float u0 = safeTo(s0) + 30f, u1 = safeFrom(start[i + 1]) - 40f;
+                power[i] = new float[n];
+                for (int k = 0; k < n; k++) power[i][k] = u0 + (u1 - u0) * (k + 0.5f + (r.nextFloat() - 0.5f) * 0.4f) / n;
+            }
+        }
+
+        /** A zone in play other than the one just left (and, when there is a choice, not the one before it either,
+         *  so the run doesn't ping-pong between two). `avoid` is the zone the plan wraps round to. */
+        static int pick(java.util.Random r, int[] play, int prev, int prev2, int avoid) {
+            int[] c = new int[play.length];
+            int n = 0;
+            for (int z : play) if (z != prev && z != avoid && (z != prev2 || play.length <= 2)) c[n++] = z;
+            if (n == 0) for (int z : play) if (z != prev) c[n++] = z;
+            return c[r.nextInt(n)];
+        }
+
+        float total() { return start[N]; }
+
+        /** Index of the zone containing d (zone 0 also covers everything behind the start). */
+        int index(float d) {
+            if (d < start[1]) return 0;
+            int lo = 0, hi = N - 1;
+            while (lo < hi) {
+                int mid = (lo + hi + 1) >>> 1;
+                if (start[mid] <= d) lo = mid; else hi = mid - 1;
+            }
+            return lo;
+        }
     }
 
-    /** Distance of the next zone boundary at or after d. */
-    public static float nextBoundary(float d) {
-        return (float) (Math.floor(d / ZONE_LEN) + 1) * ZONE_LEN;
+    /** Distance covered in t seconds from s0 under the speed law v = min(max, base + gain * s). */
+    static float distanceIn(float s0, float t, float base, float gain, float max) {
+        float v0 = Math.min(max, base + gain * s0);
+        if (v0 >= max || gain <= 0f) return v0 * t;
+        float tCap = (float) (Math.log(max / v0) / gain);           // v = v0 e^(gain t) reaches max
+        if (t <= tCap) return (float) (v0 * (Math.exp(gain * t) - 1) / gain);
+        return (max - v0) / gain + max * (t - tCap);
+    }
+
+    private static volatile Plan plan = new Plan(1L, SPEED_BASE, SPEED_GAIN, SPEED_MAX);
+
+    /** Lays out a fresh random plan for a new run (Game.resetWorld). The same seed gives the same run. */
+    public static void newRun(long seed, float speedBase, float speedGain, float speedMax) {
+        plan = new Plan(seed, speedBase, speedGain, speedMax);
+    }
+
+    public static void newRun(long seed) { newRun(seed, SPEED_BASE, SPEED_GAIN, SPEED_MAX); }
+
+    /** Index of the zone containing d in this run (0 = the first zone, which also covers d < 0). */
+    public static int zoneIndexAt(float d) {
+        Plan p = plan;
+        float t = p.total();
+        if (d < t) return p.index(d);
+        int laps = (int) Math.floor(d / t);
+        return laps * Plan.N + p.index(d - laps * t);
+    }
+
+    /** Where zone i begins (boundary(0) = 0; boundary(i) for i >= 1 is the i-th zone change). */
+    public static float boundary(int i) {
+        Plan p = plan;
+        int lap = i / Plan.N;
+        return lap * p.total() + p.start[i - lap * Plan.N];
+    }
+
+    /** The i-th zone of this run. */
+    public static int zoneOf(int i) {
+        Plan p = plan;
+        return p.zone[i % Plan.N];
+    }
+
+    /** Zone of a distance (behind the start, the first zone: the menu camera looks back there). */
+    public static int zoneAt(float d) { return zoneOf(zoneIndexAt(d)); }
+
+    /** The next zone boundary after d (strictly after it: on a boundary, the one after). */
+    public static float nextBoundary(float d) { return boundary(zoneIndexAt(d) + 1); }
+
+    /** Where the zone containing d began (0 for the first zone, and for d < 0). */
+    public static float zoneStart(float d) { return boundary(zoneIndexAt(d)); }
+
+    /** How many power-ups zone i gets (3 or 4). */
+    public static int powerUpsIn(int i) { return plan.power[i % Plan.N].length; }
+
+    /** The first power-up spot at or after d: spawn one power-up per spot, and that keeps every zone to its 3 or 4. */
+    public static float nextPowerUpAt(float d) {
+        Plan p = plan;
+        int i = zoneIndexAt(Math.max(0f, d));
+        for (; ; i++) {
+            float lap = (i / Plan.N) * p.total();
+            for (float x : p.power[i % Plan.N]) if (lap + x >= d) return lap + x;
+        }
     }
 
     /** True when the transition at `boundary` leaves the cavern (the set piece turned round: lining before the
@@ -128,10 +243,14 @@ public final class Zones {
         return d >= safeFrom(b) && d < safeTo(b) ? safeTo(b) : d;
     }
 
+    /** True when a Y parting (cave_fork, 2 segments) starting at s0 ends clear of the lining on the way out (with
+     *  10 m to spare); the kit's partings that don't fit are left out. */
+    public static boolean caveForkFits(float s0) { return s0 + 2 * SEG + 10f <= portalAt(nextBoundary(s0)); }
+
     /** False where the Sakura Line world (buildings, lamps, trees, bridges) gives way to a set piece or the cavern. */
     public static boolean cityWorldAt(float d) {
         if (zoneAt(d) == CAVERN) return false;
-        float b = nextBoundary(d), pb = b - ZONE_LEN;
+        float b = nextBoundary(d), pb = zoneStart(d);
         if (zoneAt(b) == CAVERN && d >= approachAt(b)) return false;          // cutting and hill into the tunnel
         return !(exitAt(pb) && d < pb + APPROACH);                             // cutting after the way out
     }
@@ -143,9 +262,9 @@ public final class Zones {
         return !(zoneAt(b) == CAVERN && d >= portalAt(b));
     }
 
-    /** Back to the start of a run (the first zone, nothing blended, no card). */
+    /** Back to the start of a run (the first zone, nothing blended, no card). Call newRun first for a new plan. */
     public void reset() {
-        zone = prevZone = CYCLE[0];
+        zone = prevZone = zoneOf(0);
         paletteZone = -1;
         blend = 0f;
         invulnerable = inTransition = false;
@@ -157,7 +276,7 @@ public final class Zones {
     /** Advances to distance d; returns the EV_* events crossed since the last call. */
     public int update(float d, float dt) {
         int ev = 0;
-        float b = nextBoundary(d), pb = b - ZONE_LEN;
+        float b = nextBoundary(d), pb = zoneStart(d);
         int next = zoneAt(b), cur = zoneAt(d);
         if (lastDist >= 0f) {
             ev |= crossed(lastDist, d, approachAt(b)) ? EV_APPROACH : 0;

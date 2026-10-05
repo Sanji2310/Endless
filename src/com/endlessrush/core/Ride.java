@@ -71,6 +71,8 @@ public final class Ride {
         int vehicleAt(float s);
         /** Start of the next zone after s. */
         float nextZoneStart(float s);
+        /** The zone plan's next power-up spot at or after s (four or fewer per zone, Zones.nextPowerUpAt). */
+        float nextPowerUpAt(float s);
     }
 
     /** Default schedule (docs/PONGO_DESIGN.md section 4): Sakura Line, Cavern, River, Sky, Rooftops, repeat. */
@@ -87,6 +89,15 @@ public final class Ride {
         public float nextZoneStart(float s) {
             return ((float) Math.floor((s + offset) / zoneLen) + 1) * zoneLen - offset;
         }
+
+        /** Test schedule: three spots per zone, at 30, 55 and 80 percent of it. */
+        public float nextPowerUpAt(float s) {
+            float z0 = nextZoneStart(s) - zoneLen;
+            for (int k = 0; ; k++) {
+                float b = z0 + k * zoneLen;
+                for (float f : new float[]{0.3f, 0.55f, 0.8f}) if (b + f * zoneLen >= s) return b + f * zoneLen;
+            }
+        }
     }
 
     /** The run's zone cycle (com.pongo.core.Zones): cavern = ore cart, river = canoe, sky = glider. She boards
@@ -102,6 +113,8 @@ public final class Ride {
         }
 
         public float nextZoneStart(float s) { return com.pongo.core.Zones.nextBoundary(s); }
+
+        public float nextPowerUpAt(float s) { return com.pongo.core.Zones.nextPowerUpAt(s); }
     }
 
     /** How far ahead step() looks for the next zone's vehicle: she boards this far before the mouth. */
@@ -311,7 +324,7 @@ public final class Ride {
         forks.clear();
         fork = null;
         genS = g.s + TR_DUR[transition] * g.speed + 45f;
-        nextPowerS = genS + 120f;
+        nextPowerS = zones.nextPowerUpAt(genS);        // the zone's own power-up spots (four or fewer per zone)
         nextForkS = genS + 160f + rng.nextFloat() * 120f;
         // Game's pickups ahead belong to the old zone
         for (int i = g.pickups.size() - 1; i >= 0; i--) {
@@ -761,7 +774,7 @@ public final class Ride {
                 nextForkS = genS + 260f + rng.nextFloat() * 200f;
             } else if (genS >= nextPowerS) {
                 patternPower();
-                nextPowerS = genS + 300f + rng.nextFloat() * 240f;
+                nextPowerS = zones.nextPowerUpAt(genS + 1f);
             } else {
                 switch (vehicle) {
                     case CART: patternCart(); break;
@@ -983,13 +996,13 @@ public final class Ride {
     /** The cavern's partings sit where the kit puts them (Zones.caveKit, 24 m from a segment seam). If one starts
      *  within the next stretch, fills up to it and lays it out; returns true when it did. */
     private boolean caveFork(float at, float zoneEnd) {
-        float mouth = zoneEnd - com.pongo.core.Zones.ZONE_LEN, seg = com.pongo.core.Zones.SEG;
+        float mouth = com.pongo.core.Zones.zoneStart(at), seg = com.pongo.core.Zones.SEG;
         int[] kit = new int[3];
         for (int i = (int) Math.ceil((at - mouth) / seg); mouth + i * seg < at + gap() + 30f; i++) {
             com.pongo.core.Zones.caveKit(i, kit);
             if (kit[2] != 1) continue;
             float s0 = mouth + i * seg;
-            if (s0 + FORK_LEN + 10f > zoneEnd - com.pongo.core.Zones.LINED) return false;
+            if (s0 + FORK_LEN + 10f > zoneEnd - com.pongo.core.Zones.LINED || !com.pongo.core.Zones.caveForkFits(s0)) return false;
             for (int k = 0; k < forks.size(); k++) if (forks.get(k).s0 == s0) return false;
             Fork f = new Fork();
             f.s0 = s0;

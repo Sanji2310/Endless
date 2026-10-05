@@ -55,6 +55,9 @@ public class PowerSim {
         boolean ridePickupBad = false, magPulledOnRide = false, x2OnRide = true, x2Seen = false, boardOnRideRefused = true;
         boolean jetOnRide = false, sneakOnRide = false;
         int coinsStart = 0, lastVeh = Ride.NONE;
+        java.util.Set<Game.Pickup> injected = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<Game.Pickup, Boolean>());
+        java.util.Set<Game.Pickup> seen = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<Game.Pickup, Boolean>());
+        int[] perZone = new int[8];
         for (int f = 0; f < 60 * 60 * 8 && g.s < 4 * ZONE + 120; f++) {
             if (g.state == Game.SAVE_ME) g.saveMe();
             if (g.state != Game.RUNNING) { g.update(1 / 60f); continue; }
@@ -67,6 +70,7 @@ public class PowerSim {
                     p.y = g.y + 0.6f;
                     p.s = g.s + 0.6f;
                     g.pickups.add(p);
+                    injected.add(p);
                 } else {
                     boolean ok = g.hoverboard();
                     if (riding && ok) boardOnRideRefused = false;
@@ -89,6 +93,9 @@ public class PowerSim {
                 if (g.x2T > 0) { x2Seen = true; if (g.multiplier() % 2 != 0) x2OnRide = false; }
             }
             for (Game.Pickup p : g.pickups)
+                if (!injected.contains(p) && seen.add(p) && p.type != Game.KEY && p.type != Game.COIN)
+                    perZone[Math.min(7, (int) (p.s / ZONE))]++;
+            for (Game.Pickup p : g.pickups)
                 if ((p.type == Game.JETPACK || p.type == Game.SNEAKERS) && sch.vehicleAt(p.s) != Ride.NONE && TYPES[k] != p.type)
                     ridePickupBad = true;
             float tm;
@@ -102,6 +109,10 @@ public class PowerSim {
             if (f % 6 == 0) out.add(new float[]{g.s, tm, r.vehicle, r.inTransition() ? 1 : 0});
         }
         check(g.s >= 4 * ZONE, NAMES[k] + ": the run gets through cart, canoe, glider and back to running (" + (int) g.s + " m)");
+        int most = 0;
+        for (int z = 1; z < 4; z++) most = Math.max(most, perZone[z]);
+        check(most <= 4, NAMES[k] + ": rides place four or fewer power-ups per zone (cart " + perZone[1] + ", canoe "
+                + perZone[2] + ", glider " + perZone[3] + ")");
         check(!ridePickupBad, NAMES[k] + ": no Rocket or Boots pickup is ever placed inside a ride");
         switch (k) {
             case 0: check(magPulledOnRide, "Magnet keeps pulling coins while riding"); break;

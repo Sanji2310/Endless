@@ -33,6 +33,8 @@ public final class Game {
     public static final float LANE_W = Models.LANE_W, TRAIN_H = Models.TRAIN_H;
     public static final float GRAVITY = 58f, JUMP_V = 16.5f, SNEAK_V = 24f, LAT_SPEED = 15f;
     public static final float BASE_SPEED = 17f, MAX_SPEED = 31f, TRAIN_SPEED = 12f;
+    /** Run speed gain per metre (speed = min(MAX_SPEED, BASE_SPEED + s * SPEED_GAIN)); Zones times zone lengths by it. */
+    public static final float SPEED_GAIN = 0.0028f;
     public static final float JET_Y = 8.5f, ROLL_TIME = 0.65f, BOARD_TIME = 30f;
     public static final float SAVE_ME_TIME = 4.5f;
 
@@ -127,7 +129,8 @@ public final class Game {
         scoreF = 0; coinsRun = keysRun = jumpsRun = rollsRun = 0; stumbleFree = 0;
         runTime = 0;
         genS = 45;
-        nextPowerS = 260;
+        Zones.newRun(rng.nextLong(), BASE_SPEED, SPEED_GAIN, MAX_SPEED);   // this run's zone order and lengths
+        nextPowerS = Zones.nextPowerUpAt(0f);
         lastMystery = 0;
         ride.reset();
         coinLine(0, 18, 8, 3f);
@@ -287,7 +290,7 @@ public final class Game {
         for (int i = 0; i < obstacles.size(); i++) obstacles.get(i).prevS0 = obstacles.get(i).s0;
 
         speedFactor = Math.min(1, speedFactor + dt * 0.35f);
-        float target = Math.min(MAX_SPEED, BASE_SPEED + s * 0.0028f);
+        float target = Math.min(MAX_SPEED, BASE_SPEED + s * SPEED_GAIN);
         speed = target * speedFactor * (ride.riding() ? ride.speedScale : 1f);
         s += speed * dt;
 
@@ -609,6 +612,7 @@ public final class Game {
         while (genS < s + 240) {
             if (ride.zones.vehicleAt(genS) != Ride.NONE) {
                 genS = Math.max(genS + 1f, Zones.safeTo(ride.zones.nextZoneStart(genS)));
+                nextPowerS = Zones.nextPowerUpAt(genS);   // the ride placed that zone's power-ups
                 continue;
             }
             float skip = Zones.skipSafe(genS);
@@ -628,7 +632,7 @@ public final class Game {
         int ev = zones.update(s, dt);
         zoneEvents |= ev;
         if (!zoneScenery) return;
-        float b = Zones.nextBoundary(s), pb = b - Zones.ZONE_LEN;
+        float b = Zones.nextBoundary(s), pb = Zones.zoneStart(s);
         if ((ev & Zones.EV_PORTAL) != 0) sound(Zones.exitAt(b) ? SND_ZONE + CaveSounds.TUNNEL_WHOOSH : SND_ENTER_TUNNEL);
         if ((ev & Zones.EV_MOUTH) != 0 && Zones.exitAt(pb)) sound(SND_ZONE + CaveSounds.TUNNEL_WHOOSH);
         // cave one-shots over the ambience loop: drips, a crystal ringing, a bat somewhere up in the dark
@@ -656,13 +660,13 @@ public final class Game {
 
     private float difficulty() { return Math.min(1f, genS / 5000f); }
 
-    private float gap() { return 14f + Math.min(MAX_SPEED, BASE_SPEED + genS * 0.0028f) * 0.75f; }
+    private float gap() { return 14f + Math.min(MAX_SPEED, BASE_SPEED + genS * SPEED_GAIN) * 0.75f; }
 
     private void spawnPattern() {
         float d = difficulty();
         boolean power = genS >= nextPowerS;
         if (power) {
-            nextPowerS = genS + 320 + rng.nextFloat() * 260;
+            nextPowerS = Zones.nextPowerUpAt(genS + 1f);      // 3 or 4 per zone, spread through it
             patternPower();
             return;
         }
