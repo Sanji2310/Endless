@@ -39,9 +39,9 @@ def mats():
     M("sk_glow_core", 0xFFF2C0, emis=2.0, rim=0.0, soft=0.05, outline=0.0)
     M("sk_cable", 0x3A3E4E, rim=0.1, soft=0.1, outline=0.0)
     M("sk_glass", 0xBFEAFF, spec=1.0, rim=0.5, soft=0.04, flags=E.F_GLASS, outline=0.5)
-    M("sk_rock", 0xE4CBA2, rim=0.3, soft=0.14, shadow=0x9E8EB0)
-    M("sk_rock_dark", 0xC9A98A, rim=0.25, soft=0.14, shadow=0x8E7EA4)
-    M("sk_rock_band", 0xA88C78, rim=0.2, soft=0.12, shadow=0x7A6C94)
+    M("sk_rock", 0xEEDCC0, rim=0.3, soft=0.14, shadow=0xB0A2C4)
+    M("sk_rock_dark", 0xDCC6A6, rim=0.25, soft=0.14, shadow=0xA294BC)
+    M("sk_rock_band", 0xC8AE92, rim=0.2, soft=0.12, shadow=0x9284AC)
     M("sk_pine", 0x5E9A6A, rim=0.25, soft=0.2, flags=E.F_FOLIAGE, sway=0.2, shadow=0x5A6A9A)
     M("sk_bark", 0x6E4A3A, rim=0.2, soft=0.12)
     M("sk_red", 0xE8473C, rim=0.3, soft=0.1)
@@ -49,7 +49,7 @@ def mats():
     M("sk_ring", 0xFFF6C8, emis=0.8, rim=0.0, soft=0.1, flags=E.F_NOCAST, outline=0.0)
     M("sk_streak", 0xFFFFFF, emis=0.6, rim=0.0, soft=0.1, flags=E.F_NOCAST | E.F_DOUBLE, outline=0.0)
     M("sk_terrace", 0x9ACD6E, rim=0.1, soft=0.2, shadow=0x9A9AD0)
-    M("sk_terrace_water", 0xB9E4F0, rim=0.1, soft=0.2, spec=0.5)
+    M("sk_terrace_water", 0x8FC8D2, rim=0.1, soft=0.2, spec=0.15, shadow=0x7FA0C8)
     M("sk_roof", 0x4A4E66, rim=0.2, soft=0.1)
     M("sk_wall", 0xF2EAD8, rim=0.2, soft=0.1)
     M("sk_grass", 0xA8D46E, rim=0.2, soft=0.2, shadow=0x9A9AD0)
@@ -131,16 +131,22 @@ def chime_cable(name="chime_cable", span=24.0, rnd_seed=4, pylon=24.0):
         x = sx * span / 2
         m.mat("sk_timber")
         for dy in (-0.35, 0.35):
-            m.cyl((x, dy, 0.9 - pylon / 2), r=0.11, h=pylon + 0.6, seg=7)
+            m.box((x, dy, 0.9 - pylon / 2), (0.2, 0.2, pylon + 0.6), smooth=False)
         z = 0.2
         while z > -pylon + 1.5:
             m.box((x, 0, z), (0.16, 0.85, 0.12), smooth=False)                           # rungs
-            m.push(Matrix.Translation((x, 0, z - 1.0)) @ Matrix.Rotation(math.radians(55), 4, 'X'))
-            m.box((0, 0, 0), (0.08, 0.08, 2.3), smooth=False)                            # cross brace
-            m.pop()
+            for sg in (-1, 1):
+                m.push(Matrix.Translation((x, 0, z - 1.0)) @ Matrix.Rotation(math.radians(20 * sg), 4, 'X'))
+                m.box((0, 0, 0), (0.09, 0.09, 2.1), smooth=False)                        # X brace
+                m.pop()
             z -= 2.0
+        m.mat("sk_roof")                                                                 # little gabled cap
+        m.poly([(x - 0.35, -0.6, 1.2), (x - 0.35, 0.6, 1.2), (x, 0.6, 1.5), (x, -0.6, 1.5)])
+        m.poly([(x + 0.35, 0.6, 1.2), (x + 0.35, -0.6, 1.2), (x, -0.6, 1.5), (x, 0.6, 1.5)])
         m.mat("sk_red")
-        m.box((x, 0, 1.25), (0.5, 1.1, 0.12), smooth=False)                             # painted cap
+        m.box((x, 0, 1.17), (0.3, 0.95, 0.08), smooth=False)
+        m.mat("sk_glow")
+        m.sphere((x - sx * 0.25, 0, 0.95), 1.0, 10, 6, s=(0.1, 0.1, 0.13))               # lantern under the cap
         m.mat("sk_rope")
         m.torus((x, 0, 0.62), R=0.16, r=0.035, seg=12, sides=5, axis='Y')               # tie-off wrap
     m.mat("sk_cable")
@@ -166,27 +172,32 @@ def chime_cable(name="chime_cable", span=24.0, rnd_seed=4, pylon=24.0):
 # ----------------------------------------------------------------------------- spire
 
 def spire(name="spire", h=14.0, seed=3):
-    """Rock spire from the valley: stacked eroded drums, a pine leaning off the top, a tiny red shrine."""
+    """Rock spire from the valley (same layered sandstone as the gorge): a grassy cap with ivy, a black pine leaning
+    out and a little hokora shrine with a torii in front."""
+    import scenery as SC
     mats()
     rnd = random.Random(seed)
     m = E.Mesher(name)
-    z = 0.0
-    r = 1.6
-    while z < h:
-        dh = rnd.uniform(1.4, 2.4)
-        m.mat("sk_rock" if rnd.random() < 0.65 else "sk_rock_dark")
-        m.cyl((rnd.uniform(-0.1, 0.1), rnd.uniform(-0.1, 0.1), z + dh / 2), r=r, h=dh, seg=9, r2=r * rnd.uniform(0.8, 0.95))
-        z += dh * 0.92
-        r *= rnd.uniform(0.86, 0.96)
-    m.mat("sk_bark")
-    m.tube([(0, 0, z), (0.4, 0.1, z + 0.8), (1.1, 0.2, z + 1.3)], r=0.12, seg=8, taper=0.6)
-    m.mat("sk_pine")
-    for (x, zz, s) in ((1.1, 1.4, 0.8), (0.6, 1.0, 0.6), (1.5, 1.2, 0.5)):
-        m.ico((x, 0.2, z + zz), s, 2, s=(1.3, 1.0, 0.45))
+    top, rt = _cliff_column(m, rnd, 0.0, 0.0, 0.0, h, 1.6)
+    _cap(m, rnd, top, rt, dense=True)
+    SC.pine(m, PAL, tuple(top + V((rt * 0.35, 0.1, 0.25))), rnd, h=2.6)
+    sx, sy, sz = top.x - rt * 0.3, top.y, top.z + 0.3
+    m.mat("sk_rock_dark")
+    m.box((sx, sy, sz), (0.6, 0.5, 0.12), smooth=False)
+    m.mat("sk_timber")
+    m.box((sx, sy, sz + 0.25), (0.42, 0.34, 0.38), smooth=False)
     m.mat("sk_red")
-    m.box((-0.4, 0, z + 0.25), (0.35, 0.3, 0.3), smooth=False)
+    m.box((sx, sy - 0.175, sz + 0.25), (0.3, 0.02, 0.26), smooth=False)
     m.mat("sk_roof")
-    m.cyl((-0.4, 0, z + 0.48), r=0.32, h=0.16, seg=4, r2=0.02)
+    m.push(Matrix.Translation((sx, sy, sz + 0.5)))
+    m.poly([(-0.32, -0.3, 0), (0.32, -0.3, 0), (0.32, 0, 0.2), (-0.32, 0, 0.2)])
+    m.poly([(0.32, 0.3, 0), (-0.32, 0.3, 0), (-0.32, 0, 0.2), (0.32, 0, 0.2)])
+    m.pop()
+    m.mat("sk_red")
+    for dx in (-0.2, 0.2):
+        m.cyl((sx + dx, sy - 0.6, sz + 0.25), r=0.025, h=0.5, seg=6)
+    m.box((sx, sy - 0.6, sz + 0.5), (0.58, 0.05, 0.05), smooth=False)
+    m.box((sx, sy - 0.6, sz + 0.4), (0.46, 0.04, 0.035), smooth=False)
     return m.obj(name, smooth_angle=30)
 
 
@@ -280,18 +291,22 @@ def _cap(m, rnd, top, rt, sd=1, dense=True):
         a = rnd.uniform(0, 2 * math.pi)
         p = top + V((math.cos(a) * rt * 0.85, math.sin(a) * rt * 0.85, 0.12))
         SC.shrub(m, P, tuple(p), rnd, r=rnd.uniform(0.35, 0.6), flowers=rnd.choice((None, "sk_fl_pink", "sk_flower", "sk_fl_blue")))
-    for k in range(rnd.randint(4, 7)):                  # ivy strands: chains of leaf clusters down the face
+    for k in range(rnd.randint(4, 7)):                  # ivy: irregular tapering strands of leaf tufts
         a = rnd.uniform(0, 2 * math.pi)
         d = V((math.cos(a), math.sin(a), 0))
-        ln = rnd.uniform(1.5, 4.5)
-        for j in range(rnd.randint(2, 4)):
-            p0 = top + d * (rt * 0.98) + d.cross(V((0, 0, 1))) * rnd.uniform(-0.5, 0.5)
-            n = int(ln / 0.32)
-            for i in range(n):
-                f = i / max(1, n)
-                q = p0 + d * (0.06 + 0.05 * math.sin(i * 1.7)) + V((0, 0, -i * 0.32))
-                m.mat("sk_vine" if (i + j) % 3 else "sk_grass_b")
-                m.ico(tuple(q), 0.2 * (1 - 0.55 * f) + rnd.uniform(0, 0.05), 1, s=(0.55, 1.0, 0.8))
+        sdv = d.cross(V((0, 0, 1)))
+        for j in range(rnd.randint(1, 3)):
+            p = top + d * (rt * 0.98) + sdv * rnd.uniform(-0.6, 0.6) + V((0, 0, 0.05))
+            ln = rnd.uniform(0.8, 3.8)
+            zz = 0.0
+            while zz < ln:
+                f = zz / ln
+                p = p + sdv * rnd.uniform(-0.09, 0.09) + d * rnd.uniform(-0.02, 0.03)
+                q = p + V((0, 0, -zz))
+                m.mat(("sk_vine", "sk_grass_b", "sk_tree2")[rnd.randrange(3)])
+                m.ico(tuple(q + sdv * rnd.uniform(-0.08, 0.08)), (0.16 + rnd.uniform(-0.05, 0.06)) * (1 - 0.6 * f), 1,
+                      s=(rnd.uniform(0.45, 0.7), rnd.uniform(0.8, 1.2), rnd.uniform(0.6, 1.0)))
+                zz += rnd.uniform(0.18, 0.4)
 
 
 GORGE = 10.5        # cliff faces start this far either side of the glide line (Ride.SKY_HALF is 6 game m = 5 here)
@@ -306,8 +321,9 @@ def _cliff_column(m, rnd, x, y, z0, z1, r):
         ox, oy = x + rnd.uniform(-0.25, 0.25), y + rnd.uniform(-0.25, 0.25)
         m.mat("sk_rock" if rnd.random() < 0.65 else "sk_rock_dark")
         m.cyl((ox, oy, z + dh / 2), r=r, h=dh, seg=16, r2=r * rnd.uniform(0.86, 0.98))
-        m.mat("sk_rock_band")                       # eroded stratum lip where two layers meet
-        m.cyl((ox, oy, z + dh * 0.9), r=r * 1.035, h=0.16, seg=16, r2=r * 0.97)
+        if rnd.random() < 0.45:
+            m.mat("sk_rock_band")                   # eroded stratum lip where two layers meet
+            m.cyl((ox, oy, z + dh * 0.9), r=r * 1.03, h=0.12, seg=16, r2=r * 0.98)
         m.mat("sk_rock_dark")
         for j in range(rnd.randint(1, 3)):         # weathered chunks breaking the silhouette
             a = rnd.uniform(0, 2 * math.pi)
@@ -361,16 +377,15 @@ def sky_gorge(name="sky_gorge", L=40.0, seed=3):
                                   rnd, h=rnd.uniform(2.0, 3.2), r=rnd.uniform(0.8, 1.2))
             # ledge pines and moss clinging to the cliff face on the gorge side
             m.mat("sk_moss")
-            for j in range(4):                      # moss and ivy patches down the face
+            for j in range(3):                      # bushes rooted in cracks on the gorge face
                 zz = rnd.uniform(FLOOR + 2, top_z - 0.5)
                 a = math.radians(rnd.uniform(-50, 50)) + (math.pi if sd > 0 else 0.0)
-                p = V((x + math.cos(a) * r * 0.97, y + r + math.sin(a) * r * 0.97, zz))
-                m.push(Matrix.Translation(p) @ Matrix.Rotation(a, 4, 'Z'))
-                m.ico((0, 0, 0), rnd.uniform(0.6, 1.1), 2, s=(0.22, 1.0, 1.3))
-                m.mat("sk_grass_b")
-                m.ico((0.06, 0, 0.25), 0.4, 2, s=(0.3, 1.0, 0.7))
-                m.mat("sk_moss")
-                m.pop()
+                p = V((x + math.cos(a) * r * 1.0, y + r + math.sin(a) * r * 1.0, zz))
+                for q in range(3):
+                    m.mat(("sk_tree", "sk_tree2", "sk_tree_hi")[q])
+                    m.ico(tuple(p + V((math.cos(a) * 0.15, math.sin(a) * 0.15, 0)) +
+                                V((rnd.uniform(-0.3, 0.3), rnd.uniform(-0.3, 0.3), q * 0.18))), rnd.uniform(0.28, 0.42), 2,
+                          s=(1, 1, 0.8))
             for j in range(2):
                 zz = rnd.uniform(FLOOR + 4, top_z - 1)
                 p = V((x - sd * r * 0.95, y + r + rnd.uniform(-r, r) * 0.6, zz))
@@ -421,7 +436,7 @@ def sky_gorge(name="sky_gorge", L=40.0, seed=3):
     for sd in (-1, 1):
         y = 0.0
         while y < L:                                    # terraces: stepped paddies with grass lips and water tops
-            ln = rnd.uniform(3.0, 5.0)
+            ln = rnd.uniform(5.0, 8.0)
             for st in range(3):
                 x0 = sx(y) + sd * (1.6 + st * 1.6)
                 zt = FLOOR + 0.25 * st
@@ -539,13 +554,16 @@ def thundercloud(name="thundercloud", seed=3, size=3.0):
         a = rnd.uniform(0, 2 * math.pi)
         rr = size * 0.42 * math.sqrt(rnd.random())
         c = V((math.cos(a) * rr, math.sin(a) * rr * 0.55, rnd.uniform(0, size * 0.25)))
-        m.mat("sk_storm" if c.z > size * 0.08 else "sk_storm_dark")
+        m.mat("sk_cloud" if c.z > size * 0.17 else "sk_storm" if c.z > size * 0.06 else "sk_storm_dark")
         m.ico(tuple(c), size * rnd.uniform(0.2, 0.32), 2, s=(1, 1, 0.8))
     m.mat("sk_storm_dark")
     m.ico((0, 0, -size * 0.05), size * 0.5, 2, s=(1.1, 0.6, 0.25))
     m.mat("sk_bolt")
-    pts = [V((0.2, -0.2, -0.1)), V((-0.15, -0.25, -0.6)), V((0.15, -0.25, -0.75)), V((-0.1, -0.3, -1.3))]
-    m.sweep(pts, [(-0.06, 0), (0.06, 0)], closed=False, cap=False)
+    pts = [V((0.25, -0.25, -0.2)), V((-0.2, -0.3, -0.75)), V((0.2, -0.3, -0.95)), V((-0.15, -0.35, -1.6))]
+    m.sweep(pts, [(-0.07, -0.03), (0.07, -0.03), (0.07, 0.03), (-0.07, 0.03)], closed=True, cap=True,
+            scale=lambda t: 1.0 - 0.6 * t)
+    m.sweep([pts[1], pts[1] + V((-0.3, 0, -0.35))], [(-0.04, -0.02), (0.04, -0.02), (0.04, 0.02), (-0.04, 0.02)],
+            closed=True, cap=True, scale=lambda t: 1.0 - 0.7 * t)
     m.mat("sk_water")
     for k in range(9):
         x = rnd.uniform(-size * 0.4, size * 0.4)

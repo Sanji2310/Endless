@@ -458,6 +458,16 @@ def windmill(m, P, c, rnd, rot=0.0, h=3.4):
     for z in (0.2, h * 0.5, h - 0.15):
         m.cyl((0, 0, z), r=0.82 - 0.27 * z / h, h=0.12, seg=8)
     m.box((0, -0.81 + 0.27 * 0.3, 0.6), (0.4, 0.06, 0.8), smooth=False)
+    m.mat(P.get("stone2", P["timber"]))                # stone footing, and a gallery round the middle
+    m.cyl((0, 0, 0.1), r=0.9, h=0.2, seg=10)
+    m.mat(P["timber"])
+    m.cyl((0, 0, h * 0.55), r=0.95, h=0.06, seg=12)
+    for k in range(12):
+        a = 2 * math.pi * k / 12
+        m.cyl((math.cos(a) * 0.92, math.sin(a) * 0.92, h * 0.55 + 0.2), r=0.02, h=0.4, seg=4)
+    m.torus((0, 0, h * 0.55 + 0.4), R=0.92, r=0.02, seg=24, sides=4)
+    m.mat(P.get("glow", P["flower"]))
+    m.box((0, -(0.8 - 0.25 * 0.72) - 0.01, h * 0.72), (0.22, 0.03, 0.3), smooth=False)       # window
     m.mat(P["roof"])
     m.cyl((0, 0, h + 0.4), r=0.75, h=0.8, seg=8, r2=0.05)
     m.mat(P["timber"])
@@ -465,9 +475,12 @@ def windmill(m, P, c, rnd, rot=0.0, h=3.4):
     a0 = rnd.uniform(0, 90)
     for k in range(4):
         m.push(Matrix.Translation((0, -1.0, h - 0.1)) @ Matrix.Rotation(math.radians(a0 + 90 * k), 4, 'Y'))
-        m.mat(P["timber"])
-        m.box((0, 0, 1.3), (0.07, 0.07, 2.6), smooth=False)
+        m.mat(P["timber"])                          # whip, lattice frame, then the cloth over it
+        m.box((0, 0, 1.3), (0.08, 0.08, 2.6), smooth=False)
+        for zz in range(6):
+            m.box((0.22, 0.0, 0.65 + zz * 0.36), (0.44, 0.04, 0.03), smooth=False)
+        m.box((0.44, 0.0, 1.55), (0.03, 0.04, 1.85), smooth=False)
         m.mat(P.get("sail", P["wall"]))
-        m.box((0.22, 0.02, 1.55), (0.36, 0.02, 1.9), smooth=False)
+        m.box((0.22, 0.03, 1.55), (0.38, 0.015, 1.8), smooth=False)
         m.pop()
     m.pop()

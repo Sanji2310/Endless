@@ -53,9 +53,9 @@ The run cycles through **five zones**. Each lasts about 1,400 m. Between zones t
 | # | Zone | Mode | Obstacles | Scenery & effects |
 |---|---|---|---|---|
 | 1 | **Sakura Line** 桜線 | Run on rails | Commuter trains, oncoming **bullet trains**, ramps, crossing barriers (jump), sign gantries (roll), buffer stops (dodge) | Overhead catenary wires, utility poles with crows, tiled-roof houses, konbini, vending machines, sakura trees shedding **falling petals**, level crossings that go *kan-kan-kan*, a torii shrine, distant mountains |
-| 2 | **Crystal Cavern** 水晶洞窟 | Run on mine rails | Ore-cart trains, wooden ramps, rock piles (jump), timber beams (roll), boulders/crystal clusters (dodge) | Glowing crystals, stalactites, lanterns, mine timbers, bats, water drips, dust motes, echoing sounds, **Hotaru Lamp** light pool |
-| 3 | **Bamboo River** 竹の川 | Surf down a river | Floating logs (jump), bamboo bridges/branches (duck), rocks & whirlpools (dodge), waterfall drops (auto big-air) | Bamboo forest, stone lanterns, torii in the water, **koi jumping**, spray trail, splashes, mist, rainbows |
-| 4 | **Sky Glide** 空の道 | Paraglide | Swipe up to climb, down to dive: kites (climb), wind-chime cables (dive), balloons, rock spires, crow flocks (dodge) | Valley panorama: rice terraces, villages, sea, huge anime clouds, herons, wind streaks, cloud puffs |
+| 2 | **Crystal Cavern** 水晶洞窟 | Ride the **ore cart** on mine rails | Tilt to switch track, crouch under timber beams, low logs and approaching bats, pick a branch where the rails part round a pillar | Glowing crystals, stalactites, lanterns, mine timbers, bats, water drips, dust motes, echoing sounds, cart sparks, **Hotaru Lamp** light pool |
+| 3 | **Bamboo River** 竹の川 | Paddle the **bamboo canoe** | Tilt only: dodge crocodiles, river stones, drift logs and whirlpools, collect coins, pick a branch at Y-shaped forks round islands | Bamboo groves, grass and flowers to the water, stone lanterns, torii, houses, a water mill, docks, koi, herons, paddle splashes, spray, mist, rainbows |
+| 4 | **Sky Glide** 空の道 | Paraglide on the **Tsubasa Glider** | Tilt in every direction to steer and climb or dive: crows and V flocks flying straight at you, floating islets, storm clouds (burst through with a jolt), chime cables, rock spires. Ordinary clouds never block: the glider bursts through them | Sandstone gorge with grassy pillar tops, waterfalls, windmills, pagodas, forest and rice terraces far below, huge painterly clouds, thermals, wind streaks, distance haze |
 | 5 | **Express Rooftops** 特急の屋根 | Run on the roofs of moving trains | Roof units (jump), gaps between cars (jump), catenary gantries & low bridges (roll), cargo stacks (dodge) | Countryside flying past: rice paddies, farmhouses, rivers, a Fuji-like mountain, wind streaks, sparks from the pantographs |
 
 Transitions: Sakura Line → tunnel mouth → **Cavern** → underground river, board drops in → **Bamboo River** → waterfall off a cliff, glider opens → **Sky Glide** → land on a passing express → **Express Rooftops** → the train pulls into the city, hop down → **Sakura Line**.
@@ -93,7 +93,21 @@ Every action has its own layered, synthesized sound effect:
 
 ## 8. Controls
 
-These work the same in every zone: swipe left/right to change lanes, swipe up to jump (climb on the glider), swipe down to roll (duck on the board, dive on the glider), double-tap for the Kaze Board. Arrow keys and WASD also work.
+On foot: swipe left/right to change lanes, swipe up to jump, swipe down to roll, double-tap for the Kaze Board. Arrow keys and WASD also work.
+
+On the vehicles (the phone's tilt, or the same swipes and keys):
+- **Ore cart**: tilt left/right to switch track; swipe down (or hold) to crouch.
+- **Bamboo canoe**: tilt only. She paddles on her own; tilting steers between the banks and into a branch at forks.
+- **Glider**: tilt left/right to steer, tilt forward/back (or swipe down/up) to dive and climb.
+
+### 8.1 Riding and power-ups
+
+- Pongo boards each vehicle inside the tunnel lining at a zone's start and steps off it in the lining at the zone's end. Each change of vehicle is a short set piece (no hazards, can't be hurt), and she is rigged to every vehicle (hands, feet and seat on the vehicle's contact points).
+- Every zone gets four or fewer power-ups, placed by the zone plan (Zones.nextPowerUpAt). On a ride those spots carry only ride-safe pickups: Maneki Magnet, Fever Star, a Gacha Capsule, or rarely an Omamori.
+- Hayate Rocket and Tobi Boots never appear inside a ride. If one is running when she boards, it winds down before the set piece; picking one up while riding gives coins instead.
+- The Kaze Board is ground-only. Its remaining time is stowed when she boards and comes back when she is on her feet again.
+- Magnet and Fever Star keep working while riding.
+- `tools/preview/PowerSim.java` checks all of this headless, and the run must pass before a change to these rules ships.
 
 
 ## 9. Modelling standards (applied to every asset)
