@@ -57,7 +57,7 @@ public final class Lighting {
                 0xFFF2D8, 0xDCEEFB, 0x2A2233, 0xFFFFFF, 0xC9C4EA).set(0f, 0.18f, 0.35f, 60f, 200f, 0f, 0.55f);
         // Yuyake: orange sun low ahead on the left, long shadows, crimson clouds, warm glow in the haze
         KEYS[YUYAKE] = new Key(-0.45f, 0.2f, -0.87f, 0xFFC896, 0x9070AC, 0xCC8E9E, 0xFFB070, 0x5A7AC8, 0xFFB47E, 0xF0A890,
-                0xFF9C54, 0xF4BA94, 0x3A1E30, 0xFFD2A4, 0xB0729C).set(0f, 0.65f, 0.3f, 50f, 175f, 0.04f, 0.6f);
+                0xFF9C54, 0xF4BA94, 0x3A1E30, 0xFFD2A4, 0xB0729C).set(0f, 0.65f, 0.3f, 50f, 175f, 0.04f, 0.45f);
         // Tasogare: the sun just gone, purple-blue sky, soft violet light, lamps and windows coming on
         KEYS[TASOGARE] = new Key(-0.8f, 0.14f, -0.35f, 0xBCAAE6, 0x52488A, 0x8C6C96, 0xC8A2FF, 0x2C306E, 0xB48CC8, 0x6A5A9A,
                 0xEA92B2, 0x8070AA, 0x1E1630, 0xE2AAD2, 0x5E5292).set(0.55f, 0.45f, 0.35f, 40f, 165f, 0.06f, 0.5f);

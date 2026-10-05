@@ -231,12 +231,12 @@ public final class Shaders {
             "  } else if (type == 9) {\n" +
             // cloud: wide wrap light in three painted tones (sunlit cream, lilac middle, violet underside) and a warm
             // silver lining where the cloud stands against the sun
-            "    float w = ndl * 0.5 + 0.5;\n" +
+            "    float w = (ndl * 0.5 + 0.5) * 0.6 + (N.y * 0.5 + 0.5) * 0.4;\n" +
             "    vec3 under = alb * mix(shade, uSkyTop, 0.25);\n" +
             "    vec3 mid = alb * mix(shade, uLightCol, 0.6);\n" +
-            "    col = mix(under, mix(mid, alb * uLightCol, smoothstep(0.62, 0.7, w)), smoothstep(0.34, 0.42, w));\n" +
+            "    col = mix(under, mix(mid, alb * uLightCol, smoothstep(0.55, 0.85, w)), smoothstep(0.2, 0.6, w));\n" +
             "    float back = max(dot(-V, uSunDir), 0.0);\n" +
-            "    col += uSunCol * smoothstep(0.55, 0.7, fres) * (0.15 + 0.6 * back * back) * vMat.y;\n" +
+            "    col += uSunCol * smoothstep(0.6, 0.95, fres) * back * back * 0.5 * vMat.y;\n" +
             "  }\n" +
             "  col += alb * em * 2.2;\n" +
             "  col += lampLight(alb, N) * (1.0 - 0.6 * lit);\n" +
@@ -283,10 +283,11 @@ public final class Shaders {
             "  vec3 R = reflect(-V, N);\n" +
             "  vec3 sky = mix(uSkyHor, uSkyTop, clamp(R.y * 1.4, 0.0, 1.0));\n" +
             "  float fres = 1.0 - facing;\n" +
-            "  col = mix(col, sky, smoothstep(0.45, 0.6, fres) * 0.25 + smoothstep(0.75, 0.9, fres) * 0.3);\n" +
+            "  col = mix(col, sky, smoothstep(0.4, 0.6, fres) * 0.3 + smoothstep(0.72, 0.9, fres) * 0.4);\n" +
             // light on the ripple crests: soft bright patches where the three waves line up
             "  float hgt = sin(w1) + 0.6 * sin(w2) + 0.3 * sin(w3);\n" +
-            "  col += uLightCol * smoothstep(1.3, 1.6, hgt) * 0.16 * (0.4 + 0.6 * lit);\n" +
+            "  float near = 1.0 - smoothstep(8.0, 24.0, length(vW - uCamPos));\n" +
+            "  col += uLightCol * smoothstep(1.45, 1.75, hgt) * 0.07 * near * (0.4 + 0.6 * lit);\n" +
             // flow streaks: fine short dashes in wobbly lanes, few of them, fading out in the distance before they alias
             "  vec2 fd = length(uWater.xy) > 0.001 ? normalize(uWater.xy) : vec2(0.0, -1.0);\n" +
             "  vec2 ps = vec2(dot(p, vec2(-fd.y, fd.x)), dot(p, fd));\n" +
@@ -455,7 +456,7 @@ public final class Shaders {
             "    float big = bumps(az, 14.0, 0.37);\n" +
             "    float top = env * (uCloud.x * (0.3 * big + 0.09 * bumps(az, 37.0, 4.3) * step(0.01, big)\n" +
             "              + 0.035 * bumps(az, 89.0, 9.1) * step(0.01, big)));\n" +
-            "    if (h > -0.004 && h < top) {\n" +
+            "    if (top > 0.003 && h > -0.004 && h < top) {\n" +
             "      float y = clamp(h / max(top, 0.001), 0.0, 1.0);\n" +
             "      float lit = toSun * 0.3 + 0.7 * smoothstep(0.05, 0.6, y);\n" +
             "      vec3 cc = cloudCol(lit, smoothstep(0.75, 1.0, y) * (0.3 + 0.7 * toSun));\n" +
@@ -470,7 +471,8 @@ public final class Shaders {
             "      vec2 sw = uSunDir.xz * 0.22;\n" +
             "      float ns = vnoise(uv + sw) * 0.55 + vnoise((uv + sw) * 2.2 + 5.1) * 0.3;\n" +
             "      float th = 0.78 - uCloud.x * 0.42;\n" +
-            "      float a = smoothstep(th, th + 0.06, n) * smoothstep(0.02, 0.14, h);\n" +
+            "      float puff = (vnoise(uv * 9.0 + 3.3) - 0.5) * 0.07;\n" +
+            "      float a = smoothstep(th, th + 0.035, n + puff) * smoothstep(0.02, 0.14, h);\n" +
             "      float body = smoothstep(th + 0.02, th + 0.22, n);\n" +
             "      float lit = clamp(0.55 + (n - ns) * 3.0 + toSun * 0.2 - body * 0.25, 0.0, 1.0);\n" +
             "      vec3 cc = mix(uCloudShade, uCloudLit, lit);\n" +
@@ -480,12 +482,16 @@ public final class Shaders {
             "  }\n" +
             // sea of clouds below the horizon
             "  if (uCloud.w > 0.001 && h < 0.0) {\n" +
-            "    vec2 uv = d.xz / (-h + 0.05) * uCloud.y * 0.6 + vec2(0.0, uTime * uCloud.z * 1.5);\n" +
-            "    float n = vnoise(uv) * 0.6 + vnoise(uv * 2.1 + 3.7) * 0.4;\n" +
+            "    vec2 uv = d.xz / (-h + 0.03) * uCloud.y * 1.4 + vec2(0.0, uTime * uCloud.z * 1.5);\n" +
+            "    float n = vnoise(uv) * 0.5 + vnoise(uv * 2.1 + 3.7) * 0.3 + vnoise(uv * 4.7 + 1.3) * 0.2;\n" +
+            "    n += (vnoise(uv * 11.0 + 7.7) - 0.5) * 0.06;\n" +
             "    float ns = vnoise(uv + uSunDir.xz * 0.2) * 0.6 + vnoise((uv + uSunDir.xz * 0.2) * 2.1 + 3.7) * 0.4;\n" +
-            "    float a = smoothstep(0.42, 0.45, n + uCloud.w * 0.25) * smoothstep(0.0, 0.03, -h);\n" +
-            "    vec3 cc = cloudCol(0.5 + (ns - n) * -4.0, 0.0);\n" +
-            "    c = mix(c, cc, a);\n" +
+            "    float a = smoothstep(0.5, 0.54, n + uCloud.w * 0.1);\n" +
+            "    vec3 cc = cloudCol(smoothstep(0.5, 0.8, n) * 0.8 + clamp((n - ns) * 3.0, -0.25, 0.25) + 0.1, 0.0);\n" +
+            "    vec3 gap = mix(uSkyLow, uCloudShade, 0.55) * 0.85;\n" +
+            "    vec3 sea = mix(gap, cc, a);\n" +
+            "    sea = mix(sea, uSkyHor, (1.0 - smoothstep(0.0, 0.22, -h)) * 0.6);\n" +
+            "    c = mix(c, sea, uCloud.w * smoothstep(0.0, 0.02, -h));\n" +
             "  }\n" +
             "  gl_FragColor = vec4(c, 1.0);\n" +
             "}\n";
