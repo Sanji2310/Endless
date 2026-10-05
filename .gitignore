@@ -2,4 +2,4 @@ build/
 keystore/
 renders/design/dbg_*
 __pycache__/
-renders/anim/*/
+renders/anim/

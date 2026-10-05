@@ -12,6 +12,7 @@ import com.endlessrush.core.Mesh;
 import com.endlessrush.core.Models;
 import com.endlessrush.core.PongoScene;
 import com.endlessrush.core.Scene;
+import com.endlessrush.core.ZoneWorld;
 import com.pongo.app.GLRenderer;
 import com.pongo.core.PongoAssets;
 import com.pongo.core.RenderFrame;
@@ -32,6 +33,8 @@ import javax.microedition.khronos.opengles.GL10;
  * OpenGL ES 2.0 renderer; also drives the simulation on the GL thread.
  * The world is drawn from Scene's draw list; Pongo and the Mon coins are drawn on top by the toon renderer
  * (com.pongo) from assets/pongo.bin, sharing the depth buffer. Without that asset the old hero is drawn instead.
+ * When pongo.bin also carries the zone pieces, ZoneWorld draws the tunnel set pieces and the Crystal Cavern through
+ * the same toon layer and Scene leaves its city segments out there.
  */
 public final class GameRenderer implements GLSurfaceView.Renderer {
     private static final String VS =
@@ -73,6 +76,7 @@ public final class GameRenderer implements GLSurfaceView.Renderer {
     private PongoAssets pongoAssets;
     private boolean pongoTried;
     private PongoScene pongo;
+    private ZoneWorld zoneWorld;
     private GLRenderer toon;
     private final RenderFrame frame = new RenderFrame();
     private int prog, uVP, uModel, uLight, uCam, uTint, uEmis, uFogColor, uFog, uUnlit, aPos, aNrm, aCol;
@@ -123,6 +127,7 @@ public final class GameRenderer implements GLSurfaceView.Renderer {
                 in = new BufferedInputStream(assetManager.open("pongo.bin"), 1 << 16);
                 pongoAssets = PongoAssets.load(in, true);
                 pongo = new PongoScene(pongoAssets);
+                if (ZoneWorld.available(pongoAssets)) zoneWorld = new ZoneWorld(pongoAssets);
             } catch (Exception e) {
                 Log.w("EndlessRush", "toon renderer off: " + e);
                 pongoAssets = null;
@@ -136,10 +141,13 @@ public final class GameRenderer implements GLSurfaceView.Renderer {
             toon = new GLRenderer(pongoAssets);
             toon.onSurfaceCreated();
             pongo.attach(scene);
+            if (zoneWorld != null) zoneWorld.attach(scene);
+            game.zoneScenery = zoneWorld != null;
         } catch (RuntimeException e) {
             Log.w("EndlessRush", "toon renderer off: " + e);
             toon = null;
-            scene.toonHero = scene.toonCoins = false;
+            scene.toonHero = scene.toonCoins = scene.toonWorld = false;
+            game.zoneScenery = false;
         }
     }
 
@@ -167,7 +175,10 @@ public final class GameRenderer implements GLSurfaceView.Renderer {
     /** Builds the draw lists for the current game state and renders them (the desktop preview calls this too). */
     public void drawFrame(float dt) {
         scene.build(game, dl, width / (float) height, dt);
-        if (toon != null) pongo.build(game, scene, dl, frame, width, height, dt);
+        if (toon != null) {
+            pongo.build(game, scene, dl, frame, width, height, dt);
+            if (zoneWorld != null) zoneWorld.build(game, dl, frame, dt);
+        }
         if (hud != null) hud.onFrame(game);
 
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT);

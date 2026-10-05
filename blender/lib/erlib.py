@@ -888,9 +888,14 @@ _FONTS = {}
 
 
 def _font(path):
-    if path not in _FONTS:
-        _FONTS[path] = bpy.data.fonts.load(path)
-    return _FONTS[path]
+    f = _FONTS.get(path)
+    try:
+        f and f.name
+    except ReferenceError:      # reset() reloads factory settings and frees the font datablocks
+        f = None
+    if f is None:
+        f = _FONTS[path] = bpy.data.fonts.load(path)
+    return f
 
 
 # ----------------------------------------------------------------------------- curves

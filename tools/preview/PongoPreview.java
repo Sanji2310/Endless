@@ -8,7 +8,9 @@ import java.io.*;
 /**
  * Runs the real Android renderers (GameRenderer with the Pongo toon layer) on the desktop: GL calls are recorded
  * by the GLES20 stand-in in tools/preview/stubs and replayed in headless Chromium by tools/web/replay.mjs.
- * Usage: java PongoPreview <gles.bin out> [width height]
+ * Usage: java PongoPreview <gles.bin out> [width height] [zones]
+ *   zones: a run through the Sakura Line -> Crystal Cavern tunnel, the cavern and the way back out (zone_*.png)
+ *   -Dpongo.assets=<dir> loads pongo.bin from another folder than assets/ (e.g. a local build in build/)
  */
 public class PongoPreview {
     static GameRenderer renderer;
@@ -24,10 +26,17 @@ public class PongoPreview {
         prof.boards = 5;
         game = new Game(prof, null);
         Scene scene = new Scene();
-        renderer = new GameRenderer(game, scene, null, new AssetManager(new File("assets")));
+        renderer = new GameRenderer(game, scene, null, new AssetManager(new File(System.getProperty("pongo.assets", "assets"))));
         renderer.onSurfaceCreated(null, null);
         renderer.onSurfaceChanged(null, w, h);
         if (!scene.toonHero) throw new IllegalStateException("toon layer did not start (is assets/pongo.bin built?)");
+        if (a.length > 3 && a[3].equals("zones")) {
+            if (!scene.toonWorld) throw new IllegalStateException("pongo.bin has no zone pieces (tools/build_assets.sh)");
+            zones();
+            try (OutputStream os = new BufferedOutputStream(new FileOutputStream(a[0]))) { GLES20.save(os); }
+            System.out.println("recorded " + new File(a[0]).length() / 1024 + " KB of GL commands");
+            return;
+        }
 
         sim(30, false);
         shot("pongo_01_menu");
@@ -55,6 +64,40 @@ public class PongoPreview {
         shot("pongo_08_jetpack");
         try (OutputStream os = new BufferedOutputStream(new FileOutputStream(a[0]))) { GLES20.save(os); }
         System.out.println("recorded " + new File(a[0]).length() / 1024 + " KB of GL commands");
+    }
+
+    /** Sakura Line -> tunnel -> Crystal Cavern -> back out. Obstacles are cleared every frame: the cave's own
+     *  obstacles belong to the vehicle side, and these shots are about the set piece and the cavern. */
+    static void zones() {
+        game.start();                                   // lays out this run's zones: Sakura Line, then the cavern
+        float b = com.pongo.core.Zones.boundary(1), b2 = com.pongo.core.Zones.boundary(2);
+        game.s = b - 110;
+        runTo(b - 80); shot("zone_01_approach");
+        runTo(b - 36); shot("zone_02_portal");
+        runTo(b - 12); shot("zone_03_tunnel");
+        runTo(b + 3); shot("zone_04_mouth");
+        runTo(b + 30); shot("zone_05_cavern");
+        runTo(b + 54); shot("zone_06_parting");
+        runTo(b + 400); shot("zone_07_deep");
+        game.s = b2 - 90;
+        runTo(b2 - 32); shot("zone_08_way_out");
+        runTo(b2 + 6); shot("zone_09_daylight");
+    }
+
+    /** Runs (no obstacles, invulnerable) until distance s; the last SETTLE frames are drawn muted. */
+    static void runTo(float s) {
+        int n = 0;
+        while (game.s < s) {
+            game.obstacles.clear();
+            game.invulnT = 1f;
+            ai.drive(game);
+            game.update(DT);
+            n++;
+            if (game.s + game.speed * DT * SETTLE >= s) {
+                GLES20.drawing = false;
+                renderer.drawFrame(DT);
+            }
+        }
     }
 
     /** Advances the game; only the last SETTLE frames are drawn (without draw calls) to keep the stream short. */
