@@ -145,6 +145,10 @@ def chaser_mats():
     M("ch_shiba", 0xD98A3E, rim=0.45, soft=0.12, shadow=0xA45A6A)
     M("ch_shiba_dark", 0x2E2630, rim=0.35, soft=0.12)
     M("ch_cream", 0xFFF1DC, rim=0.35, soft=0.12, shadow=0xD6B6C8)
+    M("ch_mouth", 0x5A1A2A, rim=0.0, soft=0.1, outline=0.0)
+    M("ch_tongue", 0xF0708A, rim=0.1, soft=0.12, outline=0.0)
+    M("ch_sole", 0x7A6A66, rim=0.1, soft=0.1)
+    M("ch_lip", 0x3A2A34, rim=0.1, soft=0.08, outline=0.0)
 
 
 # Daigo's joints (Blender: +Y forward, Z up; SakuraWorld.chasers uses the same numbers in game space)
@@ -189,32 +193,62 @@ def daigo_torso(name="daigo_torso"):
 
 def daigo_head(name="daigo_head"):
     """Neck base at the origin: a big round head (anime proportions next to Pongo), jowls, a nose, a bushy walrus
-    moustache, angry brows over small dot eyes, sideburns, ears, and a peaked cap with a glossy visor and brass badge."""
+    moustache, and a furious face: heavy brows driven down into a V, narrowed eyes under hard upper lids, a mouth
+    open in a shout (teeth and tongue), a throbbing anger mark at the temple, and a peaked cap with a brass badge."""
     chaser_mats()
     m = E.Mesher(name)
     m.mat("ch_skin")
     m.cyl((0, 0, 0.04), r=0.085, h=0.1, seg=14)
     m.sphere((0, 0.0, 0.22), 0.19, 28, 16, s=(1.0, 0.98, 1.0))                         # cranium
-    m.sphere((0, 0.04, 0.13), 0.17, 24, 12, s=(1.05, 0.95, 0.7))                        # jowls and chin
-    m.sphere((0, 0.19, 0.2), 0.042, 14, 8, s=(1.0, 1.0, 0.95))                          # nose
+    m.sphere((0, 0.04, 0.12), 0.17, 24, 12, s=(1.05, 0.95, 0.72))                       # jowls and chin
+    m.sphere((0, 0.19, 0.2), 0.044, 14, 8, s=(1.05, 1.0, 0.92))                         # nose
+    # the shout: a dark mouth opening under the moustache, upper teeth, a tongue at the bottom
+    m.mat("ch_mouth")
+    m.sphere((0, 0.183, 0.085), 0.072, 18, 10, s=(1.0, 0.3, 0.72))
+    m.mat("ch_white")
+    m.sphere((0, 0.192, 0.112), 0.06, 16, 6, s=(1.0, 0.26, 0.2))                        # upper teeth
+    m.sphere((0, 0.19, 0.052), 0.045, 14, 6, s=(1.0, 0.24, 0.16))                       # lower teeth
+    m.mat("ch_tongue")
+    m.sphere((0, 0.19, 0.066), 0.04, 12, 6, s=(1.0, 0.3, 0.42))
     for sx in (-1, 1):
         m.mat("ch_skin")
         m.sphere((sx * 0.188, -0.01, 0.21), 0.045, 12, 8, s=(0.45, 0.8, 1.15))         # ears
         m.mat("ch_cheek")
-        m.sphere((sx * 0.11, 0.155, 0.15), 0.035, 12, 6, s=(1.0, 0.3, 0.6))            # ruddy cheeks
+        m.sphere((sx * 0.115, 0.15, 0.16), 0.04, 12, 6, s=(1.0, 0.3, 0.6))             # flushed cheeks
         m.mat("ch_white")
-        m.sphere((sx * 0.065, 0.17, 0.245), 0.026, 12, 8, s=(1.0, 0.45, 1.0))          # eye whites
-        m.mat("ch_ink")
-        m.sphere((sx * 0.063, 0.181, 0.243), 0.014, 10, 6, s=(1.0, 0.5, 1.15))         # pupils
-        m.mat("ch_hair")
-        m.push(Matrix.Translation((sx * 0.07, 0.17, 0.29)) @ Matrix.Rotation(math.radians(-sx * 20), 4, 'Y'))
-        m.sphere((0, 0, 0), 0.05, 12, 6, s=(1.0, 0.35, 0.3))                            # angry brows
+        m.push(Matrix.Translation((sx * 0.066, 0.172, 0.246)) @ Matrix.Rotation(math.radians(sx * 14), 4, 'Y'))
+        m.sphere((0, 0, 0), 0.028, 12, 8, s=(1.0, 0.45, 0.62))                          # eye whites, narrowed
         m.pop()
-        m.push(Matrix.Translation((sx * 0.07, 0.19, 0.155)) @ Matrix.Rotation(math.radians(sx * 22), 4, 'Y'))
-        m.sphere((0, 0, 0), 0.07, 16, 8, s=(1.25, 0.55, 0.5))                           # moustache halves
-        m.sphere((sx * 0.07, -0.01, -0.015), 0.035, 10, 6, s=(1.1, 0.6, 0.6))         # curled tips
+        m.mat("ch_ink")
+        m.sphere((sx * 0.06, 0.184, 0.242), 0.011, 10, 6, s=(1.0, 0.5, 1.0))           # pinpoint pupils
+        # hard upper lid: an ink stroke slanting down toward the nose
+        m.tube([V((sx * 0.098, 0.163, 0.262)), V((sx * 0.066, 0.183, 0.256)), V((sx * 0.036, 0.181, 0.24))],
+               r=0.0075, seg=6)
+        m.mat("ch_hair")
+        # brows: thick wedges driven down hard toward the nose, inner ends touching the lids
+        m.push(Matrix.Translation((sx * 0.068, 0.172, 0.282)) @ Matrix.Rotation(math.radians(sx * 32), 4, 'Y'))
+        m.sphere((0, 0, 0), 0.056, 14, 6, s=(1.0, 0.4, 0.34))
+        m.pop()
+        m.push(Matrix.Translation((sx * 0.075, 0.19, 0.152)) @ Matrix.Rotation(math.radians(sx * 26), 4, 'Y'))
+        m.sphere((0, 0, 0), 0.07, 16, 8, s=(1.25, 0.55, 0.48))                          # moustache halves, flared
+        m.sphere((sx * 0.072, -0.012, -0.02), 0.034, 10, 6, s=(1.1, 0.6, 0.6))         # tips
         m.pop()
         m.sphere((sx * 0.17, 0.02, 0.2), 0.04, 10, 6, s=(0.5, 0.9, 1.4))              # sideburns
+    m.mat("ch_skin")
+    m.sphere((0, 0.172, 0.27), 0.03, 10, 6, s=(1.2, 0.5, 0.5))                          # knotted brow ridge
+    # anger mark (the anime cross vein) on his right temple, laid on the skull: four corner arcs, each pointing its
+    # bend at the centre
+    m.mat("ch_red")
+    n = Vector((0.75, 0.6, 0.15)).normalized()
+    u = Vector((0, 0, 1)).cross(n).normalized()
+    w = n.cross(u)
+    c = Vector((0, 0, 0.22)) + n * 0.196
+    def at(ang, r):
+        return c + (u * math.cos(ang) + w * math.sin(ang)) * r + n * (0.004 * (1 - r / 0.026))
+    for k in range(4):
+        a = math.radians(45 + k * 90)
+        m.tube([at(a - 0.62, 0.026), at(a - 0.25, 0.014), at(a, 0.009), at(a + 0.25, 0.014), at(a + 0.62, 0.026)],
+               r=0.005, seg=5)
     m.mat("ch_hair")
     m.sphere((0, -0.05, 0.22), 0.18, 22, 10, s=(1.04, 0.9, 0.62))                      # hair at the back
     # cap: crown flaring out, dark band, glossy visor, brass badge with a cherry blossom
@@ -233,168 +267,352 @@ def daigo_head(name="daigo_head"):
     return m.obj(name, smooth_angle=40)
 
 
-def daigo_arm(name="daigo_arm"):
-    """Shoulder pivot at the origin, hangs down -Z with the elbow a little forward: puffed sleeve top, tapered
-    sleeve, brass cuff rings and a white glove (mitten with a thumb)."""
+# Daigo's limb segments (pivot at the top joint, hanging down -Z, forward +Y)
+DAIGO_UARM, DAIGO_FARM, DAIGO_THIGH, DAIGO_SHIN = 0.28, 0.3, 0.46, 0.49
+
+
+def daigo_uarm(name="daigo_uarm"):
+    """Shoulder pivot at the origin down to the elbow: puffed sleeve top, red armband."""
     chaser_mats()
     m = E.Mesher(name)
     m.mat("ch_navy")
     m.sphere((0, 0, -0.03), 0.105, 16, 10)                                               # shoulder cap
-    m.tube([V((0, 0, -0.02)), V((0, 0.0, -0.28)), V((0, 0.06, -0.52))], r=0.088, seg=16,
-           taper=lambda t: 1.0 - 0.18 * t)
-    m.sphere((0, 0.0, -0.28), 0.084, 14, 8)                                              # elbow
+    m.cyl((0, 0, -DAIGO_UARM / 2), r=0.09, h=DAIGO_UARM, r2=0.084, seg=16)
     m.mat("ch_red")
-    m.cyl((0, 0.0, -0.15), r=0.093, h=0.08, seg=16)                                      # armband
-    m.mat("ch_brass")
-    for z, y in ((-0.48, 0.05), (-0.505, 0.055)):
-        m.cyl((0, y, z), r=0.077, h=0.014, seg=16)
-    m.mat("ch_white")
-    m.sphere((0, 0.075, -0.6), 0.072, 16, 10, s=(0.8, 1.0, 1.25))                       # glove
-    m.sphere((0.055, 0.1, -0.57), 0.028, 10, 6, s=(1, 1, 1.4))                          # thumb
+    m.cyl((0, 0, -0.13), r=0.095, h=0.08, seg=16)                                        # armband
     return m.obj(name, smooth_angle=40)
 
 
-def daigo_leg(name="daigo_leg"):
-    """Hip pivot at the origin, down to the sole at z -0.95: full trousers tapering to the ankle with a gold side
-    stripe, and a polished shoe with a toe cap and a heel, toward +Y."""
+def daigo_farm(name="daigo_farm"):
+    """Elbow pivot at the origin down to a clenched white-gloved fist (thumb on the +Y side, knuckles at the end)."""
     chaser_mats()
     m = E.Mesher(name)
     m.mat("ch_navy")
-    m.lathe([(0.0, -0.84), (0.09, -0.84), (0.092, -0.7), (0.1, -0.45), (0.12, -0.2), (0.13, -0.05), (0.11, 0.04),
-             (0.0, 0.06)], seg=18)
+    m.sphere((0, 0, 0), 0.086, 14, 8)                                                    # elbow
+    m.cyl((0, 0, -0.11), r=0.084, h=0.22, r2=0.074, seg=16)
     m.mat("ch_brass")
-    m.box((0.122, 0, -0.42), (0.012, 0.03, 0.74), smooth=False)
-    m.mat("ch_shoe")
-    m.sphere((0, 0.07, -0.885), 0.095, 16, 8, s=(0.95, 1.65, 0.62))                     # shoe
-    m.box((0, -0.04, -0.915), (0.15, 0.08, 0.05), smooth=False)                          # heel
+    for z in (-0.19, -0.215):
+        m.cyl((0, 0, z), r=0.079, h=0.014, seg=16)                                       # cuff rings
+    m.mat("ch_white")
+    m.cyl((0, 0, -0.235), r=0.062, h=0.04, seg=14)                                       # glove cuff
+    m.rbox((0, 0.0, -0.3), (0.115, 0.125, 0.12), r=0.045, seg=3)                       # fist
+    for k in (-1, 0, 1):
+        m.sphere((k * 0.032, -0.012, -0.355), 0.022, 8, 6, s=(1, 1.2, 0.8))            # knuckles
+    m.sphere((0.0, 0.07, -0.285), 0.028, 10, 6, s=(1.5, 0.8, 1.0))                     # thumb across the front
+    return m.obj(name, smooth_angle=40)
+
+
+def daigo_thigh(name="daigo_thigh"):
+    """Hip pivot at the origin down to the knee: full trousers with the gold side stripe."""
+    chaser_mats()
+    m = E.Mesher(name)
+    m.mat("ch_navy")
+    m.sphere((0, 0, 0.0), 0.13, 16, 10, s=(1, 1, 0.8))
+    m.cyl((0, 0, -DAIGO_THIGH / 2), r=0.128, h=DAIGO_THIGH, r2=0.104, seg=18)
+    m.mat("ch_brass")
+    for sx in (-1, 1):
+        m.box((sx * 0.121, 0, -0.22), (0.012, 0.03, 0.4), smooth=False)                  # side stripes
+    return m.obj(name, smooth_angle=40)
+
+
+def daigo_shin(name="daigo_shin"):
+    """Knee pivot at the origin down to the sole at z -0.49: knee, trouser leg, hem, polished shoe toward +Y."""
+    chaser_mats()
+    m = E.Mesher(name)
+    m.mat("ch_navy")
+    m.sphere((0, 0, 0), 0.106, 16, 10)                                                    # knee
+    m.cyl((0, 0, -0.2), r=0.102, h=0.4, r2=0.09, seg=18)
+    m.mat("ch_brass")
+    for sx in (-1, 1):
+        m.box((sx * 0.097, 0, -0.2), (0.012, 0.03, 0.36), smooth=False)
     m.mat("ch_navy_dark")
-    m.lathe([(0.092, -0.85), (0.096, -0.8), (0.092, -0.79)], seg=18)                     # trouser hem
+    m.lathe([(0.092, -0.4), (0.097, -0.385), (0.093, -0.37)], seg=18)                   # trouser hem
+    m.mat("ch_shoe")
+    m.sphere((0, 0.07, -0.437), 0.095, 16, 8, s=(0.95, 1.65, 0.6))                      # shoe
+    m.box((0, -0.04, -0.467), (0.15, 0.08, 0.046), smooth=False)                         # heel
+    m.mat("ch_sole")
+    m.sphere((0, 0.07, -0.47), 0.092, 16, 4, s=(0.97, 1.66, 0.22))                      # sole (shows on the kick)
     return m.obj(name, smooth_angle=40)
 
 
 def kuro_body(name="kuro_body"):
-    """Shiba body centred at the origin, nose toward +Y: black-and-tan coat, cream chest, curled tail, red collar."""
+    """Shiba body centred at the origin, nose toward +Y, stretched for the gallop: black-and-tan coat, cream chest and
+    belly, tan 'trousers' on the haunches and a cream underside to the curled tail (what the player sees from
+    behind), red collar with a bell."""
     chaser_mats()
     m = E.Mesher(name)
     m.mat("ch_shiba_dark")
-    m.sphere((0, 0, 0), 0.2, 20, 12, s=(0.95, 1.8, 0.95))
+    m.sphere((0, 0, 0.02), 0.19, 20, 12, s=(0.95, 2.0, 0.92))
     m.mat("ch_cream")
-    m.sphere((0, 0.18, -0.06), 0.15, 16, 10, s=(0.9, 1.2, 1.0))
+    m.sphere((0, 0.2, -0.05), 0.15, 16, 10, s=(0.88, 1.2, 1.0))                         # chest
+    m.sphere((0, 0.0, -0.08), 0.15, 16, 10, s=(0.8, 1.7, 0.55))                         # belly
     m.mat("ch_shiba")
-    m.sphere((0, 0.05, -0.04), 0.19, 18, 10, s=(1.0, 1.55, 0.8))
-    # curled tail
+    for sx in (-1, 1):
+        m.sphere((sx * 0.1, -0.26, -0.03), 0.1, 14, 8, s=(0.7, 1.0, 1.1))              # tan haunches
+        m.sphere((sx * 0.11, 0.22, 0.0), 0.07, 12, 8, s=(0.6, 1.0, 1.2))               # tan shoulders
+    # curled tail over the back: dark on top, cream underneath
     m.mat("ch_shiba_dark")
-    m.torus((0, -0.3, 0.2), R=0.09, r=0.045, seg=20, sides=8, axis='Y')
+    m.torus((0, -0.33, 0.2), R=0.085, r=0.05, seg=20, sides=8, axis='Y')
     m.mat("ch_cream")
-    m.sphere((0.0, -0.3, 0.29), 0.04, 10, 6)
+    m.torus((0, -0.355, 0.2), R=0.085, r=0.032, seg=20, sides=8, axis='Y', arc=200)
+    m.sphere((0.0, -0.36, 0.3), 0.04, 10, 6)
+    m.sphere((0, -0.4, 0.03), 0.06, 10, 6, s=(1.3, 0.6, 1.0))                           # cream rump patch
+    m.mat("ch_shiba_dark")
+    for k in range(6):
+        y = 0.3 - k * 0.09
+        z = 0.02 + 0.19 * 0.92 * math.sqrt(max(0.0, 1 - (y / (0.19 * 2.0)) ** 2))
+        m.push(Matrix.Translation((0, y, z - 0.02)) @ Matrix.Rotation(math.radians(-28), 4, 'X'))
+        m.cyl((0, 0, 0.04), r=0.045, h=0.1, r2=0.0, seg=5)                              # hackles up
+        m.pop()
     m.mat("ch_red")
-    m.torus((0, 0.33, 0.06), R=0.11, r=0.025, seg=20, sides=6, axis='Y')
+    m.torus((0, 0.34, 0.08), R=0.11, r=0.025, seg=20, sides=6, axis='Y')
     m.mat("ch_brass")
-    m.sphere((0, 0.38, -0.05), 0.035, 12, 8)
-    ob = m.obj(name, smooth_angle=40)
-    return ob
+    m.sphere((0, 0.39, -0.03), 0.035, 12, 8)
+    return m.obj(name, smooth_angle=40)
 
 
 def kuro_head(name="kuro_head"):
-    """Neck at the origin, muzzle toward +Y: fox-like head, pointed ears, tan eyebrow dots, cream muzzle."""
+    """Neck at the origin, muzzle toward +Y, snarling: ears up and pricked forward, a dark furrow over narrowed eyes
+    under angled tan brows, the muzzle wrinkled and the lips pulled back off big white fangs, the jaw dropped open on
+    a pink tongue."""
     chaser_mats()
     m = E.Mesher(name)
     m.mat("ch_shiba_dark")
-    m.sphere((0, 0.04, 0.08), 0.15, 20, 12, s=(1.05, 1.0, 0.95))
+    m.sphere((0, 0.03, 0.08), 0.15, 20, 12, s=(1.05, 1.0, 0.92))
     m.mat("ch_cream")
-    m.sphere((0, 0.15, 0.03), 0.09, 16, 10, s=(0.9, 1.3, 0.7))
-    m.sphere((0, 0.1, -0.02), 0.11, 16, 10, s=(1.1, 0.9, 0.6))
-    m.mat("ch_ink")
-    m.sphere((0, 0.26, 0.05), 0.025, 10, 6)                                # nose
+    m.sphere((0, 0.17, 0.06), 0.085, 16, 10, s=(0.9, 1.3, 0.58))                        # upper muzzle
+    m.sphere((0, 0.07, -0.02), 0.1, 16, 10, s=(1.1, 0.9, 0.55))                         # cheeks and throat
+    m.mat("ch_mouth")
+    m.sphere((0, 0.19, 0.005), 0.07, 14, 8, s=(0.78, 1.1, 0.62))                        # open mouth
+    # dropped lower jaw with its fangs and the tongue
+    m.push(Matrix.Translation((0, 0.12, -0.03)) @ Matrix.Rotation(math.radians(30), 4, 'X'))
+    m.mat("ch_cream")
+    m.sphere((0, 0.065, -0.005), 0.062, 14, 8, s=(0.78, 1.3, 0.34))
+    m.mat("ch_tongue")
+    m.sphere((0, 0.075, 0.016), 0.036, 12, 6, s=(0.9, 1.4, 0.3))
+    m.mat("ch_white")
     for sx in (-1, 1):
-        m.sphere((sx * 0.062, 0.168, 0.115), 0.028, 12, 8, s=(1, 0.5, 1.15))  # eyes
-        m.mat("ch_white")
-        m.sphere((sx * 0.055, 0.183, 0.127), 0.008, 8, 6)                       # eye highlight
-        m.mat("ch_shiba")
-        m.sphere((sx * 0.062, 0.14, 0.175), 0.012, 8, 6, s=(1.4, 0.5, 0.7))  # tan eyebrow dots
-        m.mat("ch_shiba_dark")
-        m.push(Matrix.Translation((sx * 0.08, 0.02, 0.2)) @ Matrix.Rotation(math.radians(sx * 15), 4, 'Y'))
-        m.cyl((0, 0, 0.05), r=0.055, h=0.12, r2=0.0, seg=4)
-        m.mat("ch_cream")
-        m.cyl((0, 0.012, 0.045), r=0.03, h=0.08, r2=0.0, seg=4)
-        m.pop()
+        m.cyl((sx * 0.032, 0.115, 0.028), r=0.013, h=0.04, r2=0.0, seg=6)              # lower fangs
+    m.pop()
+    m.mat("ch_white")
+    for sx in (-1, 1):
+        m.cyl((sx * 0.036, 0.215, 0.0), r=0.015, h=0.055, r2=0.0, seg=6)                # upper fangs
+        m.sphere((sx * 0.018, 0.238, 0.02), 0.01, 6, 4)                                   # front teeth
+    m.mat("ch_lip")
+    m.tube([V((-0.06, 0.17, 0.02)), V((-0.04, 0.22, 0.03)), V((0, 0.24, 0.035)), V((0.04, 0.22, 0.03)),
+            V((0.06, 0.17, 0.02))], r=0.007, seg=6)                                       # curled-back lip
+    m.mat("ch_ink")
+    m.sphere((0, 0.255, 0.075), 0.027, 10, 6)                                             # nose
+    for k in range(3):
+        y, z = 0.215 - k * 0.022, 0.1 - k * 0.002
+        m.tube([V((-0.032, y, z - 0.004)), V((0, y + 0.006, z)), V((0.032, y, z - 0.004))], r=0.004, seg=5)  # wrinkles
+    for sx in (-1, 1):
         m.mat("ch_ink")
-    ob = m.obj(name, smooth_angle=40)
-    return ob
+        m.push(Matrix.Translation((sx * 0.064, 0.163, 0.12)) @ Matrix.Rotation(math.radians(sx * 20), 4, 'Y'))
+        m.sphere((0, 0, 0), 0.03, 12, 8, s=(1.1, 0.5, 0.55))                              # narrowed eyes
+        m.pop()
+        m.mat("ch_white")
+        m.sphere((sx * 0.058, 0.178, 0.126), 0.007, 8, 6)                                  # glint
+        m.mat("ch_shiba")
+        m.push(Matrix.Translation((sx * 0.056, 0.152, 0.152)) @ Matrix.Rotation(math.radians(sx * 32), 4, 'Y'))
+        m.sphere((0, 0, 0), 0.024, 8, 6, s=(1.7, 0.55, 0.5))                              # tan brows, slanted down
+        m.pop()
+        # ears up and pricked forward
+        m.push(Matrix.Translation((sx * 0.08, 0.0, 0.19)) @ Matrix.Rotation(math.radians(sx * 14), 4, 'Y')
+               @ Matrix.Rotation(math.radians(18), 4, 'X'))
+        m.mat("ch_shiba_dark")
+        m.cyl((0, 0, 0.055), r=0.058, h=0.13, r2=0.0, seg=4)
+        m.mat("ch_cream")
+        m.cyl((0, 0.014, 0.05), r=0.032, h=0.085, r2=0.0, seg=4)
+        m.pop()
+    m.mat("ch_ink")
+    m.tube([V((-0.024, 0.148, 0.155)), V((0, 0.156, 0.137)), V((0.024, 0.148, 0.155))], r=0.006, seg=5)  # furrow
+    return m.obj(name, smooth_angle=40)
 
 
-def kuro_leg(name="kuro_leg"):
+KURO_ULEG, KURO_LLEG = 0.17, 0.18
+
+
+def kuro_uleg(name="kuro_uleg"):
+    """Shoulder or hip pivot at the origin down to the elbow or hock."""
     chaser_mats()
     m = E.Mesher(name)
     m.mat("ch_shiba_dark")
-    m.sphere((0, 0, -0.01), 0.07, 12, 8, s=(1, 1.1, 1.2))
-    m.cyl((0, 0, -0.14), r=0.058, h=0.26, r2=0.048, seg=12)
+    m.sphere((0, 0, -0.01), 0.072, 12, 8, s=(1, 1.15, 1.2))
+    m.cyl((0, 0, -KURO_ULEG / 2), r=0.06, h=KURO_ULEG, r2=0.048, seg=12)
+    m.mat("ch_shiba")
+    m.cyl((0, -0.012, -0.1), r=0.05, h=0.12, r2=0.044, seg=12)                          # tan on the back of the leg
+    return m.obj(name, smooth_angle=40)
+
+
+def kuro_lleg(name="kuro_lleg"):
+    """Elbow or hock pivot at the origin down to the paw sole at z -0.18: tan at the joint, cream socks and paw."""
+    chaser_mats()
+    m = E.Mesher(name)
+    m.mat("ch_shiba")
+    m.sphere((0, 0, 0), 0.05, 10, 6)
+    m.cyl((0, -0.006, -0.04), r=0.046, h=0.08, r2=0.044, seg=12)
     m.mat("ch_cream")
-    m.cyl((0, 0, -0.24), r=0.05, h=0.08, r2=0.052, seg=12)
-    m.sphere((0, 0.025, -0.29), 0.056, 12, 6, s=(1, 1.3, 0.65))
-    ob = m.obj(name, smooth_angle=40)
-    return ob
+    m.cyl((0, 0, -0.11), r=0.044, h=0.09, r2=0.04, seg=12)                              # white socks (urajiro)
+    m.sphere((0, 0.022, -0.155), 0.05, 12, 6, s=(1, 1.35, 0.55))                        # paw
+    return m.obj(name, smooth_angle=40)
 
 
-CHASERS = [("daigo_torso", daigo_torso), ("daigo_head", daigo_head), ("daigo_arm", daigo_arm), ("daigo_leg", daigo_leg),
-           ("kuro_body", kuro_body), ("kuro_head", kuro_head), ("kuro_leg", kuro_leg)]
+CHASERS = [("daigo_torso", daigo_torso), ("daigo_head", daigo_head), ("daigo_uarm", daigo_uarm),
+           ("daigo_farm", daigo_farm), ("daigo_thigh", daigo_thigh), ("daigo_shin", daigo_shin),
+           ("kuro_body", kuro_body), ("kuro_head", kuro_head), ("kuro_uleg", kuro_uleg), ("kuro_lleg", kuro_lleg)]
 
 
-def _assemble_chasers(x0=0.0, pose=0.6, grab=False, kuro=True):
-    """Poses the parts the way SakuraWorld.chasers does in the game, for the design renders."""
+# ----------------------------------------------------------------------------- the chase run
+# The same numbers drive SakuraWorld.chasers in the game: angles in degrees, + swings a limb forward (+Y), knee and
+# elbow flex measured from straight. The hip height is solved so the lower shoe sits on the ground.
+
+def _drop(lt, theta, k, pts):
+    """Height of the hip above the lowest of pts (y, z in the lower segment) for a two-segment limb."""
+    t, ph = math.radians(theta), math.radians(theta - k)
+    return lt * math.cos(t) - min(y * math.sin(ph) + z * math.cos(ph) for y, z in pts)
+
+
+DAIGO_SOLE = ((0.22, -0.47), (-0.08, -0.49), (0.07, -0.49))
+KURO_PAW = ((0.06, -0.175), (-0.02, -0.18))
+
+
+# knee flex through the stride (phase in degrees, flex): high heel kick in mid-swing, knee drive, a reach that
+# straightens just before the foot lands, a firm stance, and the push off the toe
+DAIGO_KNEE = ((0, 116), (45, 102), (90, 80), (125, 36), (155, 15), (205, 15), (250, 20), (270, 26), (300, 62),
+              (330, 102), (360, 116))
+
+
+def keyed(deg, keys):
+    """Cosine-eased lookup in a periodic (phase, value) table."""
+    d = deg % 360.0
+    for (a, va), (b, vb) in zip(keys, keys[1:]):
+        if d <= b:
+            t = (d - a) / (b - a)
+            return va + (vb - va) * (0.5 - 0.5 * math.cos(math.pi * t))
+    return keys[-1][1]
+
+
+def daigo_pose(p, grab=False):
+    """Sprint pose at cycle phase p (radians): lean, twist, head, (thigh, knee) and (upper arm, elbow) per side."""
+    legs, arms = [], []
+    for side in (0, 1):
+        q = p + side * math.pi
+        if grab:
+            legs.append((22.0, 34.0))
+            arms.append((84.0, 12.0))
+            continue
+        legs.append((18 + 48 * math.sin(q), keyed(math.degrees(q), DAIGO_KNEE)))
+        a = -math.sin(q)
+        arms.append((10 + 56 * a, 92 + 22 * a))
+    lean = 8.0 if grab else 27 + 3 * math.cos(2 * p)
+    twist = 0.0 if grab else -10 * math.sin(p)
+    head = 10.0 if grab else 20 + 3 * math.cos(2 * p)
+    hip = max(_drop(DAIGO_THIGH, t, k, DAIGO_SOLE) for t, k in legs)
+    return dict(legs=legs, arms=arms, lean=lean, twist=twist, head=head, hip=hip)
+
+
+# Kuro's legs: (x, y) on the body, phase offset
+KURO_LEGS = ((-0.1, 0.25, 0.0), (0.1, 0.25, 0.35), (-0.1, -0.25, 2.5), (0.1, -0.25, 2.85))
+KURO_HIP_Z = -0.06
+
+
+def kuro_pose(q):
+    """Gallop at phase q: body pitch, per-leg (upper, flex), and the body height that puts the lowest paw down."""
+    pitch = 7 * math.sin(q + 0.6)
+    legs = []
+    for (lx, ly, off) in KURO_LEGS:
+        u = 38 * math.sin(q + off)
+        legs.append((u, 8 + 72 * max(0.0, math.cos(q + off + 0.4)) ** 2))
+    pr = math.radians(pitch)
+    h = 0.0
+    for (lx, ly, off), (u, k) in zip(KURO_LEGS, legs):
+        # the pivot drops below the body centre by the body pitch
+        pz = ly * math.sin(pr) + KURO_HIP_Z * math.cos(pr)
+        h = max(h, _drop(KURO_ULEG, u, k, KURO_PAW) - pz)
+    return dict(pitch=pitch, legs=legs, y=h)
+
+
+def _assemble_chasers(x0=0.0, phase=0.8, grab=False, kuro=True, kuro_dx=1.0, kuro_dy=0.6):
+    """Poses the parts the way SakuraWorld.chasers does in the game, for the design renders and the run clip."""
     obs = []
-    def put(fn, loc, rx=0.0, rz=0.0, s=1.0):
+    P = daigo_pose(phase, grab)
+    R = lambda deg, ax: Matrix.Rotation(math.radians(deg), 4, ax)
+    T = Matrix.Translation
+
+    def put(fn, mw):
         ob = fn()
-        ob.location = loc
-        ob.rotation_euler = (math.radians(rx), 0, math.radians(rz))
-        ob.scale = (s, s, s)
+        ob.matrix_world = mw
         obs.append(ob)
-        return ob
-    s = 1.0
-    hip, sx_, sz_ = DAIGO_HIP, DAIGO_SHOULDER[0], DAIGO_SHOULDER[1]
-    lean = 8.0
-    put(daigo_leg, (x0 - DAIGO_HIP_X * s, 0, hip * s), rx=pose * 40)
-    put(daigo_leg, (x0 + DAIGO_HIP_X * s, 0, hip * s), rx=-pose * 40)
-    torso = Matrix.Translation((x0, 0, hip * s)) @ Matrix.Rotation(math.radians(lean), 4, 'X')
-    def on_torso(fn, local, rx=0.0, rz=0.0):
-        ob = fn()
-        ob.matrix_world = torso @ Matrix.Translation(local) @ Matrix.Rotation(math.radians(rx), 4, 'X') \
-            @ Matrix.Rotation(math.radians(rz), 4, 'Z')
-        obs.append(ob)
-    on_torso(daigo_torso, (0, 0, 0))
-    on_torso(daigo_head, (0, 0.02, DAIGO_NECK))
-    if grab:
-        on_torso(daigo_arm, (-sx_, 0, sz_), rx=95)
-        on_torso(daigo_arm, (sx_, 0, sz_), rx=95)
-    else:
-        on_torso(daigo_arm, (-sx_, 0, sz_), rx=-pose * 45)
-        on_torso(daigo_arm, (sx_, 0, sz_), rx=150)                          # waving a fist
+        return mw
+
+    root = T((x0, 0, P["hip"]))
+    for side, sx in ((0, -1), (1, 1)):
+        th, kn = P["legs"][side]
+        hipm = put(daigo_thigh, root @ T((sx * DAIGO_HIP_X, 0, 0)) @ R(th, 'X'))
+        put(daigo_shin, hipm @ T((0, 0, -DAIGO_THIGH)) @ R(-kn, 'X'))
+    torso = root @ R(P["twist"], 'Z') @ R(-P["lean"], 'X')
+    put(daigo_torso, torso)
+    put(daigo_head, torso @ T((0, 0.02, DAIGO_NECK)) @ R(P["head"], 'X'))
+    for side, sx in ((0, -1), (1, 1)):
+        ua, el = P["arms"][side]
+        sh = put(daigo_uarm, torso @ T((sx * DAIGO_SHOULDER[0], 0, DAIGO_SHOULDER[1])) @ R(ua, 'X') @ R(-sx * 8, 'Y'))
+        put(daigo_farm, sh @ T((0, 0, -DAIGO_UARM)) @ R(el, 'X'))
     if kuro:
-        d = x0 + 1.0
-        put(kuro_body, (d, 0.6, 0.5), s=1.0)
-        put(kuro_head, (d, 0.6 + 0.34, 0.5 + 0.16), s=1.0)
-        for (lx, ly, sw) in ((-0.1, 0.25, 1), (0.1, 0.25, -1), (-0.1, -0.25, -1), (0.1, -0.25, 1)):
-            put(kuro_leg, (d + lx, 0.6 + ly, 0.5 - 0.04), rx=sw * pose * 35, s=1.0)
+        K = kuro_pose(phase * 16 / 11)
+        body = T((x0 + kuro_dx, kuro_dy, K["y"])) @ R(K["pitch"], 'X')
+        put(kuro_body, body)
+        put(kuro_head, body @ T((0, 0.36, 0.14)) @ R(-K["pitch"] * 0.6, 'X'))
+        for (lx, ly, off), (u, k) in zip(KURO_LEGS, K["legs"]):
+            up = put(kuro_uleg, body @ T((lx, ly, KURO_HIP_Z)) @ R(u, 'X'))
+            put(kuro_lleg, up @ T((0, 0, -KURO_ULEG)) @ R(-k, 'X'))
     return obs
 
 
 def design_chasers():
-    """Front, side, the player's view (from behind and above, as they chase Pongo), a head close-up, and the grab."""
+    """Front, side, back (the player's view), three-quarter, head close-ups, Kuro, and the grab."""
     import studio
     E.reset()
     studio.stage(res=(1200, 900))
-    for o in _assemble_chasers(-0.4):
+    for o in _assemble_chasers(-0.5, phase=1.75):
         E.add_outline(o, 0.008)
-    studio.shoot("chasers_front", target=(0.0, 0.3, 1.05), dist=4.8, yaw=160, pitch=6, lens=40)
-    studio.shoot("chasers_side", target=(0.0, 0.3, 1.05), dist=4.8, yaw=95, pitch=4, lens=40)
-    studio.shoot("chasers_player_view", target=(0.0, 1.2, 1.0), dist=6.6, yaw=4, pitch=26, lens=35)
-    studio.shoot("chasers_head", target=(-0.4, 0.05, 1.95), dist=1.5, yaw=150, pitch=4, lens=50)
-    studio.shoot("chasers_kuro", target=(0.6, 0.7, 0.55), dist=1.9, yaw=140, pitch=10, lens=50)
+    studio.shoot("chasers_front", target=(0.0, 0.3, 1.0), dist=5.0, yaw=158, pitch=6, lens=40)
+    studio.shoot("chasers_side", target=(0.0, 0.3, 1.0), dist=5.0, yaw=90, pitch=4, lens=40)
+    studio.shoot("chasers_three_quarter", target=(0.0, 0.3, 1.0), dist=5.0, yaw=128, pitch=10, lens=40)
+    studio.shoot("chasers_player_view", target=(0.0, 1.6, 0.9), dist=7.0, yaw=0, pitch=22, lens=35)
+    studio.shoot("chasers_head", target=(-0.5, 0.45, 1.7), dist=1.5, yaw=162, pitch=4, lens=50)
+    studio.shoot("chasers_kuro", target=(0.5, 0.75, 0.42), dist=1.9, yaw=140, pitch=8, lens=50)
     E.reset()
     studio.stage(res=(1200, 900))
-    for o in _assemble_chasers(0.0, pose=0.0, grab=True, kuro=False):
+    for o in _assemble_chasers(0.0, grab=True, kuro=False):
         E.add_outline(o, 0.008)
     studio.shoot("chasers_grab", target=(0.0, 0.3, 1.2), dist=4.0, yaw=150, pitch=6, lens=40)
+
+
+def chase_clip(frames=18, views="side,three_quarter,back"):
+    """One stride cycle of the chase run per view, frame by frame -> build/clips/chase_<view>_NN.png (ffmpeg makes
+    the clip). 18 frames at 30 fps is the game's stride rate."""
+    import os, studio
+    cams = {"side": dict(target=(0.0, 0.7, 0.95), dist=4.6, yaw=270, pitch=4, lens=40),
+            "three_quarter": dict(target=(0.0, 0.7, 1.0), dist=4.6, yaw=215, pitch=8, lens=40),
+            "back": dict(target=(0.0, 1.0, 1.0), dist=5.0, yaw=4, pitch=18, lens=35)}
+    out = os.path.join(E.ROOT, "build", "clips")
+    os.makedirs(out, exist_ok=True)
+    for view in views.split(","):
+        for i in range(frames):
+            E.reset()
+            studio.stage(res=(960, 720))
+            bpy.context.scene.eevee.taa_render_samples = 24
+            # Kuro a stride further ahead than in the game, so the side views show both of them whole
+            for o in _assemble_chasers(-0.5, phase=2 * math.pi * i / frames, kuro_dy=1.5):
+                E.add_outline(o, 0.008)
+            c = cams[view]
+            studio.aim_sun(c["yaw"])
+            t = Vector(c["target"])
+            y, p = math.radians(c["yaw"]), math.radians(c["pitch"])
+            E.camera(t + Vector((math.sin(y) * math.cos(p), -math.cos(y) * math.cos(p), math.sin(p))) * c["dist"], t,
+                     lens=c["lens"])
+            E.render(os.path.join(out, "chase_%s_%02d.png" % (view, i)))
 
 
 def export_chasers():
@@ -818,6 +1036,56 @@ def verge(lod=0):
     return cl.soften(m.obj("sl_verge", smooth_angle=35))
 
 
+def greenbed(lod=0):
+    """12 m planted bed along the line side of the lane (right side, x 6.48..8.3, laid over the asphalt): a low stone
+    edge to the road, dense grass, mounded azaleas in bloom, hydrangeas, round shrubs and wildflowers, so the strip
+    between the line and the houses reads as a garden, never bare road. Everything stays under 1.4 m: the sakura on
+    the far kerb are the trees. lod 2 keeps the bed and the shrubs."""
+    import greenery as G
+    G.mats()
+    E.mat("gb_soil", 0x6F8C52, soft=0.2, rim=0.0, outline=0)
+    E.mat("gb_edge", 0xD9D1C4, soft=0.2, rim=0.2, outline=0.6, shadow=0x9C94B4)
+    rnd = random.Random(70)
+    m = E.Mesher("sl_greenbed")
+    cl = G.Clumps()
+    seg, g = city.SEG, city.GROUND
+    x0, x1 = 6.48, 8.3
+    z = g + 0.1
+    m.mat("gb_soil")
+    m.box(((x0 + x1) / 2, seg / 2, g + 0.05), (x1 - x0, seg, 0.1), smooth=False)
+    m.mat("gb_edge")
+    m.box((x1 + 0.07, seg / 2, g + 0.09), (0.14, seg, 0.18), bevel=(0.02, 1) if lod == 0 else None, smooth=False)
+    if lod < 2:
+        G.meadow(m, x0 + 0.04, x1 - 0.04, 0.0, seg, z, rnd, density=16.0, bloom=0.5, lod=lod, light=0.4, h=0.3)
+    # shrubs in a staggered double row; some azaleas so covered in flowers that the green barely shows
+    srnd = random.Random(71)
+    y, row = srnd.uniform(0.0, 0.6), 0
+    while y < seg - 0.3:
+        r = srnd.uniform(0.42, 0.66)
+        x = (7.0, 7.8)[row % 2] + srnd.uniform(-0.12, 0.12)
+        kind = srnd.random()
+        if kind < 0.4:
+            cl.lobes(m, "gr_leaf_dark", (x, y, z + r * 0.5), (r * 1.1, r, r * 0.68), (4, 2, 0)[lod], srnd, lod=lod)
+            if lod < 2:
+                fl = "gr_azalea" if srnd.random() < 0.7 else "gr_azalea_w"
+                for k in range((7, 4)[lod]):
+                    a = srnd.uniform(0, 2 * math.pi)
+                    b = srnd.uniform(0.25, 1.1)
+                    p = (x + math.cos(a) * math.cos(b) * r * 0.95, y + math.sin(a) * math.cos(b) * r * 0.85,
+                         z + r * 0.5 + math.sin(b) * r * 0.62)
+                    cl.lobes(m, fl, p, (0.24, 0.22, 0.16), 2 if lod == 0 else 0, srnd, lod=max(lod, 1))
+        elif kind < 0.65:
+            G.bush(m, cl, x, y, z, srnd, r=r, lod=lod, mat="gr_hydrangea")
+        else:
+            G.bush(m, cl, x, y, z, srnd, r=r, lod=lod, mat=srnd.choice(("gr_leaf", "gr_leaf_light", "gr_hedge")))
+        y += r * 1.25 + srnd.uniform(0.1, 0.7)
+        row += 1
+    if lod == 0:
+        for k in range(6):
+            G.flowers(m, srnd.uniform(x0 + 0.1, x1 - 0.1), srnd.uniform(0.3, seg - 0.3), z, srnd)
+    return cl.soften(m.obj("sl_greenbed", smooth_angle=35))
+
+
 def garden(variant, lod=0):
     """20 m behind a pair of houses (right side; plots at y 0..10 and 10..20, houses x 11..21.8): hedges and shrubs
     in the gaps between the houses, and back gardens out to x 30 with lawn tufts, flower beds and round trees."""
@@ -922,6 +1190,8 @@ def export_greens():
         sx = GL.sfx(lv)
         E.reset(); city.city_mats()
         E.export_erm(verge(lv), "sl_verge" + sx)
+        E.reset(); city.city_mats()
+        E.export_erm(greenbed(lv), "sl_greenbed" + sx)
         for v in range(3):
             E.reset(); city.city_mats()
             E.export_erm(garden(v, lv), "sl_garden_%d" % v + sx)

@@ -23,7 +23,8 @@ import erlib as E
 
 V = Vector
 
-LEAF = ("gr_leaf", "gr_leaf_dark", "gr_leaf_light", "gr_leaf_pink", "gr_hydrangea", "gr_hedge")
+LEAF = ("gr_leaf", "gr_leaf_dark", "gr_leaf_light", "gr_leaf_pink", "gr_hydrangea", "gr_hedge", "gr_azalea",
+        "gr_azalea_w")
 BLADE = ("gr_blade", "gr_blade_light", "gr_susuki", "gr_ivy", "gr_ivy_light")
 
 
@@ -35,6 +36,8 @@ def mats():
     M("gr_leaf_pink", 0xF5BCD3, soft=0.35, rim=0.3, outline=0.6, shadow=0xC88AB8, flags=E.F_FOLIAGE)
     M("gr_hedge", 0x4C9E52, soft=0.35, rim=0.25, outline=0.7, shadow=0x336B5E, flags=E.F_FOLIAGE)
     M("gr_hydrangea", 0x8DA6EE, soft=0.35, rim=0.3, outline=0.6, shadow=0x6A6AC0, flags=E.F_FOLIAGE)
+    M("gr_azalea", 0xF57DB4, soft=0.35, rim=0.3, outline=0.6, shadow=0xC060A8, flags=E.F_FOLIAGE)
+    M("gr_azalea_w", 0xFFF2F6, soft=0.35, rim=0.3, outline=0.6, shadow=0xD0B8D8, flags=E.F_FOLIAGE)
     M("gr_blade", 0x7CC457, soft=0.4, rim=0.2, outline=0.0, shadow=0x5A9A62, flags=E.F_DOUBLE | E.F_NOCAST | E.F_FOLIAGE)
     M("gr_blade_light", 0xA6D96A, soft=0.4, rim=0.2, outline=0.0, shadow=0x76A866, flags=E.F_DOUBLE | E.F_NOCAST | E.F_FOLIAGE)
     M("gr_susuki", 0xF1E2BE, soft=0.4, rim=0.3, outline=0.0, shadow=0xC4AFA8, flags=E.F_DOUBLE | E.F_NOCAST | E.F_FOLIAGE)

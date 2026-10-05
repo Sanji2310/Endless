@@ -29,11 +29,11 @@ public final class SakuraWorld {
     private final boolean zones;
     private final int[] track, sideR, sideL, wires, lotR, lotL, gantry, pole, crossing, crossArm;
     private final int[][] houses = new int[5][], streets = new int[4][], sakura = new int[3][], far = new int[3][];
-    private final int[] apartment, konbini, hills, clouds, verge, backyard;
+    private final int[] apartment, konbini, hills, clouds, verge, greenbed, backyard;
     private final int[][] gardens = new int[3][];
     private final int[] comFront, comMid, comFrontB, comMidB, expFront, expMid, expFrontB, expMidB, ramp, works, barricade, highBar;
     private final int puMagnet, puRocket, puBoots, puX2, puGacha, puOmamori, board, rocketPack, halo;
-    private final int dTorso, dHead, dArm, dLeg, kBody, kHead, kLeg;
+    private final int dTorso, dHead, dUarm, dFarm, dThigh, dShin, kBody, kHead, kUleg, kLleg;
     private final float[] uvGlow, uvStar;
     private final float[] tmp = new float[3], ident = Mat4.identity(), lv = new float[16], lp = new float[16];
     private final float[] planes = new float[24];
@@ -59,7 +59,8 @@ public final class SakuraWorld {
         for (int i = 0; i < 4; i++) streets[i] = lods("sl_street_" + i);
         for (int i = 0; i < 3; i++) { sakura[i] = lods("sl_sakura_" + (i + 1)); far[i] = lods("sl_far_" + i); }
         apartment = lods("sl_apartment"); konbini = lods("sl_konbini"); hills = lods("sl_hills");
-        clouds = lods("sl_clouds"); verge = lods("sl_verge"); backyard = lods("sl_backyard");
+        clouds = lods("sl_clouds"); verge = lods("sl_verge"); greenbed = lods("sl_greenbed");
+        backyard = lods("sl_backyard");
         for (int i = 0; i < 3; i++) gardens[i] = lods("sl_garden_" + i);
         comFront = lods("commuter_front"); comMid = lods("commuter_mid");
         comFrontB = lods("commuter_front_b"); comMidB = lods("commuter_mid_b");
@@ -69,8 +70,9 @@ public final class SakuraWorld {
         puMagnet = a.lod("pu_magnet", 0); puRocket = a.lod("pu_rocket", 0); puBoots = a.lod("pu_boots", 0);
         puX2 = a.lod("pu_x2", 0); puGacha = a.lod("pu_gacha", 0); puOmamori = a.lod("pu_omamori", 0);
         board = a.lod("kaze_board", 0); rocketPack = a.lod("rocket_pack", 0); halo = a.lod("pickup_halo", 0);
-        dTorso = a.lod("daigo_torso", 0); dHead = a.lod("daigo_head", 0); dArm = a.lod("daigo_arm", 0); dLeg = a.lod("daigo_leg", 0);
-        kBody = a.lod("kuro_body", 0); kHead = a.lod("kuro_head", 0); kLeg = a.lod("kuro_leg", 0);
+        dTorso = a.lod("daigo_torso", 0); dHead = a.lod("daigo_head", 0); dUarm = a.lod("daigo_uarm", 0);
+        dFarm = a.lod("daigo_farm", 0); dThigh = a.lod("daigo_thigh", 0); dShin = a.lod("daigo_shin", 0);
+        kBody = a.lod("kuro_body", 0); kHead = a.lod("kuro_head", 0); kUleg = a.lod("kuro_uleg", 0); kLleg = a.lod("kuro_lleg", 0);
         uvGlow = a.tile("fx_glow"); uvStar = a.tile("fx_star");
     }
 
@@ -224,9 +226,6 @@ public final class SakuraWorld {
     /** Level crossings every 30 segments (360 m), offset so the first is soon after the start. */
     static boolean crossingAt(int k) { return Math.floorMod(k, 30) == 9; }
 
-    /** Heights of the contact wire and the messenger wire (city.wires in the Blender kit). */
-    private static final float WIRE_LO = 5.3f, WIRE_HI = 6.0f;
-
     private void city(RenderFrame f, float from, float to) {
         // horizon: hills, the far peak and the clouds ride with the camera so they never come closer
         int sky = RenderFrame.D_NO_FOG | RenderFrame.D_NO_SHADOW | RenderFrame.D_NO_OUTLINE;
@@ -263,27 +262,21 @@ public final class SakuraWorld {
                 // grass and wildflowers along both fences (the left is the same strip turned round)
                 piece(f, verge, 0, 0, d, 0, VERGE_LOD1);
                 piece(f, verge, 0, 0, d + SEG, 180, VERGE_LOD1);
+                // and a planted bed of azaleas, hydrangeas and grass along the line side of each lane
+                piece(f, greenbed, 0, 0, d, 0, VERGE_LOD1);
+                piece(f, greenbed, 0, 0, d + SEG, 180, VERGE_LOD1);
             }
-            // the span over the camera (and one starting just ahead of it) has vertices behind or right next to
-            // the camera: the ink hull's screen-space push goes wrong there (black wedges from the top of the
-            // screen) and a 2 cm wire a few centimetres away fills half the view. That span goes without ink and
-            // see-through, fading out completely while a jump carries the camera up through the wire heights.
-            boolean near = camS >= d - 3f && camS <= d + SEG + 1;
-            float wa = near ? Math.min(0.4f, (Math.min(Math.abs(camY - WIRE_LO), Math.abs(camY - WIRE_HI)) - 0.15f) / 0.6f) : 1;
-            if (wa > 0.02f && piece(f, wires, 0, 0, d, 0) != null && near) {
-                int i = f.count - 1;
-                f.flags[i] |= RenderFrame.D_NO_OUTLINE | RenderFrame.D_BLEND;
-                f.tint[i * 4 + 3] = wa;
-            }
+            // Overhead wires and gantries that the camera is about to pass under: a 2 cm wire half a metre over
+            // the lens is a black bar across the top of the screen, and a gantry a few metres ahead is a giant
+            // truss over everything. Both fade out on the way in (no ink, see-through) and are gone overhead.
+            float wa = fadeIn(lookBack ? camS - d - SEG : d - camS, 2f, 12f);
+            if (camS >= d - 3f && camS <= d + SEG + 1) wa = 0;
+            if (wa > 0.02f) fade(f, piece(f, wires, 0, 0, d, 0), wa);
             piece(f, lotR, 0, 0, d, 0);
             piece(f, lotL, 0, 0, d, 0);
             if (Math.floorMod(k, 2) == 0) {
-                // a super jump lifts the camera through the cross beams: the frame it passes goes see-through
-                if (piece(f, gantry, 0, 0, d + 6f, 0) != null && Math.abs(camS - d - 6f) < 1.5f && camY > 5.3f) {
-                    int i = f.count - 1;
-                    f.flags[i] |= RenderFrame.D_NO_OUTLINE | RenderFrame.D_BLEND;
-                    f.tint[i * 4 + 3] = 0.3f;
-                }
+                float ga = fadeIn(lookBack ? camS - d - 6f : d + 6f - camS, 3f, 11f);
+                if (ga > 0.02f) fade(f, piece(f, gantry, 0, 0, d + 6f, 0), ga);
                 // utility poles alternate sides every 24 m; on the left the pole is turned round so its cables
                 // reach back to the previous one
                 if (Math.floorMod(k, 4) == 0) piece(f, pole, 0, 0, d + 2f, 0);
@@ -456,52 +449,126 @@ public final class SakuraWorld {
 
     // ------------------------------------------------------------------ Inspector Daigo and Kuro
 
-    private void part(RenderFrame f, int mesh, float[] parent, float x, float y, float z, float pitch, float roll) {
-        if (mesh < 0) return;
+    /** Draws a part under parent * T(x, y, z) * rotY(yaw) * rotX(pitch) * rotZ(roll) and returns its matrix. */
+    private float[] part(RenderFrame f, int mesh, float[] parent, float x, float y, float z, float yaw, float pitch,
+                         float roll) {
+        if (mesh < 0) return null;
         float[] m = f.draw(mesh);
         Mat4.copy(m, parent);
         Mat4.translate(m, x, y, z);
+        if (yaw != 0) Mat4.rotY(m, yaw);
         if (pitch != 0) Mat4.rotX(m, pitch);
         if (roll != 0) Mat4.rotZ(m, roll);
+        return m;
+    }
+
+    // The chase run, the same numbers as blender/assets/sakura_line.py (daigo_pose, kuro_pose): angles in degrees, +
+    // swings a limb forward, knee and elbow flex measured from straight; the hips are lifted so the lower foot is down.
+    private static final float HIP_X = 0.15f, SH_X = 0.37f, SH_Z = 0.6f, NECK = 0.74f, UARM = 0.28f, THIGH = 0.46f;
+    private static final float K_ULEG = 0.17f, K_HIP_Z = -0.06f;
+    /** Knee flex through the stride (phase in degrees, flex): heel kick, knee drive, reach, stance, push off. */
+    private static final float[] KNEE = {0, 116, 45, 102, 90, 80, 125, 36, 155, 15, 205, 15, 250, 20, 270, 26, 300, 62,
+            330, 102, 360, 116};
+    private static final float[] SOLE = {0.22f, -0.47f, -0.08f, -0.49f, 0.07f, -0.49f}, PAW = {0.06f, -0.175f, -0.02f, -0.18f};
+    /** Kuro's legs: x, y (forward) on the body, gallop phase offset. */
+    private static final float[] K_LEGS = {-0.1f, 0.25f, 0f, 0.1f, 0.25f, 0.35f, -0.1f, -0.25f, 2.5f, 0.1f, -0.25f, 2.85f};
+    private final float[] legA = new float[4], armA = new float[4], kLeg = new float[8];
+
+    static float keyed(float deg, float[] k) {
+        float d = deg % 360f;
+        if (d < 0) d += 360f;
+        for (int i = 2; i < k.length; i += 2)
+            if (d <= k[i]) {
+                float t = (d - k[i - 2]) / (k[i] - k[i - 2]);
+                return k[i - 1] + (k[i + 1] - k[i - 1]) * (0.5f - 0.5f * (float) Math.cos(Math.PI * t));
+            }
+        return k[k.length - 1];
+    }
+
+    /** Height of the upper pivot above the lowest of pts (y forward, z down the lower segment) of a two-segment limb. */
+    static float drop(float upper, float theta, float flex, float[] pts) {
+        double t = Math.toRadians(theta), ph = Math.toRadians(theta - flex), lo = 9;
+        for (int i = 0; i < pts.length; i += 2) lo = Math.min(lo, pts[i] * Math.sin(ph) + pts[i + 1] * Math.cos(ph));
+        return (float) (upper * Math.cos(t) - lo);
     }
 
     private final float[] root = new float[16], torso = new float[16], droot = new float[16];
 
-    /** Rigid-part run cycle (game forward = -Z; the parts face Blender +Y = game -Z). */
+    /** Inspector Daigo sprinting at Pongo with Kuro galloping alongside, rigid parts on a jointed run cycle (the parts
+     *  face Blender +Y = game -Z, which is forward). */
     private void chasers(Game g, RenderFrame f, float gz, float gx, boolean grabbing) {
-        float t = g.animPhase, ph = t * 11;
-        float sw = grabbing ? 0 : (float) Math.sin(ph);
+        float p = g.animPhase * 11, hip = 0;
+        for (int side = 0; side < 2; side++) {
+            float q = p + side * (float) Math.PI;
+            if (grabbing) {
+                legA[side * 2] = 22; legA[side * 2 + 1] = 34;
+                armA[side * 2] = 84; armA[side * 2 + 1] = 12;
+            } else {
+                legA[side * 2] = 18 + 48 * (float) Math.sin(q);
+                legA[side * 2 + 1] = keyed((float) Math.toDegrees(q), KNEE);
+                float s = -(float) Math.sin(q);
+                armA[side * 2] = 10 + 56 * s;
+                armA[side * 2 + 1] = 92 + 22 * s;
+            }
+            hip = Math.max(hip, drop(THIGH, legA[side * 2], legA[side * 2 + 1], SOLE));
+        }
+        float c2 = (float) Math.cos(2 * p);
+        float lean = grabbing ? 8 : 27 + 3 * c2, twist = grabbing ? 0 : -10 * (float) Math.sin(p);
+        float head = grabbing ? 10 : 20 + 3 * c2;
         f.quad(false, gx, 0.04f, gz, 0.6f, 0.6f, 0, uvGlow, 0.3f, 0.25f, 0.45f, 0.35f);
-        // joints as in blender/assets/sakura_line.py (DAIGO_HIP, DAIGO_HIP_X, DAIGO_SHOULDER, DAIGO_NECK)
         Mat4.setIdentity(root);
-        Mat4.translate(root, gx, Math.abs((float) Math.cos(ph)) * 0.1f, gz);
-        part(f, dLeg, root, -0.15f, 0.95f, 0, -sw * 40, 0);
-        part(f, dLeg, root, 0.15f, 0.95f, 0, sw * 40, 0);
+        Mat4.translate(root, gx, hip, gz);
+        for (int side = 0; side < 2; side++) {
+            float sx = side == 0 ? -1 : 1;
+            float[] th = part(f, dThigh, root, sx * HIP_X, 0, 0, 0, legA[side * 2], 0);
+            if (th != null) part(f, dShin, th, 0, -THIGH, 0, 0, -legA[side * 2 + 1], 0);
+        }
         Mat4.copy(torso, root);
-        Mat4.translate(torso, 0, 0.95f, 0);
-        Mat4.rotX(torso, -8);
-        part(f, dTorso, torso, 0, 0, 0, 0, 0);
-        part(f, dHead, torso, 0, 0.74f, -0.02f, 0, 0);
-        float armA = grabbing ? -95 : sw * 45;
-        float armB = grabbing ? -95 : -sw * 45;
-        if (!grabbing && g.chaseT > 0) armB = -150 + sw * 15;    // waving a fist
-        part(f, dArm, torso, -0.37f, 0.6f, 0, armA, 0);
-        part(f, dArm, torso, 0.37f, 0.6f, 0, armB, 0);
-        // Kuro trots alongside
-        float dx = gx + 1.0f, dz = gz - 0.6f, df = t * 16;
+        Mat4.rotY(torso, twist);
+        Mat4.rotX(torso, -lean);
+        part(f, dTorso, torso, 0, 0, 0, 0, 0, 0);
+        part(f, dHead, torso, 0, NECK, -0.02f, 0, head, 0);
+        for (int side = 0; side < 2; side++) {
+            float sx = side == 0 ? -1 : 1;
+            float[] ua = part(f, dUarm, torso, sx * SH_X, SH_Z, 0, 0, armA[side * 2], sx * 8);
+            if (ua != null) part(f, dFarm, ua, 0, -UARM, 0, 0, armA[side * 2 + 1], 0);
+        }
+        // Kuro gallops alongside, a little ahead
+        float dx = gx + 1.0f, dz = gz - 0.6f, kq = g.animPhase * 16;
+        float pitch = 7 * (float) Math.sin(kq + 0.6f), pr = (float) Math.toRadians(pitch), ky = 0;
+        for (int l = 0; l < 4; l++) {
+            float off = K_LEGS[l * 3 + 2], u = 38 * (float) Math.sin(kq + off);
+            float k = 8 + 72 * (float) Math.pow(Math.max(0, Math.cos(kq + off + 0.4f)), 2);
+            kLeg[l * 2] = u; kLeg[l * 2 + 1] = k;
+            float pz = K_LEGS[l * 3 + 1] * (float) Math.sin(pr) + K_HIP_Z * (float) Math.cos(pr);
+            ky = Math.max(ky, drop(K_ULEG, u, k, PAW) - pz);
+        }
         f.quad(false, dx, 0.04f, dz, 0.35f, 0.45f, 0, uvGlow, 0.3f, 0.25f, 0.45f, 0.3f);
         Mat4.setIdentity(droot);
-        Mat4.translate(droot, dx, 0.5f + Math.abs((float) Math.sin(df)) * 0.12f, dz);
-        part(f, kBody, droot, 0, 0, 0, 0, 0);
-        part(f, kHead, droot, 0, 0.16f, -0.34f, (float) Math.sin(df) * 6, 0);
-        float ls = (float) Math.sin(df) * 35;
-        part(f, kLeg, droot, -0.1f, -0.04f, -0.25f, ls, 0);
-        part(f, kLeg, droot, 0.1f, -0.04f, -0.25f, -ls, 0);
-        part(f, kLeg, droot, -0.1f, -0.04f, 0.25f, -ls, 0);
-        part(f, kLeg, droot, 0.1f, -0.04f, 0.25f, ls, 0);
+        Mat4.translate(droot, dx, ky, dz);
+        Mat4.rotX(droot, pitch);
+        part(f, kBody, droot, 0, 0, 0, 0, 0, 0);
+        part(f, kHead, droot, 0, 0.14f, -0.36f, 0, -pitch * 0.6f, 0);
+        for (int l = 0; l < 4; l++) {
+            float[] up = part(f, kUleg, droot, K_LEGS[l * 3], K_HIP_Z, -K_LEGS[l * 3 + 1], 0, kLeg[l * 2], 0);
+            if (up != null) part(f, kLleg, up, 0, -K_ULEG, 0, 0, -kLeg[l * 2 + 1], 0);
+        }
     }
 
     // ------------------------------------------------------------------ helpers
+
+    /** 0 at or before `from` metres ahead of the camera, rising to 1 at `to`. */
+    private static float fadeIn(float ahead, float from, float to) {
+        return Math.max(0f, Math.min(1f, (ahead - from) / (to - from)));
+    }
+
+    /** Makes the draw just added (m non-null) see-through at alpha a < 1, without ink. */
+    private static void fade(RenderFrame f, float[] m, float a) {
+        if (m == null || a >= 1f) return;
+        int i = f.count - 1;
+        f.flags[i] |= RenderFrame.D_NO_OUTLINE | RenderFrame.D_BLEND;
+        f.tint[i * 4 + 3] = a;
+    }
 
     private static void set(float[] v, float r, float g, float b) { v[0] = r; v[1] = g; v[2] = b; }
 
