@@ -111,10 +111,15 @@ def run(group="all"):
             if o.type == 'MESH' and "cloud" not in o.name and "streak" not in o.name:
                 E.add_outline(o, 0.01)
         lo, hi = _bounds(objs)
+        if floor_col is None and lo.z < -0.01:      # e.g. the paddle hangs below its grip: stand it on the floor
+            for o in objs:
+                if o.parent is None:
+                    o.location.z -= lo.z
+            lo, hi = _bounds(objs)
         c = (lo + hi) * 0.5
         size = max((hi - lo).length, 0.5)
         for vn, yaw, pitch in VIEWS:
             studio.shoot("../audit/%s_%s" % (name, vn), target=tuple(c), dist=size * 1.25, yaw=yaw + face, pitch=pitch, lens=40)
         # close-up on the busiest part: the upper front third
         cz = V((c.x, c.y, lo.z + (hi.z - lo.z) * 0.62))
-        studio.shoot("../audit/%s_close" % name, target=tuple(cz), dist=size * 0.5, yaw=200 + face, pitch=18, lens=50)
+        studio.shoot("../audit/%s_close" % name, target=tuple(cz), dist=max(size * 0.5, (hi - lo).length * 0.5 + 0.3), yaw=200 + face, pitch=18, lens=50)

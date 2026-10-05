@@ -112,6 +112,18 @@ def ore_cart(name="ore_cart", seed=4):
             m.poly([(wa, sy * la, za), (-wa, sy * la, za), (-wb, sy * lb, zb), (wb, sy * lb, zb)][::(1 if sy > 0 else -1)])
             m.poly([(-wa + 0.03, sy * (la - 0.04), za), (wa - 0.03, sy * (la - 0.04), za), (wb - 0.03, sy * (lb - 0.04), zb),
                     (-wb + 0.03, sy * (lb - 0.04), zb)][::(1 if sy > 0 else -1)])
+    # backing boards behind the planks, so the seams between planks read as dark grooves, not see-through slits
+    m.mat("v_wood_dark")
+    for sx in (-1, 1):
+        m.poly([(sx * (bw0 - 0.02), -bl0, z0), (sx * (bw0 - 0.02), bl0, z0), (sx * (bw1 - 0.02), bl1, z1 - 0.01),
+                (sx * (bw1 - 0.02), -bl1, z1 - 0.01)][::(1 if sx > 0 else -1)])
+        m.poly([(sx * (bw0 - 0.02), bl0, z0), (sx * (bw0 - 0.02), -bl0, z0), (sx * (bw1 - 0.02), -bl1, z1 - 0.01),
+                (sx * (bw1 - 0.02), bl1, z1 - 0.01)][::(1 if sx > 0 else -1)])
+    for sy in (-1, 1):
+        m.poly([(bw0, sy * (bl0 - 0.02), z0), (-bw0, sy * (bl0 - 0.02), z0), (-bw1, sy * (bl1 - 0.02), z1 - 0.01),
+                (bw1, sy * (bl1 - 0.02), z1 - 0.01)][::(1 if sy > 0 else -1)])
+        m.poly([(-bw0, sy * (bl0 - 0.02), z0), (bw0, sy * (bl0 - 0.02), z0), (bw1, sy * (bl1 - 0.02), z1 - 0.01),
+                (-bw1, sy * (bl1 - 0.02), z1 - 0.01)][::(1 if sy > 0 else -1)])
     # iron corner angles + rivets
     for sx in (-1, 1):
         for sy in (-1, 1):
@@ -145,10 +157,13 @@ def ore_cart(name="ore_cart", seed=4):
     for a in (45, 135, 225, 315):
         m.box((math.cos(math.radians(a)) * 0.07, bl1 + 0.08 + math.sin(math.radians(a)) * 0.07, z1), (0.012, 0.012, 0.22),
               smooth=False)
+    # number plate on the back wall, where the chase camera sees it (text faces -Y and reads left to right from behind)
+    zp = z0 + 0.3
+    lp = bl0 + (bl1 - bl0) * (zp - z0) / (z1 - z0)
     m.mat("v_red")
-    m.box((0.28, bl0 + 0.05, z0 + 0.25), (0.22, 0.012, 0.14), smooth=False)
+    m.box((0.24, -(lp + 0.012), zp), (0.22, 0.014, 0.14), smooth=False)
     m.mat("v_canopy_white")
-    m.push(Matrix.Translation((0.28, bl0 + 0.06, z0 + 0.25)) @ Matrix.Rotation(math.radians(90), 4, 'X'))
+    m.push(Matrix.Translation((0.24, -(lp + 0.02), zp)) @ Matrix.Rotation(math.radians(90), 4, 'X'))
     m.text("06", size=0.1, depth=0.006, c=(0, 0, 0))
     m.pop()
     # brake lever on her right side
@@ -238,6 +253,18 @@ def boat(name="bamboo_boat", L=1.75):
         m.cyl((x, 0, 0.05), r=0.025, h=2.4, seg=8, axis='Y')
     m.mat("v_mat")
     m.rbox((0, -0.12, 0.085), (0.5, 0.6, 0.03), 0.01, 1)
+    m.mat("v_bamboo_dry")                                 # tatami-style weave: raised strands and a bound edge
+    for k in range(9):
+        m.box((0, -0.12 - 0.27 + 0.0675 * k, 0.102), (0.46, 0.012, 0.006), smooth=False)
+    m.mat("v_rope")
+    m.sweep([V((0.25, -0.42, 0.1)), V((0.25, 0.18, 0.1)), V((-0.25, 0.18, 0.1)), V((-0.25, -0.42, 0.1)), V((0.25, -0.42, 0.1)),
+             V((0.25, 0.18, 0.1))], [(math.cos(2 * math.pi * k / 6) * 0.012, math.sin(2 * math.pi * k / 6) * 0.012)
+                                     for k in range(6)], closed=True, cap=False)
+    m.mat("v_paper_red")                                  # furoshiki bundle stowed behind her at the stern
+    m.rbox((0.0, -0.66, 0.16), (0.24, 0.18, 0.14), 0.05, 2)
+    m.mat("v_rope")
+    m.torus((0.0, -0.66, 0.16), R=0.13, r=0.008, seg=14, sides=4, axis='Y')
+    m.sphere((0.0, -0.66, 0.25), 0.03, 8, 6)
     m.mat("v_bamboo_dry")
     w, d, rise = _hull(0.85, L)
     m.cyl((0, 0.85, 0.19), r=0.03, h=2 * w + 0.06, seg=8, axis='X')
@@ -367,7 +394,23 @@ def glider(name="glider"):
         m.torus(tuple(CARABINERS[0 if sd > 0 else 1]), R=0.03, r=0.007, seg=14, sides=6, axis='Y')
     m.mat("v_strap")
     k = PONGO_SCALE
-    m.rbox((0.0, -0.05 * k, 0.0), (0.36 * k, 0.32 * k, 0.05), 0.02, 2)
+    # padded seat harness: seat board in a thick padded sling, a back protector, leg loops, chest strap, buckles
+    m.rbox((0.0, -0.05 * k, 0.0), (0.4 * k, 0.34 * k, 0.09), 0.035, 2)
+    m.mat("v_canopy_orange")
+    m.rbox((0.0, -0.05 * k, 0.05), (0.34 * k, 0.28 * k, 0.03), 0.012, 2)          # seat pad
+    m.mat("v_strap")
+    m.push(Matrix.Translation((0.0, -0.21 * k, 0.17 * k)) @ Matrix.Rotation(math.radians(-14), 4, 'X'))
+    m.rbox((0, 0, 0), (0.36 * k, 0.07 * k, 0.36 * k), 0.04, 2)                    # back protector
+    m.mat("v_canopy_orange")
+    m.rbox((0, 0.04 * k, 0.02), (0.28 * k, 0.02, 0.26 * k), 0.01, 1)
+    m.pop()
+    m.mat("v_strap")
+    for sd in (1, -1):
+        m.torus((sd * 0.11 * k, 0.1 * k, 0.03), R=0.085 * k, r=0.016, seg=14, sides=6, axis='Y')   # leg loops
+    cb = [V(CARABINERS[0]) + V((0, 0, -0.06)), V(CARABINERS[1]) + V((0, 0, -0.06))]
+    m.sweep(cb, [(-0.018, -0.005), (0.018, -0.005), (0.018, 0.005), (-0.018, 0.005)], closed=True, cap=True)   # chest strap
+    m.mat("v_gold")
+    m.rbox(tuple((cb[0] + cb[1]) / 2), (0.05, 0.016, 0.04), 0.006, 1)               # chest buckle
     for sd in (1, -1):
         m.sweep([V((sd * 0.17 * k, -0.18 * k, 0.0)), V((sd * 0.2 * k, -0.12 * k, 0.22 * k)), CARABINERS[0 if sd > 0 else 1]],
                 [(-0.018, -0.004), (0.018, -0.004), (0.018, 0.004), (-0.018, 0.004)], closed=True, cap=True)

@@ -4,6 +4,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 for f in renders/audit/*_front.png; do
   a=$(basename "$f" _front.png)
+  [ -f "renders/audit/${a}_close.png" ] || continue
   in=()
   for v in front side back high close; do in+=(-i "renders/audit/${a}_${v}.png"); done
   ffmpeg -loglevel error -y "${in[@]}" -filter_complex \

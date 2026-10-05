@@ -84,36 +84,57 @@ def mats():
 
 # ----------------------------------------------------------------------------- props
 
+def _leaf_blade(m, p, d, L, w):
+    """Lanceolate bamboo/grass leaf: 5-point blade from p along d (drooping), width w."""
+    d = d.normalized()
+    side = d.cross(V((0, 0, 1)))
+    if side.length < 1e-4:
+        side = V((1, 0, 0))
+    side = side.normalized() * w
+    sag = V((0, 0, -0.18 * L))
+    m.poly([tuple(p), tuple(p + d * L * 0.3 + side + sag * 0.2), tuple(p + d * L * 0.65 + side * 0.7 + sag * 0.6),
+            tuple(p + d * L + sag), tuple(p + d * L * 0.65 - side * 0.7 + sag * 0.6), tuple(p + d * L * 0.3 - side + sag * 0.2)])
+
+
 def bamboo_clump(m, c, rnd, n=7, h=6.5):
-    """A clump of culms leaning out, node rings, leaf sprays near the tops."""
+    """A clump of culms leaning out, node rings, and leaf sprays: soft lumpy foliage clusters at the crown with
+    drooping lance-shaped blades round them, so a grove reads full and feathery (no flat leaf plates)."""
     x0, y0, z0 = c
+    k_h = h / 6.5
     for i in range(n):
         a = rnd.uniform(0, 2 * math.pi)
         r0 = rnd.uniform(0.05, 0.35)
         base = V((x0 + math.cos(a) * r0, y0 + math.sin(a) * r0, z0))
         lean = V((math.cos(a) * rnd.uniform(0.15, 0.4), math.sin(a) * rnd.uniform(0.15, 0.4), 1)).normalized()
         hh = h * rnd.uniform(0.7, 1.1)
-        top = base + lean * hh + V((0, 0, 0)) + V((math.cos(a), math.sin(a), 0)) * hh * 0.08
+        top = base + lean * hh + V((math.cos(a), math.sin(a), 0)) * hh * 0.08
         pts = [base.lerp(top, k / 6) + V((math.cos(a), math.sin(a), 0)) * 0.12 * hh * (k / 6) ** 2 for k in range(7)]
         m.mat("rv_bamboo")
         m.tube([tuple(p) for p in pts], r=0.055, seg=8, taper=0.65)
         m.mat("rv_bamboo_node")
         for k in range(1, 6):
-            p = pts[k]
-            m.torus(tuple(p), R=0.05 * (1 - 0.06 * k), r=0.012, seg=10, sides=4)
-        m.mat("rv_tree" if i % 2 else "rv_tree2")      # soft leaf masses so a grove reads full, not wiry
-        for k in range(3):
-            p = pts[6].lerp(pts[4], k / 3) + V((math.cos(a), math.sin(a), 0)) * 0.3
-            m.ico(tuple(p), rnd.uniform(0.45, 0.7) * h / 6.5, 1, s=(1.2, 1.2, 0.55))
-        m.mat("rv_leaf")
-        for k in range(5):
-            p = pts[6].lerp(pts[3], k / 5) + V((rnd.uniform(-0.2, 0.2), rnd.uniform(-0.2, 0.2), 0))
+            m.torus(tuple(pts[k]), R=0.05 * (1 - 0.06 * k), r=0.012, seg=10, sides=4)
+        out = V((math.cos(a), math.sin(a), 0))
+        for k in range(4):                                  # foliage clusters along the upper culm
+            p = pts[6].lerp(pts[3], k / 4) + out * rnd.uniform(0.2, 0.45)
+            for j in range(3):
+                m.mat(("rv_tree", "rv_tree2", "rv_tree_hi")[(i + j + k) % 3])
+                q = p + V((rnd.uniform(-0.25, 0.25), rnd.uniform(-0.25, 0.25), rnd.uniform(-0.1, 0.15))) * k_h
+                m.ico(tuple(q), rnd.uniform(0.22, 0.34) * k_h, 2, s=(1.25, 1.1, 0.7))
+            m.mat("rv_leaf")
+            for j in range(6):                              # drooping blades sticking out of the cluster
+                aa = rnd.uniform(0, 2 * math.pi)
+                d = V((math.cos(aa), math.sin(aa), rnd.uniform(-0.6, -0.1)))
+                _leaf_blade(m, p + d.normalized() * 0.2 * k_h, d, rnd.uniform(0.35, 0.5) * k_h, 0.045 * k_h)
+        for k in range(3):                                  # side twigs with blades lower down
+            p = pts[2 + k]
+            tw = p + out.cross(V((0, 0, 1))) * rnd.choice((-1, 1)) * 0.35 * k_h + V((0, 0, 0.1))
+            m.mat("rv_bamboo_node")
+            m.tube([tuple(p), tuple(tw)], r=0.01, seg=4)
+            m.mat("rv_leaf")
             for j in range(4):
                 aa = rnd.uniform(0, 2 * math.pi)
-                d = V((math.cos(aa), math.sin(aa), -0.35)).normalized()
-                tip = p + d * 0.55
-                side = d.cross(V((0, 0, 1))).normalized() * 0.07
-                m.poly([tuple(p), tuple(p + d * 0.27 + side), tuple(tip), tuple(p + d * 0.27 - side)])
+                _leaf_blade(m, tw, V((math.cos(aa), math.sin(aa), -0.4)), 0.32 * k_h, 0.04 * k_h)
 
 
 def reeds(m, c, rnd, n=12):
@@ -152,31 +173,93 @@ def lily_pads(m, c, rnd, n=5):
 
 
 def stone_lantern(m, c):
-    """Kasuga-style toro on the bank: base, post, firebox with glowing windows, roof, jewel."""
+    """Kasuga-style toro: hexagonal footing with lotus petals, banded post, platform, firebox with glowing windows
+    (round moon and lattice), a broad hexagonal roof with curled-up corners, and the jewel on a lotus cup.
+    Moss on the roof and footing so it reads as old stone."""
     x, y, z = c
+    m.push(Matrix.Translation((x, y, z)))
     m.mat("rv_lantern")
-    m.cyl((x, y, z + 0.08), r=0.28, h=0.16, seg=6)
-    m.cyl((x, y, z + 0.55), r=0.09, h=0.8, seg=8)
-    m.cyl((x, y, z + 0.98), r=0.22, h=0.08, seg=6)
-    m.box((x, y, z + 1.17), (0.32, 0.32, 0.3), smooth=False)
+    m.cyl((0, 0, 0.06), r=0.32, h=0.12, seg=6)                          # kiso footing
+    m.cyl((0, 0, 0.16), r=0.27, h=0.08, seg=6, r2=0.2)
+    for k in range(6):                                                  # lotus petals
+        a = math.radians(30 + 60 * k)
+        m.ico((math.cos(a) * 0.17, math.sin(a) * 0.17, 0.2), 0.07, 1, s=(1.0, 0.7, 0.45))
+    m.cyl((0, 0, 0.58), r=0.08, h=0.78, seg=12, r2=0.07)                 # sao post
+    for zz in (0.32, 0.6, 0.86):
+        m.cyl((0, 0, zz), r=0.095, h=0.035, seg=12)
+    m.cyl((0, 0, 0.98), r=0.13, h=0.06, seg=6, r2=0.25)                  # chudai platform
+    m.cyl((0, 0, 1.04), r=0.25, h=0.06, seg=6)
+    m.mat("rv_stone_dark")
+    m.cyl((0, 0, 1.24), r=0.19, h=0.34, seg=6)                          # hibukuro firebox
+    m.mat("rv_lantern")
+    for k in range(6):                                                  # corner posts
+        a = math.radians(60 * k)
+        m.box((math.cos(a) * 0.185, math.sin(a) * 0.185, 1.24), (0.05, 0.05, 0.34), smooth=False)
     m.mat("rv_lantern_glow")
-    for sx, sy in ((0, 1), (0, -1), (1, 0), (-1, 0)):
-        m.box((x + sx * 0.161, y + sy * 0.161, z + 1.17), (0.12 if sy else 0.01, 0.01 if sy else 0.12, 0.15), smooth=False)
+    for k in range(6):
+        a = math.radians(30 + 60 * k)
+        m.push(Matrix.Translation((math.cos(a) * 0.168, math.sin(a) * 0.168, 1.24)) @ Matrix.Rotation(a + math.pi / 2, 4, 'Z'))
+        if k % 3 == 0:
+            m.cyl((0, 0, 0), r=0.055, h=0.012, seg=14, axis='Y')        # moon window
+        else:
+            m.box((0, 0, 0), (0.11, 0.012, 0.16), smooth=False)
+        m.pop()
     m.mat("rv_lantern")
-    m.cyl((x, y, z + 1.4), r=0.36, h=0.08, seg=6, r2=0.12)
-    m.cyl((x, y, z + 1.5), r=0.12, h=0.12, seg=6, r2=0.03)
-    m.sphere((x, y, z + 1.6), 0.06, 10, 6)
+    m.cyl((0, 0, 1.43), r=0.24, h=0.05, seg=6)
+    m.cyl((0, 0, 1.53), r=0.46, h=0.16, seg=6, r2=0.14)                 # kasa roof
+    for k in range(6):                                                  # warabite curls on the roof corners
+        a = math.radians(60 * k)
+        m.sphere((math.cos(a) * 0.45, math.sin(a) * 0.45, 1.5), 0.045, 8, 6)
+    m.cyl((0, 0, 1.65), r=0.09, h=0.06, seg=12)
+    m.sphere((0, 0, 1.71), 1.0, 12, 8, s=(0.11, 0.11, 0.06))           # ukebana cup
+    m.sphere((0, 0, 1.79), 1.0, 12, 8, s=(0.075, 0.075, 0.1))          # hoju jewel
+    m.cyl((0, 0, 1.88), r=0.0, h=0.06, seg=8, r2=0.02)
+    m.mat("rv_moss")
+    m.ico((0.12, 0.08, 1.58), 0.16, 2, s=(1.3, 1.0, 0.3))
+    m.ico((-0.1, -0.16, 1.56), 0.12, 2, s=(1.2, 1.0, 0.3))
+    m.ico((0.2, -0.1, 0.13), 0.14, 2, s=(1.2, 1.0, 0.35))
+    m.pop()
 
 
 def torii(m, c, w=1.6, h=1.9, s=1.0):
+    """Myojin torii: slightly leaning pillars on stone footings with black sleeves, a through tie-beam with wedges,
+    a centre strut carrying a plaque, and the double top lintel (red shimaki under a black kasagi) curving up at
+    both ends."""
     x, y, z = c
-    m.mat("rv_torii")
+    r = 0.075 * s
+    m.push(Matrix.Translation((x, y, z)))
     for sx in (-1, 1):
-        m.cyl((x + sx * w / 2, y, z + h / 2), r=0.07 * s, h=h, seg=12)
-    m.box((x, y, z + h * 0.78), (w + 0.3, 0.1, 0.1), smooth=False)
+        bx = sx * w / 2
+        m.mat("rv_stone")
+        m.cyl((bx, 0, 0.05 * s), r=r * 1.9, h=0.1 * s, seg=12, r2=r * 1.6)
+        m.mat("rv_torii")
+        m.cyl((bx - sx * 0.02 * s, 0, h / 2), r=r * 1.05, h=h, seg=14, r2=r * 0.92)
+        m.mat("rv_black")
+        m.cyl((bx, 0, 0.2 * s), r=r * 1.18, h=0.2 * s, seg=14)
+        m.cyl((bx - sx * 0.018 * s, 0, h * 0.74), r=r * 1.12, h=0.035 * s, seg=14)
+    zt = h * 0.74                                                           # nuki tie-beam, through the pillars
+    m.mat("rv_torii")
+    m.box((0, 0, zt), (w + 0.36 * s, 0.09 * s, 0.11 * s), smooth=False)
     m.mat("rv_black")
-    m.sweep([V((x - w / 2 - 0.35, y, z + h + 0.05)), V((x, y, z + h - 0.02)), V((x + w / 2 + 0.35, y, z + h + 0.05))],
-            [(-0.07, -0.07), (0.07, -0.07), (0.07, 0.07), (-0.07, 0.07)], closed=True, cap=True)
+    for sx in (-1, 1):
+        m.box((sx * (w / 2 + 0.1 * s), 0.06 * s, zt), (0.04 * s, 0.03 * s, 0.13 * s), smooth=False)   # kusabi wedges
+    m.mat("rv_torii")
+    m.box((0, 0, (zt + h) / 2), (0.08 * s, 0.08 * s, h - zt), smooth=False)   # gakuzuka strut
+    m.mat("rv_black")
+    m.box((0, -0.05 * s, (zt + h) / 2 + 0.02), (0.22 * s, 0.025 * s, 0.26 * s), smooth=False)   # plaque
+    m.mat("rv_lantern_glow")
+    m.box((0, -0.064 * s, (zt + h) / 2 + 0.02), (0.15 * s, 0.006, 0.19 * s), smooth=False)
+    ext = w / 2 + 0.38 * s
+
+    def lintel(z0, th, dep, up):
+        n = 12
+        path = [V((-ext + 2 * ext * k / n, 0, z0 + up * (abs(-1 + 2 * k / n) ** 2.4))) for k in range(n + 1)]
+        m.sweep(path, [(-dep / 2, -th / 2), (dep / 2, -th / 2), (dep / 2, th / 2), (-dep / 2, th / 2)], closed=True, cap=True)
+    m.mat("rv_torii")
+    lintel(h + 0.06 * s, 0.1 * s, 0.13 * s, 0.1 * s)                    # shimaki
+    m.mat("rv_black")
+    lintel(h + 0.15 * s, 0.09 * s, 0.17 * s, 0.16 * s)                   # kasagi
+    m.pop()
 
 
 def leaf_drift(m, c, rnd, n=14, r=0.9):
@@ -314,53 +397,103 @@ def river_seg(name="river_seg", L=20.0, seed=3, details=True):
 
 
 def fork_island(name="fork_island", L=50.0, half=1.4, seed=5):
-    """Island for a Y fork: pointed rocky nose upstream (y=0), grassy body with bamboo, a small torii."""
+    """Island for a Y fork: pointed rocky nose upstream (y=0), grassy body fully carpeted, mossy shore rocks
+    sitting in the water, bamboo groves, a small torii and a lantern."""
+    import scenery as SC
     mats()
     rnd = random.Random(seed)
     m = E.Mesher(name)
+
     def w(y):
         u = y / L
         return half * min(1.0, (u / 0.12) ** 0.6) * min(1.0, ((1 - u) / 0.12) ** 0.6)
     rings = []
-    for k in range(21):
-        y = L * k / 20
+    for k in range(41):
+        y = L * k / 40
         ww = max(0.02, w(y))
-        rings.append([(-ww - 0.15, y, -0.2), (-ww, y, 0.25), (-ww * 0.4, y, 0.45), (ww * 0.4, y, 0.45), (ww, y, 0.25),
-                      (ww + 0.15, y, -0.2)])
+        rings.append([(-ww - 0.25, y, -0.35), (-ww, y, 0.2), (-ww * 0.6, y, 0.38), (0, y, 0.45), (ww * 0.6, y, 0.38),
+                      (ww, y, 0.2), (ww + 0.25, y, -0.35)])
     m.mat("rv_grass")
     m.quad_strip(rings, closed=False, smooth=True)
-    m.mat("rv_stone")
-    for k in range(6):
-        m.ico((rnd.uniform(-0.3, 0.3), rnd.uniform(0.0, 2.0), 0.15), rnd.uniform(0.25, 0.45), 1, s=(1, 1.3, 0.7))
-    for k in range(int(L / 4)):
+
+    def zf(px, py):
+        ww = max(0.05, w(py))
+        return 0.45 - 0.25 * min(1.0, (px / ww) ** 2)
+    SC.grass_carpet(m, PAL, -half * 0.85, half * 0.85, 1.5, L - 1.5, lambda px, py: zf(px, py) if abs(px) < w(py) * 0.9 else -9,
+                    rnd, density=2.4, h=0.4, flowers=0.08)
+    m.mat("rv_stone")                                                    # rocky nose that splits the current
+    for k in range(7):
+        m.ico((rnd.uniform(-0.35, 0.35), rnd.uniform(-0.2, 2.0), rnd.uniform(-0.05, 0.12)), rnd.uniform(0.25, 0.45), 2,
+              s=(1, 1.3, 0.7))
+    for k in range(int(L / 2.2)):                                        # shore rocks half in the water, mossy tops
         y = rnd.uniform(2, L - 2)
         sd = rnd.choice((-1, 1))
-        m.rbox((sd * (w(y) + 0.05), y, 0.05), (0.3, 0.5, 0.25), 0.05, 1)
-    for k in range(3):
-        bamboo_clump(m, (rnd.uniform(-0.3, 0.3), L * (0.3 + 0.2 * k), 0.4), rnd, n=5, h=5)
-    torii(m, (0, 4.0, 0.42), w=0.9, h=1.2)
+        r = rnd.uniform(0.18, 0.34)
+        p = (sd * (w(y) + 0.08), y, 0.0)
+        m.mat("rv_stone" if k % 3 else "rv_stone_dark")
+        m.ico(p, r, 2, s=(1.1, 1.4, 0.7))
+        m.mat("rv_moss")
+        m.ico((p[0], p[1], r * 0.45), r * 0.75, 2, s=(1.1, 1.3, 0.3))
+    for k in range(4):
+        bamboo_clump(m, (rnd.uniform(-0.3, 0.3), L * (0.22 + 0.18 * k), 0.4), rnd, n=5, h=5)
+    for k in range(6):
+        y = rnd.uniform(4, L - 4)
+        SC.shrub(m, PAL, (rnd.uniform(-0.5, 0.5) * w(y), y, 0.38), rnd, r=rnd.uniform(0.35, 0.55),
+                 flowers=rnd.choice((None, "rv_hydrangea", "rv_hydrangea2")))
+    torii(m, (0, 4.0, 0.42), w=0.9, h=1.2, s=0.65)
     stone_lantern(m, (0.3, 7.0, 0.42))
-    reeds(m, (half * 0.8, L * 0.6, 0.0), rnd)
-    reeds(m, (-half * 0.8, L * 0.45, 0.0), rnd)
+    reeds(m, (half * 0.9, L * 0.6, 0.0), rnd)
+    reeds(m, (-half * 0.9, L * 0.45, 0.0), rnd)
     return m.obj(name, smooth_angle=40)
 
 
 # ----------------------------------------------------------------------------- hazards
 
 def stone(name="rv_stone", seed=1, r=0.7):
+    """River boulder: a cluster of rounded rocks with a dark wet band at the waterline, a moss cap with grass and a
+    fern, pebbles at its foot, a foam pillow on the upstream side and a wake trailing downstream (-Y)."""
     mats()
     rnd = random.Random(seed)
     m = E.Mesher(name)
     m.mat("rv_stone")
-    m.ico((0, 0, 0.15), r, 3, s=(1.0, 1.1, 0.75))
+    m.push(Matrix.Rotation(math.radians(9), 4, 'Y') @ Matrix.Rotation(math.radians(-6), 4, 'X'))
+    m.ico((-r * 0.12, 0.05, 0.1), r * 0.9, 2, s=(1.0, 1.15, 0.85))
+    m.pop()
     m.mat("rv_stone_dark")
-    m.ico((r * 0.6, -r * 0.3, 0.0), r * 0.5, 1, s=(1, 1, 0.6))
+    m.ico((r * 0.6, -r * 0.3, 0.12), r * 0.62, 2, s=(1.0, 1.1, 0.8))
+    m.mat("rv_stone")
+    m.ico((-r * 0.65, r * 0.3, 0.02), r * 0.48, 2, s=(1.1, 1.0, 0.7))
+    m.ico((r * 0.2, r * 0.55, 0.0), r * 0.35, 2, s=(1.0, 1.0, 0.6))
+    m.mat("rv_stone_dark")                                               # wet band where the water laps
+    m.ico((0, 0, -0.02), r * 1.03, 3, s=(1.0, 1.1, 0.16))
+    m.ico((r * 0.55, -r * 0.35, -0.03), r * 0.57, 2, s=(1.0, 1.1, 0.14))
+    m.ico((-r * 0.6, r * 0.2, -0.03), r * 0.47, 2, s=(1.1, 1.0, 0.14))
+    m.mat("rv_stone")                                                    # chips and cracks
+    for k in range(4):
+        a = rnd.uniform(0, 2 * math.pi)
+        m.ico((math.cos(a) * r * 0.75, math.sin(a) * r * 0.8, r * rnd.uniform(0.15, 0.4)), r * rnd.uniform(0.2, 0.3), 2,
+              s=(1, 1, 0.7))
     m.mat("rv_moss")
-    m.ico((-r * 0.2, r * 0.1, r * 0.62), r * 0.45, 1, s=(1.2, 1.1, 0.35))
+    for (mx, my, mz, mr) in ((-0.2, 0.1, 0.78, 0.42), (0.05, -0.15, 0.74, 0.3), (-0.4, 0.3, 0.62, 0.26),
+                             (0.6, -0.3, 0.55, 0.28)):
+        m.ico((r * mx, r * my, r * mz), r * mr, 2, s=(1.15, 1.05, 0.45))
+    m.mat("rv_grass_b")
+    for k in range(7):
+        a = rnd.uniform(0, 2 * math.pi)
+        p = V((-r * 0.15 + math.cos(a) * r * 0.3, r * 0.1 + math.sin(a) * r * 0.3, r * 0.78))
+        d = V((math.cos(a) * 0.3, math.sin(a) * 0.3, 1)).normalized()
+        sd = d.cross(V((0, 0, 1))).normalized() * 0.02 if abs(d.z) < 0.999 else V((0.02, 0, 0))
+        m.poly([tuple(p - sd), tuple(p + sd), tuple(p + d * rnd.uniform(0.15, 0.25))])
+    m.mat("rv_stone_dark")
+    for k in range(6):                                                   # pebbles at the foot
+        a = rnd.uniform(0, 2 * math.pi)
+        m.ico((math.cos(a) * r * 1.15, math.sin(a) * r * 1.2, 0.0), rnd.uniform(0.05, 0.1), 1, s=(1.2, 1, 0.5))
     m.mat("rv_foam")
-    m.torus((0, 0, -0.01), R=r * 1.05, r=0.05, seg=24, sides=4)
-    m.box((r * 0.4, -r * 1.3, -0.01), (0.04, 0.8, 0.01), smooth=False)
-    m.box((-r * 0.4, -r * 1.4, -0.01), (0.04, 1.0, 0.01), smooth=False)
+    m.torus((0, 0, 0.0), R=r * 1.08, r=0.03, seg=28, sides=5)
+    m.ico((0, r * 1.05, 0.0), r * 0.4, 2, s=(1.6, 0.5, 0.12))          # pillow upstream
+    for sx in (-1, 1):                                                   # wake streaks downstream
+        for k in range(3):
+            m.box((sx * (r * 0.45 + k * 0.08), -r * (1.3 + k * 0.45), 0.0), (0.05, 0.5 - k * 0.1, 0.012), smooth=False)
     return m.obj(name, smooth_angle=50)
 
 
@@ -445,88 +578,173 @@ def croc(name="croc"):
 
 
 def drift_log(name="drift_log", seed=2, L=3.2):
+    """Floating log a little over half sunk: knobbly trunk with bark ridges, ringed end grain on the sawn end and a
+    splintered break on the other, a branch stub with a leafy twig, moss, shelf fungus, and waterline foam."""
     mats()
     rnd = random.Random(seed)
     m = E.Mesher(name)
-    # floats a little over half sunk: axis 0.06 m under the water, so 0.22 of its 0.56 m shows
     zc = -0.06
+    R = 0.28
+    bulge = [rnd.uniform(0.92, 1.06) for _ in range(9)]
+    rad = lambda t: R * bulge[min(8, int(t * 8))] * (1 - 0.08 * t)
+    path = [(-L / 2 + L * k / 16, 0, zc) for k in range(17)]
     m.mat("rv_log")
-    m.cyl((0, 0, zc), r=0.28, h=L, seg=14, axis='X')
-    m.mat("rv_log_end")
-    for sx in (-1, 1):
-        m.cyl((sx * L / 2, 0, zc), r=0.24, h=0.02, seg=14, axis='X')
-        m.mat("rv_log_end")
+    m.tube(path, r=1.0, seg=16, taper=lambda t: rad(t), cap=False)
+    m.mat("rv_trunk")                                                    # bark ridges along the trunk
+    for k in range(14):
+        a = 2 * math.pi * k / 14 + rnd.uniform(-0.1, 0.1)
+        if math.sin(a) < -0.35:
+            continue
+        x0 = rnd.uniform(-L / 2 + 0.1, 0)
+        x1 = rnd.uniform(0.2, L / 2 - 0.15)
+        rr = R * 1.0
+        m.tube([(x, math.cos(a) * rr * (1 - 0.04 * (x + L / 2) / L), zc + math.sin(a) * rr) for x in (x0, (x0 + x1) / 2, x1)],
+               r=0.022, seg=4)
+    m.mat("rv_log_end")                                                  # sawn end: pale end grain with rings
+    m.cyl((-L / 2, 0, zc), r=rad(0) * 0.97, h=0.03, seg=16, axis='X')
     m.mat("rv_log")
-    m.push(Matrix.Translation((0.5, 0, zc + 0.24)) @ Matrix.Rotation(math.radians(-35), 4, 'Y'))
-    m.cyl((0, 0, 0.3), r=0.07, h=0.6, seg=8, r2=0.03)
+    for rr in (0.3, 0.55, 0.8):
+        m.torus((-L / 2 - 0.016, 0, zc), R=rad(0) * rr, r=0.008, seg=20, sides=4, axis='X')
+    m.mat("rv_log_end")                                                  # broken end: jagged splinters
+    for k in range(9):
+        a = 2 * math.pi * k / 9
+        p = V((L / 2, math.cos(a) * rad(1) * 0.6, zc + math.sin(a) * rad(1) * 0.6))
+        m.push(Matrix.Translation(p) @ Matrix.Rotation(math.radians(90), 4, 'Y'))
+        m.cyl((0, 0, 0.0), r=0.07, h=rnd.uniform(0.15, 0.35), seg=4, r2=0.0)
+        m.pop()
+    m.cyl((L / 2 - 0.01, 0, zc), r=rad(1) * 0.9, h=0.03, seg=16, axis='X')
+    m.mat("rv_log")                                                      # branch stub with a twig
+    m.push(Matrix.Translation((0.5, 0.05, zc + R * 0.85)) @ Matrix.Rotation(math.radians(-35), 4, 'Y'))
+    m.cyl((0, 0, 0.28), r=0.075, h=0.56, seg=8, r2=0.045)
+    m.tube([(0, 0, 0.45), (0.12, 0.08, 0.62), (0.18, 0.2, 0.72)], r=0.02, seg=5, taper=0.5)
+    m.mat("rv_leaf")
+    for k in range(5):
+        a = rnd.uniform(0, 2 * math.pi)
+        _leaf_blade(m, V((0.15, 0.16, 0.68)), V((math.cos(a), math.sin(a), -0.3)), 0.2, 0.05)
     m.pop()
     m.mat("rv_moss")
-    m.ico((-0.6, 0, zc + 0.22), 0.25, 1, s=(1.4, 1, 0.3))
-    m.mat("rv_leaf")
-    m.poly([(-0.2, 0.12, zc + 0.27), (0.0, 0.3, zc + 0.26), (0.1, 0.12, zc + 0.28)])
+    for (mx, my, mr) in ((-0.75, 0.0, 0.22), (-0.55, 0.08, 0.17), (-0.9, -0.06, 0.15), (0.9, -0.05, 0.16), (1.05, 0.04, 0.12)):
+        m.ico((mx, my, zc + R * 0.9), mr, 2, s=(1.3, 1.0, 0.5))
+    m.mat("rv_log_end")                                                  # shelf fungus on the side
+    for k in range(3):
+        m.sphere((-0.2 + k * 0.16, -R * 0.95, zc + 0.08 + 0.05 * (k % 2)), 1.0, 10, 5, s=(0.08, 0.06, 0.02))
     m.mat("rv_foam")
-    for sy in (-1, 1):                  # waterline foam along both sides, heavier on the upstream (+Y) side
-        m.box((0, sy * 0.27, 0.0), (L - 0.1, 0.06 if sy < 0 else 0.1, 0.012), smooth=False)
+    for sy in (-1, 1):
+        m.box((0, sy * (R * 0.92), 0.0), (L - 0.1, 0.06 if sy < 0 else 0.1, 0.012), smooth=False)
     for k in range(5):
         x = -L / 2 + 0.3 + k * (L - 0.6) / 4
         m.box((x, 0.45, 0.0), (0.3, 0.04, 0.012), smooth=False)
-    ob = m.obj(name, smooth_angle=40)
-    ob.data.transform(Matrix.Diagonal((1, 1, 1, 1)))
-    return ob
+    return m.obj(name, smooth_angle=40)
 
 
 def whirlpool(name="whirlpool", r=1.8):
+    """Whirlpool read from the canoe: a darker swirl of deep water, four thick foam arms spiralling into a dark eye,
+    and a broken ring of foam bubbles at the rim."""
     mats()
     m = E.Mesher(name)
-    m.mat("rv_whirl")
-    for arm in range(3):
-        pts = []
-        for k in range(40):
-            t = k / 39
-            a = arm * 2 * math.pi / 3 + t * 2.6 * math.pi
-            rr = r * (1 - t * 0.9)
-            pts.append(V((math.cos(a) * rr, math.sin(a) * rr, 0.01 - 0.12 * t)))
-        m.sweep(pts, [(-0.06, -0.005), (0.06, -0.005), (0.06, 0.005), (-0.06, 0.005)], closed=True, cap=True,
-                scale=lambda t: 1.0 - 0.6 * t)
     m.mat("rv_water_deep")
-    m.cyl((0, 0, -0.1), r=0.25, h=0.02, seg=16)
+    m.cyl((0, 0, 0.004), r=r * 0.95, h=0.006, seg=40)
+    m.mat("rv_black")
+    m.cyl((0, 0, 0.012), r=0.28, h=0.006, seg=24)
+    m.mat("rv_whirl")
+    for arm in range(4):
+        pts = []
+        for k in range(48):
+            t = k / 47
+            a = arm * math.pi / 2 + t * 2.4 * math.pi
+            rr = r * (1 - t * 0.85)
+            pts.append(V((math.cos(a) * rr, math.sin(a) * rr, 0.02 + 0.01 * t)))
+        m.sweep(pts, [(-0.11, -0.008), (0.11, -0.008), (0.11, 0.012), (-0.11, 0.012)], closed=True, cap=True,
+                scale=lambda t: 1.0 - 0.7 * t)
+    m.mat("rv_foam")
+    for k in range(26):
+        a = 2 * math.pi * k / 26
+        if k % 7 == 3:
+            continue
+        m.sphere((math.cos(a) * r, math.sin(a) * r, 0.02), 1.0, 8, 5, s=(0.09, 0.09, 0.04))
     return m.obj(name, smooth_angle=60)
 
 
 # ----------------------------------------------------------------------------- ambient life
 
 def koi(name="koi"):
+    """Kohaku koi: lofted body (deep in front, slim tail stock), red patches, dorsal and pectoral fins, a flowing
+    forked tail, eyes and barbels. Head toward +Y."""
     mats()
     m = E.Mesher(name)
     rings = []
-    for k in range(9):
-        y = -0.25 + 0.5 * k / 8
-        u = k / 8
-        w = 0.07 * math.sin(math.pi * min(1, u * 1.2 + 0.05)) + 0.01
-        rings.append([(w * math.cos(a), y, w * 1.1 * math.sin(a)) for a in [2 * math.pi * j / 10 for j in range(10)]])
+    N = 14
+    for k in range(N + 1):
+        u = k / N
+        y = -0.26 + 0.52 * u
+        w = 0.012 + 0.07 * math.sin(math.pi * min(1.0, 0.08 + u * 0.98)) ** 0.8
+        hh = w * 1.25
+        rings.append([(w * math.cos(a), y, hh * math.sin(a) * (0.8 if math.sin(a) < 0 else 1.0))
+                      for a in [2 * math.pi * j / 14 for j in range(14)]])
     m.mat("rv_koi_w")
     m.quad_strip(rings, closed=True, cap0=True, cap1=True)
     m.mat("rv_koi_o")
-    m.sphere((0, 0.05, 0.05), 1.0, 10, 6, s=(0.06, 0.1, 0.03))
-    m.sphere((0, -0.1, 0.045), 1.0, 10, 6, s=(0.05, 0.06, 0.03))
-    m.poly([(0, -0.24, 0), (0.09, -0.36, 0.03), (0.0, -0.31, 0), (-0.09, -0.36, 0.03)])
+    for (yy, sx, s_) in ((0.15, 0.008, 0.05), (0.02, -0.01, 0.058), (-0.12, 0.01, 0.04)):   # red saddles on the back
+        m.sphere((sx, yy, 0.05), 1.0, 14, 7, s=(s_ * 1.1, s_ * 1.5, 0.05))
+    m.mat("rv_koi_w")
+    m.poly([(0, 0.08, 0.075), (0, -0.12, 0.07), (0, -0.16, 0.05), (0, 0.0, 0.12), (0, 0.08, 0.095)])     # dorsal
+    for sx in (-1, 1):
+        m.poly([(sx * 0.06, 0.12, -0.01), (sx * 0.12, 0.07, -0.02), (sx * 0.09, 0.05, -0.015)])          # pectorals
+    m.mat("rv_koi_o")
+    m.poly([(0, -0.24, 0.01), (0.06, -0.33, 0.02), (0.16, -0.46, 0.03), (0.07, -0.44, 0.0), (0, -0.35, 0.0)])
+    m.poly([(0, -0.24, 0.01), (0, -0.35, 0.0), (-0.07, -0.44, 0.0), (-0.16, -0.46, 0.03), (-0.06, -0.33, 0.02)])
+    m.mat("rv_pupil")
+    for sx in (-1, 1):
+        m.sphere((sx * 0.032, 0.21, 0.02), 0.012, 8, 5)
+    m.mat("rv_koi_w")
+    for sx in (-1, 1):
+        m.tube([(sx * 0.015, 0.25, -0.01), (sx * 0.04, 0.27, -0.02)], r=0.004, seg=4)
     return m.obj(name, smooth_angle=60)
 
 
 def heron(name="heron"):
-    """White heron standing in the shallows (ambient)."""
+    """Grey heron standing in the shallows: teardrop body with folded wings (dark flight feathers), tail, an
+    S-curved neck, a head with a black crest plume and a long dagger bill, and backward-kneed legs with toes."""
     mats()
     m = E.Mesher(name)
+    rings = []
+    for k in range(13):                                                  # body, tilted nose-up
+        u = k / 12
+        y = -0.3 + 0.55 * u
+        w = 0.02 + 0.13 * math.sin(math.pi * min(1.0, 0.05 + u)) ** 0.7
+        rings.append([(w * math.cos(a), y, 0.78 + 0.25 * (y + 0.05) + w * 1.1 * math.sin(a))
+                      for a in [2 * math.pi * j / 14 for j in range(14)]])
     m.mat("rv_heron")
-    m.sphere((0, 0, 0.75), 1.0, 14, 10, s=(0.14, 0.26, 0.15))
-    m.tube([(0, 0.18, 0.82), (0, 0.24, 1.0), (0, 0.2, 1.15), (0, 0.26, 1.22)], r=0.03, seg=8, taper=0.8)
-    m.sphere((0, 0.27, 1.23), 0.05, 10, 8)
-    m.mat("rv_beak")
-    m.cyl((0, 0.38, 1.22), r=0.015, h=0.2, seg=6, r2=0.0, axis='Y')
+    m.quad_strip(rings, closed=True, cap0=True, cap1=True)
+    for sx in (-1, 1):                                                   # folded wings hugging the body
+        m.mat("rv_lantern")
+        m.push(Matrix.Translation((sx * 0.085, -0.06, 0.82)) @ Matrix.Rotation(math.radians(-14), 4, 'X'))
+        m.sphere((0, 0, 0), 1.0, 14, 8, s=(0.06, 0.27, 0.11))
+        m.mat("rv_stone_dark")
+        m.sphere((-sx * 0.01, -0.2, -0.03), 1.0, 12, 6, s=(0.045, 0.17, 0.06))      # dark flight feathers
+        m.pop()
+    m.mat("rv_heron")
+    neck = [(0, 0.2, 0.9), (0, 0.27, 1.0), (0, 0.22, 1.12), (0, 0.2, 1.22), (0, 0.27, 1.32)]
+    m.tube(neck, r=0.05, seg=10, taper=0.65)
+    m.sphere((0, 0.29, 1.34), 1.0, 12, 8, s=(0.05, 0.075, 0.05))
     m.mat("rv_black")
+    m.tube([(0, 0.26, 1.37), (0, 0.17, 1.39), (0, 0.08, 1.35)], r=0.012, seg=5, taper=0.2)   # crest plume
     for sx in (-1, 1):
-        m.cyl((sx * 0.04, 0, 0.32), r=0.01, h=0.64, seg=5)
-    m.sphere((0.03, 0.29, 1.25), 0.008, 6, 4)
+        m.box((sx * 0.04, 0.3, 1.355), (0.004, 0.06, 0.012), smooth=False)               # eye stripe
+    m.mat("rv_beak")
+    m.cyl((0, 0.45, 1.335), r=0.02, h=0.24, seg=8, r2=0.002, axis='Y')
+    m.mat("rv_eye")
+    for sx in (-1, 1):
+        m.sphere((sx * 0.042, 0.33, 1.35), 0.011, 6, 4)
+    m.mat("rv_beak")                                                     # legs: thigh, backward knee, shank, toes
+    for sx in (-1, 1):
+        hip, knee, ank = V((sx * 0.05, 0.0, 0.72)), V((sx * 0.055, -0.04, 0.42)), V((sx * 0.05, 0.02, 0.03))
+        m.tube([tuple(hip), tuple(knee)], r=0.016, seg=6)
+        m.sphere(tuple(knee), 0.02, 8, 5)
+        m.tube([tuple(knee), tuple(ank)], r=0.012, seg=6)
+        for a in (-35, 0, 35, 180):
+            d = V((math.sin(math.radians(a)), math.cos(math.radians(a)), 0)) * (0.1 if a != 180 else 0.05)
+            m.tube([tuple(ank), tuple(ank + d + V((0, 0, -0.02)))], r=0.007, seg=4)
     return m.obj(name, smooth_angle=50)
 
 

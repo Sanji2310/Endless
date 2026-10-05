@@ -39,12 +39,13 @@ def mats():
     M("sk_glow_core", 0xFFF2C0, emis=2.0, rim=0.0, soft=0.05, outline=0.0)
     M("sk_cable", 0x3A3E4E, rim=0.1, soft=0.1, outline=0.0)
     M("sk_glass", 0xBFEAFF, spec=1.0, rim=0.5, soft=0.04, flags=E.F_GLASS, outline=0.5)
-    M("sk_rock", 0xF0DCC4, rim=0.3, soft=0.14, shadow=0xB4A4D0)
-    M("sk_rock_dark", 0xDDC2AE, rim=0.25, soft=0.14, shadow=0xA594C4)
+    M("sk_rock", 0xE4CBA2, rim=0.3, soft=0.14, shadow=0x9E8EB0)
+    M("sk_rock_dark", 0xC9A98A, rim=0.25, soft=0.14, shadow=0x8E7EA4)
+    M("sk_rock_band", 0xA88C78, rim=0.2, soft=0.12, shadow=0x7A6C94)
     M("sk_pine", 0x5E9A6A, rim=0.25, soft=0.2, flags=E.F_FOLIAGE, sway=0.2, shadow=0x5A6A9A)
     M("sk_bark", 0x6E4A3A, rim=0.2, soft=0.12)
     M("sk_red", 0xE8473C, rim=0.3, soft=0.1)
-    M("sk_cloud", 0xFFFFFF, rim=0.4, soft=0.35, flags=E.F_NOCAST, outline=0.0, shadow=0xC9C4EA)
+    M("sk_cloud", 0xFFFFFF, rim=0.4, soft=0.35, flags=E.F_NOCAST | getattr(E, "F_CLOUD", 0), outline=0.0, shadow=0xC9C4EA)
     M("sk_ring", 0xFFF6C8, emis=0.8, rim=0.0, soft=0.1, flags=E.F_NOCAST, outline=0.0)
     M("sk_streak", 0xFFFFFF, emis=0.6, rim=0.0, soft=0.1, flags=E.F_NOCAST | E.F_DOUBLE, outline=0.0)
     M("sk_terrace", 0x9ACD6E, rim=0.1, soft=0.2, shadow=0x9A9AD0)
@@ -73,7 +74,7 @@ def mats():
     M("sk_fl_blue", 0x9EC2FF, rim=0.3, soft=0.2, emis=0.05, outline=0.0)
     M("sk_sail", 0xFFF8EC, rim=0.3, soft=0.15, flags=E.F_DOUBLE)
     M("sk_vine", 0x5FA866, rim=0.2, soft=0.25, flags=E.F_FOLIAGE | E.F_DOUBLE, sway=0.5, outline=0.0, shadow=0x5A7AA0)
-    M("sk_storm", 0xC9CCE6, rim=0.45, soft=0.35, flags=E.F_NOCAST, outline=0.0, shadow=0x7E78B8)
+    M("sk_storm", 0xC9CCE6, rim=0.45, soft=0.35, flags=E.F_NOCAST | getattr(E, "F_CLOUD", 0), outline=0.0, shadow=0x7E78B8)
     M("sk_storm_dark", 0x8E88BC, rim=0.3, soft=0.3, flags=E.F_NOCAST, outline=0.0, shadow=0x5E5694)
     M("sk_bolt", 0xFFF3A8, emis=1.6, rim=0.0, soft=0.05, flags=E.F_NOCAST, outline=0.0)
 
@@ -102,14 +103,18 @@ def crow():
         b.pop()
     bo = b.obj("crow_body", smooth_angle=60)
     w = E.Mesher("crow_wing")
+    # broad wing with real thickness so it reads head-on too: covert panel, then fingered primaries fanning out
     w.mat("sk_crow")
-    w.poly([(0, 0.08, 0), (0.25, 0.1, 0.01), (0.45, 0.05, 0.0), (0.45, -0.08, 0), (0.0, -0.1, 0)])
-    for k in range(6):
-        x0 = 0.3 + k * 0.06
-        w.poly([(x0, 0.06 - k * 0.02, 0.0), (x0 + 0.2, 0.02 - k * 0.035, 0.0), (x0 + 0.16, -0.06 - k * 0.03, 0.0),
-                (x0 - 0.02, -0.06, 0.0)])
+    w.box((0.17, 0.0, 0.0), (0.34, 0.22, 0.045), smooth=False)
+    w.ico((0.04, 0.02, 0.0), 0.09, 1, s=(1.2, 1.3, 0.6))             # shoulder, blends into the body
+    for k in range(6):                                                  # primaries, each a tapered thick feather
+        a = math.radians(-8 - 13 * k)
+        w.push(Matrix.Translation((0.32, 0.06 - 0.03 * k, 0.0)) @ Matrix.Rotation(a, 4, 'Z') @
+               Matrix.Rotation(math.radians(4 * k), 4, 'X'))
+        w.cyl((0.17, 0, 0), r=0.035, h=0.36 - 0.025 * k, seg=6, r2=0.012, axis='X')
+        w.pop()
     w.mat("sk_crow_sheen")
-    w.poly([(0.05, 0.06, 0.005), (0.3, 0.07, 0.005), (0.3, 0.0, 0.005), (0.05, -0.02, 0.005)])
+    w.box((0.16, 0.03, 0.026), (0.28, 0.12, 0.012), smooth=False)       # blue-black sheen on the coverts
     wo = w.obj("crow_wing", smooth_angle=0)
     return bo, wo
 
@@ -275,16 +280,20 @@ def _cap(m, rnd, top, rt, sd=1, dense=True):
         a = rnd.uniform(0, 2 * math.pi)
         p = top + V((math.cos(a) * rt * 0.85, math.sin(a) * rt * 0.85, 0.12))
         SC.shrub(m, P, tuple(p), rnd, r=rnd.uniform(0.35, 0.6), flowers=rnd.choice((None, "sk_fl_pink", "sk_flower", "sk_fl_blue")))
-    m.mat("sk_vine")
-    for k in range(rnd.randint(4, 7)):
+    for k in range(rnd.randint(4, 7)):                  # ivy strands: chains of leaf clusters down the face
         a = rnd.uniform(0, 2 * math.pi)
         d = V((math.cos(a), math.sin(a), 0))
-        p = top + d * rt * 1.0
         ln = rnd.uniform(1.5, 4.5)
-        w = rnd.uniform(0.25, 0.5)
-        sd_ = d.cross(V((0, 0, 1))) * w
-        m.poly([tuple(p - sd_ + V((0, 0, 0.1))), tuple(p + sd_ + V((0, 0, 0.1))), tuple(p + d * 0.12 + sd_ * 0.6 + V((0, 0, -ln))),
-                tuple(p + d * 0.12 - sd_ * 0.4 + V((0, 0, -ln * 0.8)))])
+        for j in range(rnd.randint(2, 4)):
+            p0 = top + d * (rt * 0.98) + d.cross(V((0, 0, 1))) * rnd.uniform(-0.5, 0.5)
+            n = int(ln / 0.32)
+            for i in range(n):
+                f = i / max(1, n)
+                q = p0 + d * (0.06 + 0.05 * math.sin(i * 1.7)) + V((0, 0, -i * 0.32))
+                m.mat("sk_vine" if (i + j) % 3 else "sk_grass_b")
+                m.ico(tuple(q), 0.2 * (1 - 0.55 * f) + rnd.uniform(0, 0.05), 1, s=(0.55, 1.0, 0.8))
+
+
 GORGE = 10.5        # cliff faces start this far either side of the glide line (Ride.SKY_HALF is 6 game m = 5 here)
 FLOOR = -14.0       # valley floor below the glide line
 
@@ -294,9 +303,16 @@ def _cliff_column(m, rnd, x, y, z0, z1, r):
     z = z0
     while z < z1:
         dh = rnd.uniform(1.6, 3.0)
-        m.mat("sk_rock" if rnd.random() < 0.6 else "sk_rock_dark")
-        m.cyl((x + rnd.uniform(-0.15, 0.15), y + rnd.uniform(-0.15, 0.15), z + dh / 2), r=r, h=dh, seg=9,
-              r2=r * rnd.uniform(0.86, 0.98))
+        ox, oy = x + rnd.uniform(-0.25, 0.25), y + rnd.uniform(-0.25, 0.25)
+        m.mat("sk_rock" if rnd.random() < 0.65 else "sk_rock_dark")
+        m.cyl((ox, oy, z + dh / 2), r=r, h=dh, seg=16, r2=r * rnd.uniform(0.86, 0.98))
+        m.mat("sk_rock_band")                       # eroded stratum lip where two layers meet
+        m.cyl((ox, oy, z + dh * 0.9), r=r * 1.035, h=0.16, seg=16, r2=r * 0.97)
+        m.mat("sk_rock_dark")
+        for j in range(rnd.randint(1, 3)):         # weathered chunks breaking the silhouette
+            a = rnd.uniform(0, 2 * math.pi)
+            m.ico((ox + math.cos(a) * r * 0.92, oy + math.sin(a) * r * 0.92, z + rnd.uniform(0.2, dh * 0.8)),
+                  rnd.uniform(0.35, 0.7), 1, s=(1.0, 1.0, 0.6))
         z += dh * 0.9
         r *= rnd.uniform(0.94, 1.0)
     return V((x, y, z)), r
@@ -347,8 +363,14 @@ def sky_gorge(name="sky_gorge", L=40.0, seed=3):
             m.mat("sk_moss")
             for j in range(4):                      # moss and ivy patches down the face
                 zz = rnd.uniform(FLOOR + 2, top_z - 0.5)
-                p = V((x - sd * r * 0.9, y + r + rnd.uniform(-r, r) * 0.7, zz))
-                m.ico(tuple(p), rnd.uniform(0.5, 1.0), 1, s=(0.5, 1.2, 1.6))
+                a = math.radians(rnd.uniform(-50, 50)) + (math.pi if sd > 0 else 0.0)
+                p = V((x + math.cos(a) * r * 0.97, y + r + math.sin(a) * r * 0.97, zz))
+                m.push(Matrix.Translation(p) @ Matrix.Rotation(a, 4, 'Z'))
+                m.ico((0, 0, 0), rnd.uniform(0.6, 1.1), 2, s=(0.22, 1.0, 1.3))
+                m.mat("sk_grass_b")
+                m.ico((0.06, 0, 0.25), 0.4, 2, s=(0.3, 1.0, 0.7))
+                m.mat("sk_moss")
+                m.pop()
             for j in range(2):
                 zz = rnd.uniform(FLOOR + 4, top_z - 1)
                 p = V((x - sd * r * 0.95, y + r + rnd.uniform(-r, r) * 0.6, zz))
@@ -392,16 +414,34 @@ def sky_gorge(name="sky_gorge", L=40.0, seed=3):
         m.mat("sk_paper_red")
         for k in range(2, n - 1, 3):
             m.box(tuple(pts[k] + side * 0.6 + V((0, 0, 0.4))), (0.03, 0.2, 0.32), smooth=False)
-    # valley floor: terrace bands and a stream
+    # valley floor far below: fully covered by forest canopy and stepped rice terraces, a winding stream
     m.mat("sk_terrace")
     m.box((0, L / 2, FLOOR - 0.2), (2 * GORGE + 8, L, 0.4), smooth=False)
-    m.mat("sk_terrace_water")
-    for k in range(8):
-        for sd in (-1, 1):
-            m.box((sd * rnd.uniform(2.5, 7), rnd.uniform(0, L), FLOOR + 0.02), (rnd.uniform(2, 4), rnd.uniform(2, 4), 0.02),
-                  smooth=False)
+    sx = lambda yy: 1.6 * math.sin(yy * 0.16 + seed)
+    for sd in (-1, 1):
+        y = 0.0
+        while y < L:                                    # terraces: stepped paddies with grass lips and water tops
+            ln = rnd.uniform(3.0, 5.0)
+            for st in range(3):
+                x0 = sx(y) + sd * (1.6 + st * 1.6)
+                zt = FLOOR + 0.25 * st
+                m.mat("sk_terrace")
+                m.box((x0 + sd * 0.8, y + ln / 2, zt + 0.06), (1.6, ln, 0.3), smooth=False)
+                m.mat("sk_terrace_water")
+                m.box((x0 + sd * 0.8, y + ln / 2, zt + 0.22), (1.3, ln - 0.3, 0.02), smooth=False)
+            y += ln + 0.2
+        SC.canopy_mass(m, P, sd * 7.0, sd * (GORGE + 4), 0, L, lambda px, py: FLOOR, rnd, n=26, r=(1.4, 2.4))
     m.mat("sk_water")
-    m.box((rnd.uniform(-1, 1), L / 2, FLOOR + 0.03), (1.2, L, 0.02), smooth=False)
+    pts = [(sx(k * L / 16), k * L / 16, FLOOR + 0.06) for k in range(17)]
+    for a_, b_ in zip(pts, pts[1:]):
+        m.push(Matrix.Translation(((a_[0] + b_[0]) / 2, (a_[1] + b_[1]) / 2, FLOOR + 0.06)) @
+               Matrix.Rotation(-math.atan2(b_[0] - a_[0], b_[1] - a_[1]), 4, 'Z'))
+        m.box((0, 0, 0), (1.3, L / 16 + 0.3, 0.04), smooth=False)
+        m.mat("sk_rock_dark")
+        for sd_ in (-1, 1):
+            m.ico((sd_ * 0.75, rnd.uniform(-1, 1), 0.05), rnd.uniform(0.15, 0.3), 1, s=(1, 1, 0.5))
+        m.mat("sk_water")
+        m.pop()
     return m.obj(name, smooth_angle=30)
 
 
@@ -446,16 +486,16 @@ def design_sky_gorge():
     cab = chime_cable("gorge_cable", span=2 * GORGE + 6, pylon=10.0 - FLOOR)
     cab.location = (0, 76, 10.0)
     outl += [il, cab]
-    outl += crow_flight("crow_a", (1.2, 28, 6.6), flap=26)
+    outl += crow_flight("crow_a", (1.2, 28, 6.6), flap=34)
     for i, k in enumerate(range(-2, 3)):
-        outl += crow_flight("flock_%d" % i, (-1.5 + k * 1.3, 36 + abs(k) * 1.6, 8.2 + abs(k) * 0.45), flap=12 + 14 * (i % 2))
+        outl += crow_flight("flock_%d" % i, (-1.5 + k * 1.3, 36 + abs(k) * 1.6, 8.2 + abs(k) * 0.45), flap=22 + 16 * (i % 2))
     for o in outl:
         if o.type == 'MESH':
             E.add_outline(o, 0.012)
     studio.haze(0xE4F0FA, start=20.0, depth=170.0, amount=0.7)
     studio.aim_sun(150)
     studio.shoot("sky_gorge_runner", target=(0, 30, 6.0), dist=14, yaw=0, pitch=8, lens=30, light=False)
-    studio.shoot("sky_gorge_overview", target=(0, 50, 0.0), dist=48, yaw=330, pitch=28, lens=30, light=False)
+    studio.shoot("sky_gorge_overview", target=(0, 60, 0.0), dist=44, yaw=8, pitch=34, lens=30, light=False)
 
 
 def islet(name="islet", seed=5, r=2.2):
