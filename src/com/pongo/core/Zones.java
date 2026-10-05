@@ -7,7 +7,8 @@ package com.pongo.core;
  * (newRun): it starts on the Sakura Line, then every zone after that is picked at random from the zones in play
  * (never the one just left), and each zone lasts a random 1.5 to 3.5 minutes at the run speed where it starts,
  * rounded to whole 12 m track segments (so every set-piece edge falls on a segment seam) and capped at MAX_LEN. Each
- * zone also gets 3 or 4 power-ups, spread through it away from the set pieces (nextPowerUpAt).
+ * zone also gets four or fewer power-ups, as many as suit it: one for every POWERUP_EVERY seconds of the zone on foot,
+ * fewer in the riding zones, spread through it away from the set pieces (nextPowerUpAt).
  *
  * The transition into a zone is laid out so its "mouth" (where the new zone's kit starts) sits exactly on the zone
  * boundary b. For Sakura Line -> Crystal Cavern that layout is blender/assets/tunnel.py:
@@ -45,8 +46,12 @@ public final class Zones {
     /** How long a zone lasts: a random MIN_TIME..MAX_TIME seconds at the run speed where it starts (the speed law
      *  below), rounded to whole segments and kept within MIN_LEN..MAX_LEN metres. */
     public static final float MIN_TIME = 90f, MAX_TIME = 210f, MIN_LEN = 600f, MAX_LEN = 6000f;
-    /** Power-ups per zone: POWERUPS_MIN or POWERUPS_MAX, picked per zone. */
-    public static final int POWERUPS_MIN = 3, POWERUPS_MAX = 4;
+    /** Power-ups per zone: one for every POWERUP_EVERY seconds the zone lasts on foot, or POWERUP_EVERY_RIDE in the
+     *  riding zones (the cart, canoe and glider, where only the magnet and the 2x come up and the riding is the
+     *  game), rounded, at least 1 and never more than POWERUPS_MAX. A 1.5 minute zone gets 2 on foot or 1 riding, a
+     *  3.5 minute zone 4 on foot or 3 riding. */
+    public static final int POWERUPS_MAX = 4;
+    public static final float POWERUP_EVERY = 50f, POWERUP_EVERY_RIDE = 70f;
     /** The run speed law the zone lengths are timed against (Game: min(MAX_SPEED, BASE_SPEED + s * gain)). Game
      *  passes its own numbers to newRun; these are the defaults for tools and previews. */
     public static final float SPEED_BASE = 17f, SPEED_GAIN = 0.0028f, SPEED_MAX = 31f;
@@ -128,8 +133,8 @@ public final class Zones {
                 float t = MIN_TIME + r.nextFloat() * (MAX_TIME - MIN_TIME);
                 float len = Math.max(MIN_LEN, Math.min(MAX_LEN, distanceIn(s0, t, base, gain, max)));
                 start[i + 1] = s0 + Math.round(len / SEG) * SEG;
-                // power-ups: 3 or 4, evenly through the zone with a little jitter, clear of both set pieces
-                int n = POWERUPS_MIN + r.nextInt(POWERUPS_MAX - POWERUPS_MIN + 1);
+                // power-ups: as many as suit the zone, evenly through it with a little jitter, clear of both set pieces
+                int n = powerUpsFor(zone[i], timeFor(s0, start[i + 1] - s0, base, gain, max));
                 float u0 = safeTo(s0) + 30f, u1 = safeFrom(start[i + 1]) - 40f;
                 power[i] = new float[n];
                 for (int k = 0; k < n; k++) power[i][k] = u0 + (u1 - u0) * (k + 0.5f + (r.nextFloat() - 0.5f) * 0.4f) / n;
@@ -158,6 +163,21 @@ public final class Zones {
             }
             return lo;
         }
+    }
+
+    /** Power-ups for a zone of kind z that lasts t seconds (see POWERUP_EVERY). */
+    static int powerUpsFor(int z, float t) {
+        int n = Math.round(t / (isVehicleZone(z) ? POWERUP_EVERY_RIDE : POWERUP_EVERY));
+        return Math.max(1, Math.min(POWERUPS_MAX, n));
+    }
+
+    /** Seconds to cover len metres from s0 under the speed law (the inverse of distanceIn). */
+    static float timeFor(float s0, float len, float base, float gain, float max) {
+        float v0 = Math.min(max, base + gain * s0);
+        if (v0 >= max || gain <= 0f) return len / v0;
+        float dCap = (max - v0) / gain;                                 // metres until the speed tops out
+        if (len <= dCap) return (float) (Math.log(1 + gain * len / v0) / gain);
+        return (float) (Math.log(max / v0) / gain) + (len - dCap) / max;
     }
 
     /** Distance covered in t seconds from s0 under the speed law v = min(max, base + gain * s). */
@@ -209,10 +229,10 @@ public final class Zones {
     /** Where the zone containing d began (0 for the first zone, and for d < 0). */
     public static float zoneStart(float d) { return boundary(zoneIndexAt(d)); }
 
-    /** How many power-ups zone i gets (3 or 4). */
+    /** How many power-ups zone i gets (1 to 4). */
     public static int powerUpsIn(int i) { return plan.power[i % Plan.N].length; }
 
-    /** The first power-up spot at or after d: spawn one power-up per spot, and that keeps every zone to its 3 or 4. */
+    /** The first power-up spot at or after d: spawn one power-up per spot, and every zone keeps to its count. */
     public static float nextPowerUpAt(float d) {
         Plan p = plan;
         int i = zoneIndexAt(Math.max(0f, d));

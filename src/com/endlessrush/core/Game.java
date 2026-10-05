@@ -632,7 +632,7 @@ public final class Game {
         float d = difficulty();
         boolean power = genS >= nextPowerS;
         if (power) {
-            nextPowerS = Zones.nextPowerUpAt(genS + 1f);      // 3 or 4 per zone, spread through it
+            nextPowerS = Zones.nextPowerUpAt(genS + 1f);      // four or fewer per zone, spread through it
             patternPower();
             return;
         }

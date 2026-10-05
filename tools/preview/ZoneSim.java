@@ -106,11 +106,12 @@ public class ZoneSim {
         return t;
     }
 
-    /** The run's zone plan: random order, 1.5 to 3.5 minutes a zone with a cap, 3 or 4 power-ups each. */
+    /** The run's zone plan: random order, 1.5 to 3.5 minutes a zone with a cap, four or fewer power-ups each. */
     static void plan() {
-        boolean order = true, segs = true, times = true, powers = true, clear = true, first = true;
+        boolean order = true, segs = true, times = true, powers = true, clear = true, first = true, suits = true;
         float minT = 1e9f, maxT = 0, maxLen = 0;
         int zones = 0, capped = 0;
+        int[][] hist = new int[2][Zones.POWERUPS_MAX + 1];            // [on foot, riding][count]
         java.util.Set<String> plans = new java.util.HashSet<String>();
         for (long seed = 1; seed <= 60; seed++) {
             Zones.newRun(seed);
@@ -132,7 +133,13 @@ public class ZoneSim {
                     n++;
                     clear &= p >= Zones.safeTo(a) && p < Zones.safeFrom(e);
                 }
-                powers &= n == Zones.powerUpsIn(i) && n >= Zones.POWERUPS_MIN && n <= Zones.POWERUPS_MAX;
+                powers &= n == Zones.powerUpsIn(i) && n >= 1 && n <= Zones.POWERUPS_MAX;
+                boolean ride = Zones.isVehicleZone(Zones.zoneOf(i));
+                float per = t / (ride ? Zones.POWERUP_EVERY_RIDE : Zones.POWERUP_EVERY);
+                int want = Math.max(1, Math.min(Zones.POWERUPS_MAX, Math.round(per)));
+                boolean nearHalf = Math.abs(per % 1f - 0.5f) < 0.02f;  // runTime and the plan's closed form may round apart
+                suits &= n == want || nearHalf && Math.abs(n - want) == 1;
+                if (n <= Zones.POWERUPS_MAX) hist[ride ? 1 : 0][n]++;
             }
             plans.add(sig.toString());
         }
@@ -146,7 +153,9 @@ public class ZoneSim {
         float x1 = Zones.boundary(5);
         Zones.newRun(7L);
         check(Zones.boundary(5) == x1, "the same seed lays out the same run");
-        check(powers, "3 or 4 power-ups in every zone");
+        check(powers, "1 to 4 power-ups in every zone, never more than four");
+        check(suits, String.format("one power-up per %.0f s on foot and per %.0f s riding (on foot %s, riding %s zones with 0..4)",
+                Zones.POWERUP_EVERY, Zones.POWERUP_EVERY_RIDE, java.util.Arrays.toString(hist[0]), java.util.Arrays.toString(hist[1])));
         check(clear, "no power-up inside a set piece's safe stretch");
         // a parting whose two segments would reach into the lining on the way out is left out
         boolean forks = true;
