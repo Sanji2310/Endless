@@ -25,8 +25,8 @@ JAW_HINGE = V((0.0, 0.62, 0.06))        # after the croc is sunk SINK into the w
 
 def mats():
     M = E.mat
-    M("rv_water", 0x8FD3E8, rim=0.2, spec=0.6, soft=0.12, flags=E.F_WATER | E.F_NOCAST, outline=0.0, shadow=0x7FA6D6)
-    M("rv_water_deep", 0x5FB4D6, rim=0.2, spec=0.6, soft=0.12, flags=E.F_WATER | E.F_NOCAST, outline=0.0, shadow=0x6A8CC8)
+    M("rv_water", 0x9AD8DC, rim=0.2, spec=0.25, soft=0.12, flags=E.F_WATER | E.F_NOCAST, outline=0.0, shadow=0x7FA6D6)
+    M("rv_water_deep", 0x58ACCF, rim=0.2, spec=0.25, soft=0.12, flags=E.F_WATER | E.F_NOCAST, outline=0.0, shadow=0x6A8CC8)
     M("rv_foam", 0xF4FBFF, emis=0.25, rim=0.0, soft=0.2, flags=E.F_NOCAST, outline=0.0)
     M("rv_grass", 0x9ACD6E, rim=0.15, soft=0.15, shadow=0x9A9AD0)
     M("rv_grass_dark", 0x78B45A, rim=0.15, soft=0.15, shadow=0x8A8AC8)
@@ -117,15 +117,13 @@ def bamboo_clump(m, c, rnd, n=7, h=6.5):
         out = V((math.cos(a), math.sin(a), 0))
         for k in range(4):                                  # foliage clusters along the upper culm
             p = pts[6].lerp(pts[3], k / 4) + out * rnd.uniform(0.2, 0.45)
-            for j in range(3):
-                m.mat(("rv_tree", "rv_tree2", "rv_tree_hi")[(i + j + k) % 3])
-                q = p + V((rnd.uniform(-0.25, 0.25), rnd.uniform(-0.25, 0.25), rnd.uniform(-0.1, 0.15))) * k_h
-                m.ico(tuple(q), rnd.uniform(0.22, 0.34) * k_h, 2, s=(1.25, 1.1, 0.7))
-            m.mat("rv_leaf")
-            for j in range(6):                              # drooping blades sticking out of the cluster
-                aa = rnd.uniform(0, 2 * math.pi)
-                d = V((math.cos(aa), math.sin(aa), rnd.uniform(-0.6, -0.1)))
-                _leaf_blade(m, p + d.normalized() * 0.2 * k_h, d, rnd.uniform(0.35, 0.5) * k_h, 0.045 * k_h)
+            m.mat(("rv_tree", "rv_tree2")[(i + k) % 2])      # small core, the spray itself is all blades
+            m.ico(tuple(p), rnd.uniform(0.12, 0.17) * k_h, 2, s=(1.2, 1.0, 0.8))
+            for j in range(13):                             # feathery spray of drooping blades
+                aa = 2 * math.pi * j / 13 + rnd.uniform(-0.2, 0.2)
+                d = V((math.cos(aa), math.sin(aa), rnd.uniform(-0.7, 0.1)))
+                m.mat(("rv_leaf", "rv_tree_hi", "rv_tree2")[j % 3])
+                _leaf_blade(m, p + d.normalized() * 0.08 * k_h, d, rnd.uniform(0.42, 0.62) * k_h, 0.05 * k_h)
         for k in range(3):                                  # side twigs with blades lower down
             p = pts[2 + k]
             tw = p + out.cross(V((0, 0, 1))) * rnd.choice((-1, 1)) * 0.35 * k_h + V((0, 0, 0.1))
@@ -381,12 +379,29 @@ def river_seg(name="river_seg", L=20.0, seed=3, details=True):
             rings.append([(px, y, pz) for (px, pz) in (prof if sd > 0 else prof[::-1])])
         m.mat("rv_grass")
         m.quad_strip(rings, closed=False, smooth=True)
-        m.mat("rv_stone")
-        y = 0.2
+        # natural shore: clusters of rounded rocks of mixed size sitting in the shallows (mossy tops), gaps of
+        # grass running down into the water between them, and now and then a little pebble beach
+        y = rnd.uniform(0, 1.5)
         while y < L:
-            w = rnd.uniform(0.45, 0.8)
-            m.rbox((sd * (RIVER_HALF + 0.05), y + w / 2, 0.08), (0.35, w - 0.04, 0.3), 0.05, 1)
-            y += w
+            if rnd.random() < 0.18:                                  # pebble beach
+                ln = rnd.uniform(1.5, 3.0)
+                m.mat("rv_bank")
+                m.ico((sd * (RIVER_HALF - 0.1), y + ln / 2, -0.02), 1.0, 2, s=(0.8, ln / 2, 0.08))
+                m.mat("rv_stone_dark")
+                for j in range(8):
+                    m.ico((sd * (RIVER_HALF + rnd.uniform(-0.6, 0.3)), y + rnd.uniform(0, ln), 0.02), rnd.uniform(0.05, 0.1), 1,
+                          s=(1.2, 1, 0.5))
+                y += ln + 0.3
+                continue
+            for j in range(rnd.randint(1, 3)):
+                r = rnd.uniform(0.18, 0.5)
+                p = (sd * (RIVER_HALF + rnd.uniform(-0.35, 0.15)), y + rnd.uniform(0, 0.6), r * 0.1)
+                m.mat("rv_stone" if rnd.random() < 0.7 else "rv_stone_dark")
+                m.ico(p, r, 2, s=(rnd.uniform(0.9, 1.2), rnd.uniform(1.0, 1.4), 0.68))
+                if r > 0.3:
+                    m.mat("rv_moss")
+                    m.ico((p[0], p[1], p[2] + r * 0.42), r * 0.7, 2, s=(1.0, 1.2, 0.32))
+            y += rnd.uniform(0.6, 2.2)
     if details:
         for sd in (-1, 1):
             river_sides(m, L, rnd, sd)
@@ -651,10 +666,11 @@ def whirlpool(name="whirlpool", r=1.8):
         pts = []
         for k in range(48):
             t = k / 47
-            a = arm * math.pi / 2 + t * 2.4 * math.pi
+            a = arm * math.pi / 2 + t * 1.8 * math.pi
             rr = r * (1 - t * 0.85)
             pts.append(V((math.cos(a) * rr, math.sin(a) * rr, 0.02 + 0.01 * t)))
-        m.sweep(pts, [(-0.11, -0.008), (0.11, -0.008), (0.11, 0.012), (-0.11, 0.012)], closed=True, cap=True,
+        m.mat("rv_whirl" if arm % 2 == 0 else "rv_water")
+        m.sweep(pts, [(-0.07, -0.008), (0.07, -0.008), (0.07, 0.01), (-0.07, 0.01)], closed=True, cap=True,
                 scale=lambda t: 1.0 - 0.7 * t)
     m.mat("rv_foam")
     for k in range(26):
@@ -802,7 +818,7 @@ def design_river():
         c.location = (rnd.uniform(-70, 70), rnd.uniform(90, 170), rnd.uniform(22, 40))
     studio.haze(0xDCEBF4, start=18.0, depth=150.0, amount=0.7)
     studio.aim_sun(160)
-    studio.shoot("river_overview", target=(0, 34, 0.0), dist=22, yaw=180 + 160, pitch=26, lens=30, light=False)
+    studio.shoot("river_overview", target=(0, 44, 0.0), dist=34, yaw=12, pitch=38, lens=30, light=False)
     studio.shoot("river_runner", target=(0, 30, 0.8), dist=12, yaw=0, pitch=14, lens=32, light=False)
 
 

@@ -304,7 +304,7 @@ def _cap(m, rnd, top, rt, sd=1, dense=True):
                 p = p + sdv * rnd.uniform(-0.09, 0.09) + d * rnd.uniform(-0.02, 0.03)
                 q = p + V((0, 0, -zz))
                 m.mat(("sk_vine", "sk_grass_b", "sk_tree2")[rnd.randrange(3)])
-                m.ico(tuple(q + sdv * rnd.uniform(-0.08, 0.08)), (0.16 + rnd.uniform(-0.05, 0.06)) * (1 - 0.6 * f), 1,
+                m.ico(tuple(q + sdv * rnd.uniform(-0.08, 0.08)), (0.16 + rnd.uniform(-0.05, 0.06)) * (1 - 0.6 * f), 2,
                       s=(rnd.uniform(0.45, 0.7), rnd.uniform(0.8, 1.2), rnd.uniform(0.6, 1.0)))
                 zz += rnd.uniform(0.18, 0.4)
 
@@ -327,8 +327,8 @@ def _cliff_column(m, rnd, x, y, z0, z1, r):
         m.mat("sk_rock_dark")
         for j in range(rnd.randint(1, 3)):         # weathered chunks breaking the silhouette
             a = rnd.uniform(0, 2 * math.pi)
-            m.ico((ox + math.cos(a) * r * 0.92, oy + math.sin(a) * r * 0.92, z + rnd.uniform(0.2, dh * 0.8)),
-                  rnd.uniform(0.35, 0.7), 1, s=(1.0, 1.0, 0.6))
+            m.ico((ox + math.cos(a) * r * 0.86, oy + math.sin(a) * r * 0.86, z + rnd.uniform(0.2, dh * 0.8)),
+                  rnd.uniform(0.35, 0.7), 2, s=(1.0, 1.0, 0.6))
         z += dh * 0.9
         r *= rnd.uniform(0.94, 1.0)
     return V((x, y, z)), r

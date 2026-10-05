@@ -48,13 +48,13 @@ def pine(m, P, c, rnd, h=4.0):
         if k < 4:                                               # branch out to the pad
             m.mat(P["trunk"])
             m.tube([tuple(pts[k] + V((0, 0, -0.15))), tuple(pad)], r=0.05 * h / 4, seg=6, taper=0.6)
-        w = (1.1 - k * 0.16) * h / 4
-        for j in range(4):
-            q = pad + V((rnd.uniform(-0.5, 0.5) * w, rnd.uniform(-0.5, 0.5) * w, rnd.uniform(-0.05, 0.05)))
+        w = (1.15 - k * 0.16) * h / 4
+        for j in range(6):                                      # lumpy cloud pad: shaded underside, sunlit top
+            q = pad + V((rnd.uniform(-0.55, 0.55) * w, rnd.uniform(-0.55, 0.55) * w, rnd.uniform(-0.08, 0.1) * w))
             m.mat(P["leaf3"])
-            m.ico(tuple(q), w * rnd.uniform(0.45, 0.6), 2, s=(1, 0.9, 0.42))
+            m.ico(tuple(q), w * rnd.uniform(0.35, 0.48), 2, s=(1, 0.95, 0.62))
             m.mat(hi if j % 2 == 0 else P["leaf"])
-            m.ico(tuple(q + V((0.05, 0.03, w * 0.16))), w * rnd.uniform(0.3, 0.4), 2, s=(1, 0.9, 0.35))
+            m.ico(tuple(q + V((0.04, 0.03, w * 0.2))), w * rnd.uniform(0.24, 0.32), 2, s=(1, 0.95, 0.55))
 
 
 def shrub(m, P, c, rnd, r=0.5, flowers=None):
