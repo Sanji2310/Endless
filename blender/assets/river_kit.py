@@ -27,6 +27,7 @@ def mats():
     M = E.mat
     M("rv_water", 0x9AD8DC, rim=0.2, spec=0.25, soft=0.12, flags=E.F_WATER | E.F_NOCAST, outline=0.0, shadow=0x7FA6D6)
     M("rv_water_deep", 0x58ACCF, rim=0.2, spec=0.25, soft=0.12, flags=E.F_WATER | E.F_NOCAST, outline=0.0, shadow=0x6A8CC8)
+    M("rv_water_mid", 0x7AC4DA, rim=0.2, spec=0.25, soft=0.12, flags=E.F_WATER | E.F_NOCAST, outline=0.0, shadow=0x729CD0)
     M("rv_foam", 0xF4FBFF, emis=0.25, rim=0.0, soft=0.2, flags=E.F_NOCAST, outline=0.0)
     M("rv_grass", 0x9ACD6E, rim=0.15, soft=0.15, shadow=0x9A9AD0)
     M("rv_grass_dark", 0x78B45A, rim=0.15, soft=0.15, shadow=0x8A8AC8)
@@ -364,6 +365,9 @@ def river_seg(name="river_seg", L=20.0, seed=3, details=True):
     m.mat("rv_water")
     for sx in (-1, 1):
         m.box((sx * RIVER_HALF * 0.82, L / 2, -0.025), (RIVER_HALF * 0.5, L, 0.02), smooth=False)
+    m.mat("rv_water_mid")                         # a mid tone between, so shallows fade into the channel
+    for sx in (-1, 1):
+        m.box((sx * RIVER_HALF * 0.5, L / 2, -0.027), (RIVER_HALF * 0.3, L, 0.02), smooth=False)
     m.mat("rv_foam")
     for k in range(16):
         x = rnd.uniform(-RIVER_HALF + 0.3, RIVER_HALF - 0.3)
